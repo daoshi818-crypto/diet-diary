@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/core/data/data_source/remote_search_cache_data_source.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
@@ -55,18 +57,20 @@ const _nutriments = MealNutrimentsEntity(
   fiber100: 1,
 );
 
-MealEntity _solidWithServing() => MealEntity(
-  code: 'chip-widget-test',
-  name: 'Test product',
-  url: null,
-  mealQuantity: null,
-  mealUnit: 'g',
-  servingQuantity: 30,
-  servingUnit: 'g',
-  servingSize: '30 g',
-  nutriments: _nutriments,
-  source: MealSourceEntity.off,
-);
+MealEntity _solidWithServing({List<MealPortionEntity> portions = const []}) =>
+    MealEntity(
+      portions: portions,
+      code: 'chip-widget-test',
+      name: 'Test product',
+      url: null,
+      mealQuantity: null,
+      mealUnit: 'g',
+      servingQuantity: 30,
+      servingUnit: 'g',
+      servingSize: '30 g',
+      nutriments: _nutriments,
+      source: MealSourceEntity.off,
+    );
 
 Future<void> _pumpSheet(
   WidgetTester tester, {
@@ -75,6 +79,7 @@ Future<void> _pumpSheet(
   required void Function(String?, String?) onChanged,
   String initialUnit = 'serving',
   bool usesImperialUnits = false,
+  Future<void> Function(LogTrayItem)? onConfirm,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -90,6 +95,8 @@ Future<void> _pumpSheet(
           selectedUnit: initialUnit,
           usesImperialUnits: usesImperialUnits,
           onQuantityOrUnitChanged: onChanged,
+          onSelectionConfirmed: onConfirm,
+          confirmLabel: onConfirm == null ? null : 'Confirm amount',
         ),
       ),
     ),
@@ -116,10 +123,14 @@ void main() {
       'double-serving',
       '100g',
     ]) {
-      expect(find.byWidgetPredicate((w) {
-        if (w is! Semantics) return false;
-        return w.properties.identifier == 'meal-detail-chip-$id';
-      }), findsOneWidget, reason: 'chip identifier meal-detail-chip-$id');
+      expect(
+        find.byWidgetPredicate((w) {
+          if (w is! Semantics) return false;
+          return w.properties.identifier == 'meal-detail-chip-$id';
+        }),
+        findsOneWidget,
+        reason: 'chip identifier meal-detail-chip-$id',
+      );
     }
   });
 
@@ -142,7 +153,9 @@ void main() {
       );
 
       final chip = find.byWidgetPredicate(
-        (w) => w is Semantics && w.properties.identifier == 'meal-detail-chip-100g',
+        (w) =>
+            w is Semantics &&
+            w.properties.identifier == 'meal-detail-chip-100g',
       );
       await tester.tap(chip);
       await tester.pumpAndSettle();
@@ -228,5 +241,70 @@ void main() {
 
     expect(find.text('1.06 oz'), findsOneWidget);
     expect(find.text('30 g'), findsNothing);
+  });
+  testWidgets('confirming two servings returns 60g without writing an intake', (
+    tester,
+  ) async {
+    LogTrayItem? result;
+    await _pumpSheet(
+      tester,
+      product: _solidWithServing(),
+      quantityController: TextEditingController(text: '2'),
+      onChanged: (_, _) {},
+      onConfirm: (item) async => result = item,
+    );
+    expect(result, isNull);
+    await tester.tap(find.text('Confirm amount'));
+    await tester.pumpAndSettle();
+    expect(result!.amount, 60);
+    expect(result!.kcal, 60);
+  });
+
+  testWidgets(
+    'named second portion scales by its own weight before confirmation',
+    (tester) async {
+      LogTrayItem? result;
+      await _pumpSheet(
+        tester,
+        product: _solidWithServing(
+          portions: const [
+            MealPortionEntity(
+              label: '1 slice',
+              gramWeight: 30,
+              localized: true,
+            ),
+            MealPortionEntity(
+              label: '1 bowl',
+              gramWeight: 180,
+              localized: true,
+            ),
+          ],
+        ),
+        quantityController: TextEditingController(text: '2'),
+        initialUnit: 'serving#1',
+        onChanged: (_, _) {},
+        onConfirm: (item) async => result = item,
+      );
+      await tester.tap(find.text('Confirm amount'));
+      await tester.pumpAndSettle();
+      expect(result!.amount, 360);
+      expect(result!.unit, 'serving');
+    },
+  );
+
+  testWidgets('zero amount cannot be confirmed', (tester) async {
+    LogTrayItem? result;
+    await _pumpSheet(
+      tester,
+      product: _solidWithServing(),
+      quantityController: TextEditingController(text: '0'),
+      onChanged: (_, _) {},
+      onConfirm: (item) async => result = item,
+    );
+    final button = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Confirm amount'),
+    );
+    expect(button.onPressed, isNull);
+    expect(result, isNull);
   });
 }

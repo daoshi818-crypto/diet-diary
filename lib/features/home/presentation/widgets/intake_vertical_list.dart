@@ -8,7 +8,9 @@ import 'package:opennutritracker/core/presentation/widgets/copy_dialog.dart';
 import 'package:opennutritracker/core/presentation/widgets/copy_to_profile_sheet.dart';
 import 'package:opennutritracker/core/presentation/widgets/delete_all_dialog.dart';
 import 'package:opennutritracker/core/presentation/widgets/intake_card.dart';
-import 'package:opennutritracker/core/presentation/widgets/placeholder_card.dart';
+import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
+import 'package:opennutritracker/core/domain/usecase/update_intake_usecase.dart';
+import 'package:opennutritracker/core/data/dbo/intake_type_dbo.dart';
 import 'package:opennutritracker/core/presentation/widgets/share_qr_dialog.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
@@ -17,7 +19,6 @@ import 'package:opennutritracker/core/utils/locator.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
 import 'package:opennutritracker/core/utils/tracked_day_lock.dart';
 import 'package:opennutritracker/core/utils/vertical_list_popup_menu_selections.dart';
-import 'package:opennutritracker/features/add_meal/presentation/add_meal_screen.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
 import 'package:opennutritracker/features/diary/presentation/bloc/calendar_day_bloc.dart';
 import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dart';
@@ -373,6 +374,7 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
                       intake: intakeEntity,
                       onItemLongPressed: widget.onItemLongPressedCallback,
                       onItemTapped: widget.onItemTappedCallback,
+                      onChangeMealType: (type) => _changeMealType(intakeEntity, type),
                       onShare: () => _shareIntakes(
                         [intakeEntity],
                         title: S.of(context).shareFoodLabel,
@@ -383,13 +385,13 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
                       sortType: widget.sortType,
                     ),
                   ),
-                PlaceholderCard(
-                  day: widget.day,
-                  onTap: () => _onPlaceholderCardTapped(context),
-                  firstListElement: true,
-                  semanticIdentifier: 'add-meal-placeholder',
-                  label: S.of(context).addToSectionLabel(widget.title),
-                ),
+                if (widget.intakeList.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                    child: Text(S.of(context).loggingMealEmpty,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.textMuted)),
+                  ),
               ],
             );
           },
@@ -465,9 +467,14 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
     );
   }
 
-  void _onPlaceholderCardTapped(BuildContext context) {
-    Navigator.pushNamed(context, NavigationOptions.addMealRoute,
-        arguments: AddMealScreenArguments(widget.addMealType, widget.day));
+  Future<void> _changeMealType(IntakeEntity intake, IntakeTypeEntity type) async {
+    await withTrackedDayLockOnProfile(() async {
+      await locator<UpdateIntakeUsecase>().updateIntake(intake.id,
+        {'type': IntakeTypeDBO.fromIntakeTypeEntity(type)});
+    });
+    locator<HomeBloc>().add(const LoadItemsEvent());
+    locator<DiaryBloc>().add(const LoadDiaryYearEvent());
+    locator<CalendarDayBloc>().add(const RefreshCalendarDayEvent());
   }
 
   Future<void> _onItemDropped(IntakeEntity entity) async {

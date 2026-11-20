@@ -1,11 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:opennutritracker/core/presentation/widgets/dynamic_ont_logo.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
 
-/// First screen shown on launch: the OpenNutriTracker logo with the spoon
-/// making a single accelerating-then-settling spin, after which it routes on
+/// First screen shown on launch: the diary mark gently fades into place,
+/// after which it routes on
 /// to the main screen (returning user) or onboarding (first run).
 ///
 /// The native launch screen (Android `launch_background`, iOS
@@ -38,23 +38,28 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(vsync: this, duration: _spinDuration);
 
-    // Accelerate in, then decelerate to a stop — mirrors the design mock's
-    // cubic-bezier easing (0.45, 0, 0.12, 1). A single full turn (turns: 0 → 1)
-    // leaves the spoon back in its original upright position.
-    _spin = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
-        parent: _controller, curve: const Cubic(0.45, 0.0, 0.12, 1.0)));
+    // Preserve the startup timing while gently revealing the diary mark.
+    _spin = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Cubic(0.45, 0.0, 0.12, 1.0),
+      ),
+    );
 
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) _goNext();
     });
 
-    // Honour the OS "reduce motion" setting: skip the spin and move on.
-    final reduceMotion = WidgetsBinding.instance.platformDispatcher
-        .accessibilityFeatures.disableAnimations;
+    // Honour the OS "reduce motion" setting: skip the reveal and move on.
+    final reduceMotion = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .accessibilityFeatures
+        .disableAnimations;
     if (reduceMotion) {
       _startTimer = Timer(const Duration(milliseconds: 600), _goNext);
     } else {
-      // A short beat on the upright logo before the spin begins.
+      // A short beat before the reveal begins.
       _startTimer = Timer(_startDelay, () {
         if (mounted) _controller.forward();
       });
@@ -64,9 +69,11 @@ class _SplashScreenState extends State<SplashScreen>
   void _goNext() {
     if (_navigated || !mounted) return;
     _navigated = true;
-    Navigator.of(context).pushReplacementNamed(widget.userInitialized
-        ? NavigationOptions.mainRoute
-        : NavigationOptions.onboardingRoute);
+    Navigator.of(context).pushReplacementNamed(
+      widget.userInitialized
+          ? NavigationOptions.mainRoute
+          : NavigationOptions.onboardingRoute,
+    );
   }
 
   @override
@@ -78,30 +85,15 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    // The spoon follows the theme, matching the app's own white/dark logo
-    // variants: black on the light canvas, white on the dark canvas.
-    final spoonColor = isDark ? Colors.white : Colors.black;
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: SizedBox(
           width: _logoSize,
           height: _logoSize,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              SvgPicture.asset('assets/icon/ont_splash_rings.svg',
-                  width: _logoSize, height: _logoSize),
-              RotationTransition(
-                turns: _spin,
-                child: SvgPicture.asset('assets/icon/ont_splash_spoon.svg',
-                    width: _logoSize,
-                    height: _logoSize,
-                    theme: SvgTheme(currentColor: spoonColor)),
-              ),
-            ],
+          child: FadeTransition(
+            opacity: Tween<double>(begin: 0.6, end: 1).animate(_spin),
+            child: const DynamicOntLogo(),
           ),
         ),
       ),

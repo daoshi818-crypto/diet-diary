@@ -10,6 +10,8 @@ import 'package:opennutritracker/core/utils/navigation_options.dart';
 import 'package:opennutritracker/features/diary/diary_page.dart';
 import 'package:opennutritracker/core/presentation/widgets/home_appbar.dart';
 import 'package:opennutritracker/features/home/home_page.dart';
+import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
+import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dart';
 import 'package:opennutritracker/core/presentation/widgets/main_appbar.dart';
 import 'package:opennutritracker/features/profile/profile_page.dart';
 import 'package:opennutritracker/features/trends/presentation/trends_page.dart';
@@ -24,6 +26,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _selectedPageIndex = 0;
+  DateTime? _diaryDate;
   bool _isDemoData = false;
 
   /// Guards against two lifecycle events asking the platform at once. The
@@ -103,7 +106,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   void didChangeDependencies() {
     _bodyPages = [
       const HomePage(),
-      const DiaryPage(),
+      DiaryPage(onDateChanged: (date) => _diaryDate = date),
       const TrendsPage(),
       const ProfilePage(),
     ];
@@ -208,14 +211,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   Future<void> _onFabPressed(BuildContext context) async {
     final config = await locator<GetConfigUsecase>().getConfig();
     if (!context.mounted) return;
+    final day = _selectedPageIndex == 1
+        ? (_diaryDate ?? locator<DiaryBloc>().currentDay)
+        : locator<HomeBloc>().currentDay;
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       isScrollControlled: true,
       // A tall sheet (large font) stops below the status bar.
       useSafeArea: true,
       builder: (BuildContext context) {
         return AddItemBottomSheet(
-          day: DateTime.now(),
+          day: day,
           showActivityTracking: config.showActivityTracking,
           usesImperialUnits: config.usesImperialFoodUnits,
           suggestedType: MealTypeSuggester.suggestFromTime(

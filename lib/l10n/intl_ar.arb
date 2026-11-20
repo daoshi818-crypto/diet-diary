@@ -125,7 +125,7 @@
   "alphaVersionName": "[ألفا]",
   "appDescription": "OpenNutriTracker هو تطبيق مجاني ومفتوح المصدر لتتبّع السعرات الحرارية والعناصر الغذائية، مع احترام خصوصيتك.",
   "appLicenseLabel": "ترخيص GPL-3.0",
-  "appTitle": "OpenNutriTracker",
+  "appTitle": "饮食日记",
   "appVersionName": "الإصدار {versionNumber}",
   "@appVersionName": {
     "placeholders": {

@@ -1,3 +1,17 @@
+# 饮食日记
+
+基于 [OpenNutriTracker](https://github.com/simonoppowa/OpenNutriTracker) 官方 Flutter 源码的中文定制版，保留上游 Git 历史、GPLv3 许可证及署名。当前提供 Flutter Web 交互预览，暂不生成 APK。
+
+- 简体中文、统一添加入口、餐次与用量选择、营养详情浮窗、自定义食物筛选，以及紧凑的小屏布局。
+- 餐食、饮水和活动统一从底部中央加号进入。
+- AI 卡片连接原有录入流程；正式 AI 服务、营养成分表识别和本地食物库接入尚待实现。
+- 使用固定 Flutter 3.44.6；启动、配置与限制请见 [网页预览说明](网页预览说明.md)。本地 SDK、密钥和构建产物不纳入仓库。
+- 私有预览仓库关闭 GitHub Actions，避免继承上游自动打包与发布流程；需要 CI 时再单独配置。
+
+以下保留上游项目介绍。
+
+---
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/icon/ont_banner_top_light.png">

@@ -17,6 +17,7 @@ import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dar
 import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/util/quick_serving_option.dart';
+import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
 class MealDetailBottomSheet extends StatefulWidget {
@@ -24,7 +25,7 @@ class MealDetailBottomSheet extends StatefulWidget {
   final DateTime day;
   final IntakeTypeEntity intakeTypeEntity;
   final TextEditingController quantityTextController;
-  final MealDetailBloc mealDetailBloc;
+  final MealDetailBloc? mealDetailBloc;
 
   final String selectedUnit;
 
@@ -40,6 +41,8 @@ class MealDetailBottomSheet extends StatefulWidget {
   /// as it did before the list existed, and a second button starts a list
   /// instead (#1520). Once the list has items, the main button adds to it.
   final LogTray? logTray;
+  final Future<void> Function(LogTrayItem)? onSelectionConfirmed;
+  final String? confirmLabel;
 
   const MealDetailBottomSheet({
     super.key,
@@ -48,10 +51,12 @@ class MealDetailBottomSheet extends StatefulWidget {
     required this.intakeTypeEntity,
     required this.quantityTextController,
     required this.onQuantityOrUnitChanged,
-    required this.mealDetailBloc,
+    this.mealDetailBloc,
     required this.selectedUnit,
     this.usesImperialUnits = false,
     this.logTray,
+    this.onSelectionConfirmed,
+    this.confirmLabel,
   });
 
   @override
@@ -144,10 +149,19 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     final productMissingRequiredInfo = _hasRequiredProductInfoMissing();
     final logTray = widget.logTray;
     final addsToList = _addsToList;
-    final canSubmit = !productMissingRequiredInfo && !_submitting;
-    final missingFieldsText = S.of(
-      context,
-    ).missingProductInfoFields(_missingRequiredProductInfo().join(', '));
+    final enteredQuantity = double.tryParse(
+      widget.quantityTextController.text.replaceAll(',', '.'),
+    );
+    final canSubmit =
+        !productMissingRequiredInfo &&
+        !_submitting &&
+        enteredQuantity != null &&
+        enteredQuantity.isFinite &&
+        enteredQuantity > 0 &&
+        enteredQuantity <= 10000;
+    final missingFieldsText = S
+        .of(context)
+        .missingProductInfoFields(_missingRequiredProductInfo().join(', '));
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final palette = isDark ? AppPalette.dark : AppPalette.light;
     return BottomSheet(
@@ -164,6 +178,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
             : quickServingOptionsFor(
                 widget.product,
                 S.of(context).gramUnit,
+                includeWeightPresets: widget.onSelectionConfirmed != null,
               );
         return Container(
           decoration: BoxDecoration(
@@ -233,7 +248,23 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                               items: <DropdownMenuItem<String>>[
                                 // #629: a serving the app cannot scale
                                 // is a no-op dressed as a unit.
-                                if (widget.product.scalableServingQuantity !=
+                                if (widget.product.portions.isNotEmpty)
+                                  for (
+                                    var i = 0;
+                                    i < widget.product.portions.length;
+                                    i++
+                                  )
+                                    DropdownMenuItem<String>(
+                                      value: portionUnit(i),
+                                      child: Text(
+                                        '${localizeServingLabel(S.of(context), widget.product.portions[i].label)} · ${widget.product.portions[i].gramWeight} ${S.of(context).gramUnit}',
+                                        maxLines: 3,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    )
+                                else if (widget
+                                        .product
+                                        .scalableServingQuantity !=
                                     null)
                                   _getServingDropdownItem(context),
                                 if (widget.product.isSolid ||
@@ -258,9 +289,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                       ),
                       if (quickOptions.isNotEmpty)
                         Padding(
-                          padding: const EdgeInsets.only(
-                            top: Dimens.spacing12,
-                          ),
+                          padding: const EdgeInsets.only(top: Dimens.spacing12),
                           child: Align(
                             alignment: Alignment.centerLeft,
                             child: Wrap(
@@ -268,8 +297,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                               children: [
                                 for (final option in quickOptions)
                                   Semantics(
-                                    identifier:
-                                        'meal-detail-chip-${option.id}',
+                                    identifier: 'meal-detail-chip-${option.id}',
                                     child: ActionChip(
                                       label: Text(option.label),
                                       onPressed: () =>
@@ -300,11 +328,16 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                                 borderRadius: Dimens.borderRadiusM,
                               ),
                             ),
-                            icon: const Icon(Icons.add_rounded),
+                            icon: Icon(
+                              widget.onSelectionConfirmed != null
+                                  ? Icons.check_rounded
+                                  : Icons.add_rounded,
+                            ),
                             label: Text(
-                              addsToList
-                                  ? S.of(context).addToListLabel
-                                  : S.of(context).addLabel,
+                              widget.confirmLabel ??
+                                  (addsToList
+                                      ? S.of(context).addToListLabel
+                                      : S.of(context).addLabel),
                             ),
                           ),
                         ),
@@ -423,6 +456,28 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
       return;
     }
 
+    // A confirmed choice is returned to the caller; no duplicate check or
+    // diary write belongs to the quick picker or an existing-entry edit.
+    if (widget.onSelectionConfirmed != null) {
+      final unit = widget.selectedUnit;
+      final amount = convertQuantityToBaseUnit(quantity, unit, widget.product);
+      if (!amount.isFinite || amount <= 0) return;
+      await widget.onSelectionConfirmed!(
+        LogTrayItem(
+          meal: widget.product,
+          unit: storedUnit(unit),
+          amount: amount,
+          amountLabel: logTrayAmountLabel(
+            context,
+            quantity,
+            unit,
+            widget.product,
+          ),
+        ),
+      );
+      return;
+    }
+
     // Check for duplicate additions (#212)
     final isDuplicate = await _checkForDuplicate(context);
     if (!context.mounted) return;
@@ -438,7 +493,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     if (logTray != null && (toList || logTray.collects)) {
       // Onto the list, with exactly what `addIntake` below would have been
       // given; the add-food screen writes it when the list is logged.
-      final state = widget.mealDetailBloc.state;
+      final state = widget.mealDetailBloc!.state;
       logTray.add(
         LogTrayItem(
           meal: widget.product,
@@ -467,10 +522,10 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
 
     // The refreshes below only see the intake once it is stored, which
     // can wait for the tracked-day lock (#1317).
-    await widget.mealDetailBloc.addIntake(
+    await widget.mealDetailBloc!.addIntake(
       context,
-      widget.mealDetailBloc.state.selectedUnit,
-      widget.mealDetailBloc.state.totalQuantityConverted,
+      widget.mealDetailBloc!.state.selectedUnit,
+      widget.mealDetailBloc!.state.totalQuantityConverted,
       widget.intakeTypeEntity,
       widget.product,
       widget.day,

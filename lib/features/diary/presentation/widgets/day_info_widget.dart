@@ -277,21 +277,6 @@ class _DayInfoWidgetState extends State<DayInfoWidget> {
                 selectedDay: widget.selectedDay,
                 trackedDay: widget.trackedDayEntity,
               ),
-            if (widget.showActivityTracking) ...[
-              const SizedBox(height: Dimens.spacing8),
-              ActivityVerticalList(
-                day: widget.selectedDay,
-                title: S.of(context).activityLabel,
-                userActivityList: widget.userActivities,
-                onItemLongPressedCallback: onActivityItemLongPressed,
-                onItemTappedCallback: widget.onEditActivity,
-                onCopyActivityCallback:
-                    _showsCurrentDay
-                        ? null
-                        : (activity) =>
-                            widget.onCopyActivity(activity, widget.trackedDayEntity),
-              ),
-            ],
             // #150 follow-up: a 0% share hides an empty section so OMAD users
             // (and anyone else who's set a meal slot to 0%) don't see a meal
             // type they explicitly opted out of. A section that holds intakes
@@ -399,6 +384,20 @@ class _DayInfoWidgetState extends State<DayInfoWidget> {
                 onSortTypeChanged: (sort) =>
                     _setSortFor(IntakeTypeEntity.snack, sort),
               ),
+            if (widget.showActivityTracking) ...[
+              const SizedBox(height: Dimens.spacing8),
+              ActivityVerticalList(
+                day: widget.selectedDay,
+                title: S.of(context).activityLabel,
+                userActivityList: widget.userActivities,
+                onItemLongPressedCallback: onActivityItemLongPressed,
+                onItemTappedCallback: widget.onEditActivity,
+                onCopyActivityCallback: _showsCurrentDay
+                    ? null
+                    : (activity) => widget.onCopyActivity(
+                        activity, widget.trackedDayEntity),
+              ),
+            ],
             const SizedBox(height: Dimens.spacing16),
           ],
         ),

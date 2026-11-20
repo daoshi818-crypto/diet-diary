@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.dart';
+import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
 import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/presentation/widgets/empty_hint.dart';
 import 'package:opennutritracker/core/presentation/widgets/error_dialog.dart';
@@ -34,7 +36,6 @@ import 'package:opennutritracker/features/diary/presentation/bloc/calendar_day_b
 import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dart';
 import 'package:opennutritracker/features/edit_meal/presentation/edit_meal_screen.dart';
 import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
-import 'package:opennutritracker/features/meal_detail/meal_detail_screen.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/util/hydrate_off_meal.dart';
 import 'package:opennutritracker/features/scanner/scanner_screen.dart';
@@ -54,6 +55,10 @@ class _AddMealScreenState extends State<AddMealScreen> {
 
   late AddMealType _mealType;
   late DateTime _day;
+  bool _isFoodLibrary = false;
+  bool _argumentsLoaded = false;
+  late final _customMealDataSource = locator<CustomMealDataSource>();
+  late final _customFoodChanges = _customMealDataSource.watch();
 
   late ProductsBloc _productsBloc;
   late FoodBloc _foodBloc;
@@ -114,11 +119,15 @@ class _AddMealScreenState extends State<AddMealScreen> {
 
   @override
   void didChangeDependencies() {
-    final args =
-        ModalRoute.of(context)?.settings.arguments as AddMealScreenArguments;
-    _mealType = args.mealType;
-    _day = args.day;
     super.didChangeDependencies();
+    if (!_argumentsLoaded) {
+      final args =
+          ModalRoute.of(context)?.settings.arguments as AddMealScreenArguments;
+      _mealType = args.mealType;
+      _day = args.day;
+      _isFoodLibrary = args.isFoodLibrary;
+      _argumentsLoaded = true;
+    }
   }
 
   @override
@@ -163,7 +172,11 @@ class _AddMealScreenState extends State<AddMealScreen> {
       // search bar + tab bar, which otherwise overflows (issue #165 testing).
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
-        title: Text(_mealType.getTypeName(context)),
+        title: Text(
+          _isFoodLibrary
+              ? S.of(context).loggingFoodLibrary
+              : _mealType.getTypeName(context),
+        ),
         actions: [
           Semantics(
             identifier: 'add-meal-quick-add',
@@ -218,6 +231,10 @@ class _AddMealScreenState extends State<AddMealScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        if (_isFoodLibrary) ...[
+                          _buildLibraryMealSelector(context),
+                          const SizedBox(height: Dimens.spacing8),
+                        ],
                         // The barcode lives on its own tile now, so the field
                         // carries no suffix icon of its own.
                         MealSearchBar(
@@ -346,6 +363,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
   /// or clearing the field keeps the user on it.
   _SearchSource _resolveSource(String trimmed) {
     if (_source == _SearchSource.favourites) return _SearchSource.favourites;
+    if (_source == _SearchSource.custom) return _SearchSource.custom;
     if (trimmed.isEmpty) return _SearchSource.recent;
     if (_source == _SearchSource.recent) {
       // Typing searches every source at once (All) by default — unless the
@@ -442,6 +460,31 @@ class _AddMealScreenState extends State<AddMealScreen> {
   // the All chip without the user having to find and tap it themselves.
   void _onSearchAllPressed() => _selectSource(_SearchSource.all);
 
+  Widget _buildLibraryMealSelector(BuildContext context) => Semantics(
+    identifier: 'food-library-meal-selector',
+    child: Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(
+          S.of(context).loggingRecordTo,
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        for (final type in AddMealType.values)
+          Semantics(
+            identifier: 'food-library-meal-${type.name}',
+            child: ChoiceChip(
+              label: Text(type.getTypeName(context)),
+              selected: _mealType == type,
+              showCheckmark: false,
+              onSelected: (_) => setState(() => _mealType = type),
+            ),
+          ),
+      ],
+    ),
+  );
+
   Widget _buildSourceChips(BuildContext context, AppPalette palette) {
     Widget chip(_SearchSource source, String label) => Padding(
       padding: const EdgeInsets.only(right: Dimens.spacing8),
@@ -464,6 +507,13 @@ class _AddMealScreenState extends State<AddMealScreen> {
               child: chip(
                 _SearchSource.favourites,
                 S.of(context).favouritesLabel,
+              ),
+            ),
+            Semantics(
+              identifier: 'add-meal-source-custom',
+              child: chip(
+                _SearchSource.custom,
+                S.of(context).loggingCustomFoods,
               ),
             ),
             chip(_SearchSource.all, S.of(context).allItemsLabel),
@@ -525,6 +575,8 @@ class _AddMealScreenState extends State<AddMealScreen> {
 
   Widget _buildResults(BuildContext context, AppPalette palette, String query) {
     switch (_source) {
+      case _SearchSource.custom:
+        return _buildCustomResults(context, query);
       case _SearchSource.all:
         // One merged list across product sources; each card already shows its
         // own brand/source, so provenance stays clear.
@@ -552,9 +604,11 @@ class _AddMealScreenState extends State<AddMealScreen> {
                       // A provider timeout or rate limit doesn't fail the
                       // bloc: the use case falls back to local matches and
                       // flags the gap on the loaded state instead.
-                      final productsFailed = ps is ProductsFailedState ||
+                      final productsFailed =
+                          ps is ProductsFailedState ||
                           (ps is ProductsLoadedState && ps.remoteSourceFailed);
-                      final foodFailed = fs is FoodFailedState ||
+                      final foodFailed =
+                          fs is FoodFailedState ||
                           (fs is FoodLoadedState && fs.remoteSourceFailed);
                       final VoidCallback retryFailed =
                           productsFailed && foodFailed
@@ -585,8 +639,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
                           // which would overflow and push Retry off screen.
                           return SingleChildScrollView(
                             child: ErrorDialog(
-                              errorText:
-                                  S.of(context).errorFetchingProductData,
+                              errorText: S.of(context).errorFetchingProductData,
                               onRefreshPressed:
                                   _onAllSourcesRefreshButtonPressed,
                               retryIdentifier: 'search-all-retry',
@@ -747,7 +800,8 @@ class _AddMealScreenState extends State<AddMealScreen> {
                       container: true,
                       child: ListView.builder(
                         itemCount:
-                          state.food.length + (state.remoteSourceEmpty ? 1 : 0),
+                            state.food.length +
+                            (state.remoteSourceEmpty ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index == state.food.length) {
                             return const NoResultsWidget();
@@ -885,6 +939,75 @@ class _AddMealScreenState extends State<AddMealScreen> {
     );
   }
 
+  Widget _buildCustomResults(BuildContext context, String query) =>
+      BlocBuilder<AddMealBloc, AddMealState>(
+        bloc: _addMealBloc,
+        builder: (context, state) {
+          if (state is! AddMealLoadedState) return _pendingSpinner;
+          return StreamBuilder<void>(
+            stream: _customFoodChanges,
+            builder: (context, snapshot) {
+              List<MealEntity> meals;
+              try {
+                if (snapshot.hasError) throw snapshot.error!;
+                final terms = query.trim().toLowerCase().split(RegExp(r'\s+'));
+                meals = _customMealDataSource
+                    .getAllCustomMeals()
+                    .map(MealEntity.fromMealDBO)
+                    .where((meal) {
+                      final text = '${meal.name ?? ''} ${meal.brands ?? ''}'
+                          .toLowerCase();
+                      return terms.every(text.contains);
+                    })
+                    .toList();
+                if (query.trim().isNotEmpty) {
+                  meals = rankMealsByRelevance(meals, query);
+                }
+              } catch (error, stackTrace) {
+                _log.warning('Reading custom foods failed', error, stackTrace);
+                return ErrorDialog(
+                  errorText: S.of(context).errorFetchingProductData,
+                  onRefreshPressed: () => setState(() {}),
+                );
+              }
+              if (meals.isEmpty) {
+                return SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      EmptyHint(
+                        icon: Icons.edit_note_rounded,
+                        title: query.trim().isEmpty
+                            ? S.of(context).customMealsEmptyLabel
+                            : S.of(context).noResultsFound,
+                      ),
+                      Semantics(
+                        identifier: 'food-library-create-custom',
+                        child: TextButton.icon(
+                          onPressed: () => _onCustomAddButtonPressed(
+                            state.usesImperialUnits,
+                          ),
+                          icon: const Icon(Icons.add_rounded),
+                          label: Text(S.of(context).noResultsCreateCustomFood),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+              return Semantics(
+                identifier: 'add-meal-custom-list',
+                container: true,
+                child: ListView.builder(
+                  itemCount: meals.length,
+                  itemBuilder: (context, index) =>
+                      _mealCard(meals[index], state.usesImperialUnits),
+                ),
+              );
+            },
+          );
+        },
+      );
+
   void _onBarcodeIconPressed() {
     Navigator.of(context).pushNamed(
       NavigationOptions.scannerRoute,
@@ -897,7 +1020,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
   }
 
   /// A search result, wired to this screen's list: opening it adds there,
-  /// and its + adds the default amount without opening it.
+  /// and its + asks for an explicit amount before adding to the list.
   Widget _mealCard(MealEntity meal, bool usesImperialUnits) => MealItemCard(
     day: _day,
     mealEntity: meal,
@@ -930,28 +1053,16 @@ class _AddMealScreenState extends State<AddMealScreen> {
       }
     }
     if (!mounted) return;
-    final state = _addMealBloc.state;
-    final item = defaultLogTrayItem(
-      context,
-      meal,
-      usesImperialUnits: usesImperialUnits,
-      defaultToRawFoodUnits:
-          state is AddMealLoadedState && state.defaultToRawFoodUnits,
+    final item = await showDialog<LogTrayItem>(
+      context: context,
+      builder: (_) => FoodQuantityDialog(
+        meal: meal,
+        day: _day,
+        type: _mealType.getIntakeType(),
+        usesImperialUnits: usesImperialUnits,
+      ),
     );
-    if (item == null) {
-      // Missing the values an amount needs; the detail screen says so.
-      Navigator.of(context).pushNamed(
-        NavigationOptions.mealDetailRoute,
-        arguments: MealDetailScreenArguments(
-          meal,
-          _mealType.getIntakeType(),
-          _day,
-          usesImperialUnits,
-          logTray: _logTray,
-        ),
-      );
-      return;
-    }
+    if (!mounted || item == null) return;
     // No snackbar: the count on the log button is the confirmation, and a
     // snackbar would sit over the next result someone is about to tap.
     _logTray.add(item);
@@ -1136,7 +1247,9 @@ class AddMealScreenArguments {
   final AddMealType mealType;
   final DateTime day;
 
-  AddMealScreenArguments(this.mealType, this.day);
+  final bool isFoodLibrary;
+
+  AddMealScreenArguments(this.mealType, this.day, {this.isFoodLibrary = false});
 }
 
-enum _SearchSource { recent, favourites, all, products, food }
+enum _SearchSource { recent, favourites, custom, all, products, food }

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
@@ -87,6 +88,7 @@ const _mealPhotoAssetDir = 'assets/demo/meals';
 /// Returns null on any failure: a missing photo should fall back to the
 /// placeholder thumbnail, not abort the seed.
 Future<String?> _importMealPhoto(String photoId, String ownerCode) async {
+  if (kIsWeb) return '$_mealPhotoAssetDir/$photoId.jpg';
   try {
     final bytes = (await rootBundle.load(
       '$_mealPhotoAssetDir/$photoId.jpg',

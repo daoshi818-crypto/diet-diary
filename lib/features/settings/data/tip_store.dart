@@ -44,12 +44,16 @@ class InAppPurchaseTipStore implements TipStore {
   InAppPurchase get _iap => InAppPurchase.instance;
 
   @override
-  Stream<List<PurchaseDetails>> get purchaseStream => _iap.purchaseStream.map(
-    (purchases) => [for (final purchase in purchases) withPlayState(purchase)],
-  );
+  Stream<List<PurchaseDetails>> get purchaseStream => kIsWeb
+      ? const Stream.empty()
+      : _iap.purchaseStream.map(
+          (purchases) => [
+            for (final purchase in purchases) withPlayState(purchase),
+          ],
+        );
 
   @override
-  Future<bool> isAvailable() => _iap.isAvailable();
+  Future<bool> isAvailable() async => !kIsWeb && await _iap.isAvailable();
 
   @override
   Future<ProductDetailsResponse> queryProductDetails(Set<String> ids) =>
@@ -73,7 +77,7 @@ class InAppPurchaseTipStore implements TipStore {
   Future<void> restorePurchases() => _iap.restorePurchases();
 
   @override
-  bool get needsConsume => Platform.isAndroid;
+  bool get needsConsume => !kIsWeb && Platform.isAndroid;
 
   @override
   Future<bool> consume(PurchaseDetails purchase) async {

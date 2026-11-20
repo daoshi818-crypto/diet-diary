@@ -7,6 +7,8 @@ import 'package:opennutritracker/core/domain/entity/kcal_goal_breakdown_entity.d
 import 'package:opennutritracker/core/domain/usecase/get_kcal_goal_breakdown_usecase.dart';
 import 'package:opennutritracker/core/utils/energy_unit_provider.dart';
 import 'package:opennutritracker/core/utils/locator.dart';
+import 'package:opennutritracker/core/styles/app_palette.dart';
+import 'package:opennutritracker/core/styles/app_theme.dart';
 import 'package:opennutritracker/features/home/presentation/widgets/dashboard_widget.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/kcal_goal_info_screen.dart';
 import 'package:opennutritracker/generated/l10n.dart';
@@ -15,7 +17,8 @@ import 'package:provider/provider.dart';
 
 import '../../../../fixture/user_entity_fixtures.dart';
 
-class _FakeBreakdownUsecase extends Fake implements GetKcalGoalBreakdownUsecase {
+class _FakeBreakdownUsecase extends Fake
+    implements GetKcalGoalBreakdownUsecase {
   final KcalGoalBreakdownEntity breakdown;
 
   _FakeBreakdownUsecase(this.breakdown);
@@ -45,10 +48,12 @@ void main() {
     // The gauge navigates to KcalGoalInfoScreen, which pulls its usecase
     // from the locator when none is injected.
     locator.registerSingleton<GetKcalGoalBreakdownUsecase>(
-      _FakeBreakdownUsecase(KcalGoalBreakdownEntity.compute(
-        user: UserEntityFixtures.youngSedentaryMaleWantingToMaintainWeight,
-        totalKcalActivities: 0,
-      )),
+      _FakeBreakdownUsecase(
+        KcalGoalBreakdownEntity.compute(
+          user: UserEntityFixtures.youngSedentaryMaleWantingToMaintainWeight,
+          totalKcalActivities: 0,
+        ),
+      ),
     );
   });
 
@@ -69,6 +74,66 @@ void main() {
       totalFatsGoal: 69,
       totalProteinsGoal: 93,
     );
+  }
+
+  for (final size in [
+    const Size(360, 640),
+    const Size(375, 667),
+    const Size(812, 375),
+  ]) {
+    for (final dark in [false, true]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('compact dashboard $size dark=$dark text=$scale', (
+          tester,
+        ) async {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(
+            ChangeNotifierProvider(
+              create: (_) => EnergyUnitProvider(usesKilojoules: true),
+              child: MaterialApp(
+                locale: const Locale('zh'),
+                localizationsDelegates: const [
+                  S.delegate,
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                supportedLocales: S.supportedLocales,
+                theme: buildAppTheme(dark ? AppPalette.dark : AppPalette.light),
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.linear(scale),
+                    disableAnimations: true,
+                  ),
+                  child: child!,
+                ),
+                home: Scaffold(
+                  body: SingleChildScrollView(
+                    child: dashboardWidget(totalKcalLeft: -12345),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          if (scale == 1) {
+            final gauge = find.bySemanticsIdentifier('home-kcal-gauge');
+            expect(tester.getSize(gauge).height, lessThanOrEqualTo(130));
+            expect(
+              tester.getSize(find.byType(DashboardWidget)).height,
+              lessThan(280),
+            );
+          }
+          expect(find.text('碳水'), findsOneWidget);
+          expect(find.text('脂肪'), findsOneWidget);
+          expect(find.text('蛋白质'), findsOneWidget);
+          expect(find.bySemanticsIdentifier('home-kcal-gauge'), findsOneWidget);
+        });
+      }
+    }
   }
 
   testWidgets(
@@ -113,7 +178,8 @@ void main() {
       expect(
         node.getSemanticsData().hasAction(SemanticsAction.tap),
         isTrue,
-        reason: 'excludeSemantics drops the GestureDetector\'s tap action, '
+        reason:
+            'excludeSemantics drops the GestureDetector\'s tap action, '
             'so the Semantics node must register its own onTap',
       );
 

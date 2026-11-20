@@ -88,6 +88,7 @@ class HomeWidgetCalorieStore implements CalorieWidgetStore {
   Future<void> relabel(S s) => _serially(() => _relabel(s));
 
   Future<void> _relabel(S s) async {
+    if (kIsWeb) return; // Browsers have no native home-screen widget store.
     final group = await _enterAppGroup();
     final stored = await _readSnapshot(group);
     final labels = CalorieWidgetLabels.forFigures(
@@ -130,6 +131,7 @@ class HomeWidgetCalorieStore implements CalorieWidgetStore {
   }
 
   Future<void> _save(Map<String, String?> values) async {
+    if (kIsWeb) return;
     final group = await _enterAppGroup();
     for (final entry in values.entries) {
       await HomeWidget.saveWidgetData<String>(

@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/data/data_source/health/health_package_service.dart';
 import 'package:opennutritracker/core/data/data_source/health/health_service.dart';
@@ -14,6 +15,7 @@ final _log = Logger('HealthServiceFactory');
 /// itself unavailable. A health plugin that cannot initialise must never be
 /// able to stop the app from launching.
 Future<HealthService> createHealthService() async {
+  if (kIsWeb) return const NoopHealthService();
   if (!Platform.isAndroid && !Platform.isIOS) {
     return const NoopHealthService();
   }

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.dart';
 
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
 import 'package:opennutritracker/core/data/data_source/remote_search_cache_data_source.dart';
 import 'package:opennutritracker/core/data/dbo/meal_dbo.dart';
 import 'package:opennutritracker/features/add_meal/data/repository/products_repository.dart';
@@ -156,7 +158,8 @@ class _FakeProducts extends Fake implements ProductsRepository {
 }
 
 class _FakeMealDetailBloc extends Fake implements MealDetailBloc {
-  final writes = <({String unit, String amount, String? name})>[];
+  final writes =
+      <({String unit, String amount, String? name, IntakeTypeEntity type})>[];
   int? failAt;
 
   /// When set, every write waits on it.
@@ -173,7 +176,12 @@ class _FakeMealDetailBloc extends Fake implements MealDetailBloc {
   ) async {
     if (failAt == writes.length) throw StateError('write failed');
     await gate?.future;
-    writes.add((unit: unit, amount: amountText, name: meal.name));
+    writes.add((
+      unit: unit,
+      amount: amountText,
+      name: meal.name,
+      type: intakeTypeEntity,
+    ));
   }
 }
 
@@ -229,9 +237,24 @@ FakeFavourites? _favourites;
 late _FakeMealDetailBloc _mealDetailBloc;
 late _FakeHomeBloc _homeBloc;
 late _FakeProducts _products;
+late _FakeCustomFoods _customFoods;
+
+class _FakeCustomFoods extends Fake implements CustomMealDataSource {
+  final entries = <MealDBO>[];
+  final changes = StreamController<void>.broadcast();
+
+  @override
+  List<MealDBO> getAllCustomMeals() => List.of(entries);
+
+  @override
+  Stream<void> watch() => changes.stream;
+}
 
 Future<void> _register(List<MealEntity> recent) async {
   await getIt.reset();
+  _customFoods = _FakeCustomFoods();
+  addTearDown(_customFoods.changes.close);
+  getIt.registerSingleton<CustomMealDataSource>(_customFoods);
   final config = _FakeGetConfigUsecase();
   final search = _FakeSearch();
   _mealDetailBloc = _FakeMealDetailBloc();
@@ -264,53 +287,57 @@ Future<void> _register(List<MealEntity> recent) async {
 
 /// Main at the bottom, the add-food screen pushed over it, and a recording
 /// stub for every other route.
-Widget _app(List<RouteSettings> pushed) => ChangeNotifierProvider(
-  create: (_) => EnergyUnitProvider(usesKilojoules: false),
-  child: MaterialApp(
-    localizationsDelegates: const [
-      S.delegate,
-      GlobalMaterialLocalizations.delegate,
-      GlobalWidgetsLocalizations.delegate,
-      GlobalCupertinoLocalizations.delegate,
-    ],
-    supportedLocales: S.supportedLocales,
-    initialRoute: NavigationOptions.mainRoute,
-    onGenerateRoute: (settings) {
-      if (settings.name == NavigationOptions.mainRoute) {
-        return MaterialPageRoute<void>(
-          settings: settings,
-          builder: (_) => const Scaffold(key: Key('main'), body: SizedBox()),
-        );
-      }
-      if (settings.name == NavigationOptions.addMealRoute) {
-        return MaterialPageRoute<void>(
-          settings: RouteSettings(
-            name: settings.name,
-            arguments: AddMealScreenArguments(
-              AddMealType.breakfastType,
-              DateTime(2026, 10, 18),
-            ),
-          ),
-          builder: (_) => const AddMealScreen(),
-        );
-      }
-      pushed.add(settings);
-      return MaterialPageRoute<void>(
-        settings: settings,
-        builder: (_) => const Scaffold(body: SizedBox()),
-      );
-    },
-  ),
-);
+Widget _app(List<RouteSettings> pushed, {bool library = false}) =>
+    ChangeNotifierProvider(
+      create: (_) => EnergyUnitProvider(usesKilojoules: false),
+      child: MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.supportedLocales,
+        initialRoute: NavigationOptions.mainRoute,
+        onGenerateRoute: (settings) {
+          if (settings.name == NavigationOptions.mainRoute) {
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) =>
+                  const Scaffold(key: Key('main'), body: SizedBox()),
+            );
+          }
+          if (settings.name == NavigationOptions.addMealRoute) {
+            return MaterialPageRoute<void>(
+              settings: RouteSettings(
+                name: settings.name,
+                arguments: AddMealScreenArguments(
+                  AddMealType.breakfastType,
+                  DateTime(2026, 10, 18),
+                  isFoodLibrary: library,
+                ),
+              ),
+              builder: (_) => const AddMealScreen(),
+            );
+          }
+          pushed.add(settings);
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => const Scaffold(body: SizedBox()),
+          );
+        },
+      ),
+    );
 
 Future<void> _openAddMeal(
   WidgetTester tester,
-  List<RouteSettings> pushed,
-) async {
+  List<RouteSettings> pushed, {
+  bool library = false,
+}) async {
   tester.view.physicalSize = const Size(412, 915);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(_app(pushed));
+  await tester.pumpWidget(_app(pushed, library: library));
   await tester.pumpAndSettle();
   tester
       .state<NavigatorState>(find.byType(Navigator))
@@ -328,15 +355,115 @@ Finder _card(String name) =>
 
 /// Scrolls the result into view first: once the list has items, the log
 /// button takes the bottom of the screen and the results scroll above it.
-Future<void> _tapPlus(WidgetTester tester, String name) async {
+Future<void> _tapPlus(
+  WidgetTester tester,
+  String name, {
+  bool confirm = true,
+}) async {
   await tester.ensureVisible(_plusOn(name));
   await tester.pumpAndSettle();
   await tester.tap(_plusOn(name));
+  await tester.pumpAndSettle();
+  if (confirm) await _confirmAmount(tester);
+}
+
+Future<void> _confirmAmount(WidgetTester tester) async {
+  if (find.byType(FoodQuantityDialog).evaluate().isNotEmpty) {
+    final confirm = find.widgetWithText(
+      FilledButton,
+      l10nEn.loggingConfirmAmount,
+    );
+    final button = tester.widget<FilledButton>(confirm);
+    if (button.onPressed != null) {
+      await tester.ensureVisible(confirm);
+      await tester.tap(confirm);
+      await tester.pumpAndSettle();
+    }
+  }
 }
 
 Finder _logButton() => find.bySemanticsIdentifier('add-meal-tray-log');
 
 void main() {
+  testWidgets(
+    'custom foods filters the saved library, keeps its tab and follows edits',
+    (tester) async {
+      await _register([_meal('Recently logged only')]);
+      _customFoods.entries.addAll([
+        MealDBO.fromMealEntity(_meal('Homemade oats')),
+        MealDBO.fromMealEntity(_meal('Homemade soup')),
+      ]);
+      await _openAddMeal(tester, [], library: true);
+      final custom = find.bySemanticsIdentifier('add-meal-source-custom');
+      await tester.ensureVisible(custom);
+      await tester.tap(custom);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Homemade oats', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Homemade soup', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Recently logged only', findRichText: true),
+        findsNothing,
+      );
+      final field = find.descendant(
+        of: find.byType(MealSearchBar),
+        matching: find.byType(TextField),
+      );
+      await tester.enterText(field, 'oats');
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Homemade oats', findRichText: true),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining('Homemade soup', findRichText: true),
+        findsNothing,
+      );
+      await tester.enterText(field, '');
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('Homemade soup', findRichText: true),
+        findsOneWidget,
+      );
+      _customFoods.entries.add(MealDBO.fromMealEntity(_meal('New saved food')));
+      _customFoods.changes.add(null);
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining('New saved food', findRichText: true),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'food library meal selection controls both detail navigation and logging',
+    (tester) async {
+      await _register([_meal('Oats')]);
+      final pushed = <RouteSettings>[];
+      await _openAddMeal(tester, pushed, library: true);
+      final snack = find.bySemanticsIdentifier('food-library-meal-snackType');
+      await tester.ensureVisible(snack);
+      await tester.tap(snack);
+      await tester.pumpAndSettle();
+      await tester.tap(_card('Oats'));
+      await tester.pumpAndSettle();
+      final detail = pushed.last.arguments as MealDetailScreenArguments;
+      expect(detail.intakeTypeEntity, IntakeTypeEntity.snack);
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      await _tapPlus(tester, 'Oats');
+      await tester.tap(_logButton());
+      await tester.pumpAndSettle();
+      expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.snack);
+    },
+  );
+
   group('LogTray', () {
     test('sums energy and keeps order through removals', () {
       final tray = LogTray();
@@ -514,7 +641,37 @@ void main() {
   });
 
   group('the add-food screen', () {
-    testWidgets('+ adds at the default amount, and the list can be edited', (
+    testWidgets('quick plus requires confirmation and closing adds nothing', (
+      tester,
+    ) async {
+      await _register([_meal('Oats', kcal100: 380)]);
+      await _openAddMeal(tester, []);
+      await _tapPlus(tester, 'Oats', confirm: false);
+      expect(find.byType(FoodQuantityDialog), findsOneWidget);
+      expect(_logButton(), findsNothing);
+      expect(_mealDetailBloc.writes, isEmpty);
+      await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
+      await tester.pumpAndSettle();
+      expect(_logButton(), findsNothing);
+      expect(_mealDetailBloc.writes, isEmpty);
+    });
+
+    testWidgets(
+      'quick plus records the selected 150g rather than the initial 100g',
+      (tester) async {
+        await _register([_meal('Oats', kcal100: 380)]);
+        await _openAddMeal(tester, []);
+        await _tapPlus(tester, 'Oats', confirm: false);
+        await tester.tap(find.bySemanticsIdentifier('meal-detail-chip-150g'));
+        await tester.pumpAndSettle();
+        await _confirmAmount(tester);
+        await tester.tap(_logButton());
+        await tester.pumpAndSettle();
+        expect(_mealDetailBloc.writes.single.amount, '150.0');
+      },
+    );
+
+    testWidgets('+ confirms the chosen amount, and the list can be edited', (
       tester,
     ) async {
       await _register([_meal('Oats', kcal100: 380), _meal('Milk')]);
@@ -742,6 +899,7 @@ void main() {
 
         gate.complete();
         await tester.pumpAndSettle();
+        await _confirmAmount(tester);
         await tester.tap(_logButton());
         await tester.pumpAndSettle();
         expect(_mealDetailBloc.writes.map((w) => w.name), ['Cake', 'Granola']);
@@ -769,6 +927,7 @@ void main() {
 
       gate.complete();
       await tester.pumpAndSettle();
+      await _confirmAmount(tester);
       expect(tester.takeException(), isNull);
     });
 
@@ -877,6 +1036,7 @@ void main() {
 
       gate.complete();
       await tester.pumpAndSettle();
+      await _confirmAmount(tester);
       expect(tester.widget<ButtonStyleButton>(log).onPressed, isNotNull);
       await tester.tap(log);
       await tester.pumpAndSettle();
@@ -910,22 +1070,29 @@ void main() {
 
       gate.complete();
       await tester.pumpAndSettle();
+      await _confirmAmount(tester);
       expect(_mealDetailBloc.writes.map((w) => w.name), ['Oats', 'Milk']);
       expect(find.byKey(const Key('main')), findsOneWidget);
     });
 
-    testWidgets('a food missing a macro opens its detail instead', (
-      tester,
-    ) async {
-      await _register([_meal('Odd', complete: false)]);
-      final pushed = <RouteSettings>[];
-      await _openAddMeal(tester, pushed);
+    testWidgets(
+      'a food missing a macro explains the missing value and cannot add',
+      (tester) async {
+        await _register([_meal('Odd', complete: false)]);
+        final pushed = <RouteSettings>[];
+        await _openAddMeal(tester, pushed);
 
-      await _tapPlus(tester, 'Odd');
-      await tester.pumpAndSettle();
+        await _tapPlus(tester, 'Odd');
+        await tester.pumpAndSettle();
 
-      expect(pushed.single.name, NavigationOptions.mealDetailRoute);
-      expect(_logButton(), findsNothing);
-    });
+        expect(pushed, isEmpty);
+        expect(find.byType(FoodQuantityDialog), findsOneWidget);
+        final confirm = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, l10nEn.loggingConfirmAmount),
+        );
+        expect(confirm.onPressed, isNull);
+        expect(_logButton(), findsNothing);
+      },
+    );
   });
 }

@@ -111,7 +111,7 @@
     }
   },
   "appLicenseLabel": "GPL-3.0 licentie",
-  "appTitle": "OpenNutriTracker",
+  "appTitle": "饮食日记",
   "barcodeInvalidEan13CheckDigit": "Deze 13-cijferige barcode lijkt foutief: het laatste cijfer komt niet overeen met de rest",
   "bmiInfo": "Body Mass Index (BMI) is een cijfer om overgewicht en obesitas weer te geven bij volwassenen. Het wordt berekend door het gewicht in kilogram te delen door de hoogte in meter in het kwadraat (kg/m²).\n\nBMI maakt geen verschil tussen vet en spiermassa en kan misleidend zijn voor sommige personen.",
   "bmiInfoClassificationSection": "WHO classificatie",
@@ -404,7 +404,7 @@
   "nothingAddedLabel": "Niets toegevoegd",
   "notificationsDailyReminderBody": "Vergeet je maaltijden niet te registreren vandaag!",
   "notificationsDailyReminderChannelName": "Dagelijkse herinneringen",
-  "notificationsDailyReminderTitle": "OpenNutriTracker",
+  "notificationsDailyReminderTitle": "饮食日记",
   "nutrientPanelAllHiddenLabel": "Alle voedingswaarden verborgen - zet een of meerdere aan in Instellingen → Voedingswaarden.",
   "nutrientPanelLimitLabel": "limiet",
   "nutrientPanelDayLabel": "Dag",

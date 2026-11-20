@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:hive_ce/hive.dart' show Hive;
 import 'package:opennutritracker/core/utils/hive_db_provider.dart';
 import 'package:opennutritracker/core/utils/hive_storage_integrity_exception.dart';
 import 'package:path_provider/path_provider.dart';
@@ -95,6 +97,8 @@ class SecureAppStorageProvider {
   /// non-empty `*.hive` file. Used to distinguish first install from a
   /// partial secure-storage loss.
   Future<bool> _hasExistingEncryptedHiveData() async {
+    // Web boxes live in IndexedDB, not the native documents directory.
+    if (kIsWeb) return Hive.boxExists(HiveDBProvider.profileBoxName);
     final directory = await getApplicationDocumentsDirectory();
     if (!await directory.exists()) return false;
 

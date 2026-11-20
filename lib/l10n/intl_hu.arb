@@ -125,7 +125,7 @@
   "alphaVersionName": "[Alfa]",
   "appDescription": "Az OpenNutriTracker egy ingyenes, nyílt forráskódú kalória- és tápanyag-nyomkövető alkalmazás, amely tiszteletben tartja a felhasználók magánéletét.",
   "appLicenseLabel": "GPL-3.0 licenc",
-  "appTitle": "OpenNutriTracker",
+  "appTitle": "饮食日记",
   "appVersionName": "{versionNumber} verzió",
   "@appVersionName": {
     "placeholders": {
@@ -549,7 +549,7 @@
   "notificationsDailyReminderBody": "Ne felejtse el rögzíteni a mai étkezéseit!",
   "notificationsDailyReminderChannelName": "Napi emlékeztetők",
   "notificationsDailyReminderChannelDescription": "Napi étkezés-naplózási emlékeztető",
-  "notificationsDailyReminderTitle": "OpenNutriTracker",
+  "notificationsDailyReminderTitle": "饮食日记",
   "notificationsPermissionDeniedSnack": "Az értesítési engedély elutasítva.",
   "nutrientPanelAllHiddenLabel": "Minden tápanyag el van rejtve — a Beállítások → Tápanyagok menüpontban néhányat bekapcsolhat.",
   "nutrientPanelLimitLabel": "korlát",

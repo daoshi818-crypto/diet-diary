@@ -1,4 +1,5 @@
 import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:package_info_plus/package_info_plus.dart';
 
 class AppConst {
@@ -28,6 +29,7 @@ class AppConst {
   }
 
   static String getPlatformName() {
+    if (kIsWeb) return 'Web';
     if (Platform.isAndroid) {
       return platformNameAndroid;
     } else if (Platform.isIOS) {

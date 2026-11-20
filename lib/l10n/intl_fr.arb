@@ -125,7 +125,7 @@
   "alphaVersionName": "[Alpha]",
   "appDescription": "OpenNutriTracker est un compteur de calories et de nutriments gratuit, open source et respectueux de votre vie privée.",
   "appLicenseLabel": "Licence GPL-3.0",
-  "appTitle": "OpenNutriTracker",
+  "appTitle": "饮食日记",
   "appVersionName": "Version {versionNumber}",
   "@appVersionName": {
     "placeholders": {
@@ -549,7 +549,7 @@
   "notificationsDailyReminderBody": "N'oubliez pas d'enregistrer vos repas aujourd'hui !",
   "notificationsDailyReminderChannelName": "Rappels quotidiens",
   "notificationsDailyReminderChannelDescription": "Rappel quotidien d'enregistrement des repas",
-  "notificationsDailyReminderTitle": "OpenNutriTracker",
+  "notificationsDailyReminderTitle": "饮食日记",
   "notificationsPermissionDeniedSnack": "Autorisation des notifications refusée.",
   "nutrientPanelAllHiddenLabel": "Tous les nutriments sont masqués — activez-en dans Paramètres → Nutriments.",
   "nutrientPanelLimitLabel": "limite",

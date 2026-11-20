@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/painting.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -41,6 +43,14 @@ enum UserImageKind {
 class UserImageStorage {
   static const String _extension = 'webp';
 
+  /// The same photo widget can use a bundled asset in the browser preview.
+  static ImageProvider imageProvider(String path) {
+    if (kIsWeb) {
+      return path.startsWith('assets/') ? AssetImage(path) : NetworkImage(path);
+    }
+    return FileImage(File(path));
+  }
+
   /// The relative slug stored on the DBO for a given owner id.
   static String relativePathFor(UserImageKind kind, String ownerId) =>
       '${kind.subdir}/$ownerId.$_extension';
@@ -68,6 +78,7 @@ class UserImageStorage {
   /// app's private documents directory. Use this for `File(...)`
   /// operations.
   static Future<String> absolutePath(String relativePath) async {
+    if (kIsWeb) return relativePath;
     final dir = await getApplicationDocumentsDirectory();
     return '${dir.path}/$relativePath';
   }

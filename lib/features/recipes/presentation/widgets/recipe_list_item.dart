@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -148,8 +146,8 @@ class _UserImageThumbnail extends StatelessWidget {
         if (!snapshot.hasData) return fallback;
         return ClipRRect(
           borderRadius: Dimens.borderRadiusS,
-          child: Image.file(
-            File(snapshot.data!),
+          child: Image(
+            image: UserImageStorage.imageProvider(snapshot.data!),
             fit: BoxFit.cover,
             width: RecipeListItem._thumbSize,
             height: RecipeListItem._thumbSize,

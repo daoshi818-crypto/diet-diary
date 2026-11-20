@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/data/dbo/intake_dbo.dart';
@@ -378,35 +379,37 @@ Future<void> _setupActiveProfile() async {
   final active = locator<GetProfilesUsecase>().getActiveProfile();
   if (active == null) return;
 
-  String? imagePath;
-  try {
-    final bytes = (await rootBundle.load(
-      _profileAvatarAsset,
-    )).buffer.asUint8List();
-    final tempDir = await getTemporaryDirectory();
-    final tempFile = File('${tempDir.path}/demo_profile_avatar_source.jpg');
+  String? imagePath = kIsWeb ? _profileAvatarAsset : null;
+  if (!kIsWeb) {
     try {
-      await tempFile.writeAsBytes(bytes, flush: true);
-      imagePath = await UserImageStorage.importFrom(
-        kind: UserImageKind.profile,
-        ownerId: active.id,
-        sourcePath: tempFile.path,
-      );
-      final credit = unsplashCreditForUrl(unsplashImageUrl(_profilePhotoId));
-      if (credit != null) {
-        await UserImageStorage.writeCredit(
-          imagePath,
-          name: credit.name,
-          profileUrl: credit.profileUrl,
+      final bytes = (await rootBundle.load(
+        _profileAvatarAsset,
+      )).buffer.asUint8List();
+      final tempDir = await getTemporaryDirectory();
+      final tempFile = File('${tempDir.path}/demo_profile_avatar_source.jpg');
+      try {
+        await tempFile.writeAsBytes(bytes, flush: true);
+        imagePath = await UserImageStorage.importFrom(
+          kind: UserImageKind.profile,
+          ownerId: active.id,
+          sourcePath: tempFile.path,
         );
+        final credit = unsplashCreditForUrl(unsplashImageUrl(_profilePhotoId));
+        if (credit != null) {
+          await UserImageStorage.writeCredit(
+            imagePath,
+            name: credit.name,
+            profileUrl: credit.profileUrl,
+          );
+        }
+      } finally {
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+        }
       }
-    } finally {
-      if (await tempFile.exists()) {
-        await tempFile.delete();
-      }
+    } catch (e) {
+      _log.warning('Could not import bundled demo profile picture: $e');
     }
-  } catch (e) {
-    _log.warning('Could not import bundled demo profile picture: $e');
   }
 
   await locator<UpdateProfileUsecase>().updateProfile(

@@ -6,7 +6,8 @@ import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
 import 'package:opennutritracker/core/domain/entity/tracked_day_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_activity_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/edit_activity_dialog.dart';
-import 'package:opennutritracker/core/presentation/widgets/edit_dialog.dart';
+import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
+import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/calc/met_calc.dart';
 import 'package:opennutritracker/core/domain/usecase/get_user_usecase.dart';
@@ -21,7 +22,9 @@ import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_det
 import 'package:opennutritracker/generated/l10n.dart';
 
 class DiaryPage extends StatefulWidget {
-  const DiaryPage({super.key});
+  final ValueChanged<DateTime>? onDateChanged;
+
+  const DiaryPage({super.key, this.onDateChanged});
 
   @override
   State<DiaryPage> createState() => _DiaryPageState();
@@ -316,17 +319,20 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
     // The day the entry is listed under now: "today" can move on while
     // the dialog is open (#1360), and the row to adjust is this one.
     final day = _selectedDate;
-    final changeIntakeAmount = await showDialog<double>(
+    final changeIntakeAmount = await showDialog<LogTrayItem>(
       context: context,
-      builder: (context) => EditDialog(
-        intakeEntity: intakeEntity,
+      builder: (context) => FoodQuantityDialog(
+        meal: intakeEntity.meal,
+        day: intakeEntity.dateTime,
+        type: intakeEntity.type,
+        editingIntake: intakeEntity,
         usesImperialUnits: usesImperialUnits,
       ),
     );
     if (changeIntakeAmount != null) {
       await _calendarDayBloc.updateIntakeItem(
         intakeEntity.id,
-        {'amount': changeIntakeAmount},
+        {'amount': changeIntakeAmount.amount, 'unit': changeIntakeAmount.unit},
         day,
       );
       _diaryBloc.add(const LoadDiaryYearEvent());
@@ -377,6 +383,7 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
           DateUtils.isSameDay(newDate, _currentDate) ? null : newDate;
       _calendarDayBloc.add(LoadCalendarDayEvent(_selectedDate));
     });
+    widget.onDateChanged?.call(_selectedDate);
     if (newDate.isAfter(_currentDate) && !DateUtils.isSameDay(newDate, _currentDate)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(S.of(context).diaryFutureDateWarning)),

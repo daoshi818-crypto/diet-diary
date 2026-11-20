@@ -125,7 +125,7 @@
   "alphaVersionName": "[Alfa]",
   "appDescription": "OpenNutriTracker är en kostnadsfri app med öppen källkod som hjälper dig att följa ditt kalori- och näringsintag och respekterar din integritet.",
   "appLicenseLabel": "GPL-3.0-licens",
-  "appTitle": "OpenNutriTracker",
+  "appTitle": "饮食日记",
   "appVersionName": "Version {versionNumber}",
   "@appVersionName": {
     "placeholders": {
@@ -561,7 +561,7 @@
   "notificationsDailyReminderBody": "Glöm inte att registrera dina måltider i dag!",
   "notificationsDailyReminderChannelName": "Dagliga påminnelser",
   "notificationsDailyReminderChannelDescription": "Daglig påminnelse om att registrera måltider",
-  "notificationsDailyReminderTitle": "OpenNutriTracker",
+  "notificationsDailyReminderTitle": "饮食日记",
   "notificationsPermissionDeniedSnack": "Tillstånd att visa aviseringar nekades.",
   "nutrientPanelAllHiddenLabel": "Alla näringsämnen är dolda – aktivera några under Inställningar → Näringsämnen.",
   "nutrientPanelLimitLabel": "gräns",

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:logging/logging.dart';
 import 'package:path_provider/path_provider.dart';
@@ -15,7 +16,9 @@ class OntImageCacheManager {
       key,
       stalePeriod: _cacheDuration,
       maxNrOfCacheObjects: _maxNrOfCacheObjects,
-      repo: SelfHealingJsonCacheInfoRepository(databaseName: key),
+      repo: kIsWeb
+          ? NonStoringObjectProvider()
+          : SelfHealingJsonCacheInfoRepository(databaseName: key),
       fileService: HttpFileService(),
     ),
   );

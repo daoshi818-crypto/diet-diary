@@ -1,8 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
+import 'package:opennutritracker/core/presentation/widgets/intake_details_dialog.dart';
+import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:intl/intl.dart';
 import 'package:opennutritracker/core/domain/entity/intake_entity.dart';
@@ -26,6 +30,7 @@ class IntakeCard extends StatelessWidget {
   final Function(BuildContext, IntakeEntity)? onItemLongPressed;
   final Function(BuildContext, IntakeEntity, bool)? onItemTapped;
   final VoidCallback? onShare;
+  final ValueChanged<IntakeTypeEntity>? onChangeMealType;
   final bool firstListElement;
   final bool usesImperialUnits;
   final DiarySortType? sortType;
@@ -36,6 +41,7 @@ class IntakeCard extends StatelessWidget {
     this.onItemLongPressed,
     this.onItemTapped,
     this.onShare,
+    this.onChangeMealType,
     required this.firstListElement,
     required this.usesImperialUnits,
     this.sortType,
@@ -89,7 +95,9 @@ class IntakeCard extends StatelessWidget {
                     children: [
                       AutoSizeText(
                         intake.meal.name ?? "?",
-                        style: textTheme.titleSmall?.copyWith(color: palette.textStrong),
+                        style: textTheme.titleSmall?.copyWith(
+                          color: palette.textStrong,
+                        ),
                         maxLines: 1,
                         minFontSize: 11,
                         overflow: TextOverflow.ellipsis,
@@ -99,7 +107,9 @@ class IntakeCard extends StatelessWidget {
                         value: intake.amount,
                         meal: intake.meal,
                         usesImperialUnits: usesImperialUnits,
-                        textStyle: textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                        textStyle: textTheme.bodySmall?.copyWith(
+                          color: palette.textMuted,
+                        ),
                       ),
                     ],
                   ),
@@ -139,24 +149,56 @@ class IntakeCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (onShare != null)
+                if (onItemTapped != null ||
+                    onChangeMealType != null ||
+                    onShare != null)
                   Semantics(
                     identifier: 'intake-item-menu',
                     container: true,
-                    child: PopupMenuButton<void>(
+                    child: PopupMenuButton<String>(
+                      tooltip: s.loggingEditAmount,
                       icon: Icon(
                         Icons.more_vert_rounded,
                         color: palette.textMuted,
                       ),
                       shape: Dimens.shapeM,
+                      onSelected: (action) {
+                        if (action == 'amount') {
+                          onItemTapped?.call(
+                            context,
+                            intake,
+                            usesImperialUnits,
+                          );
+                        } else if (action == 'type') {
+                          _chooseMealType(context);
+                        } else if (action == 'share') {
+                          onShare?.call();
+                        }
+                      },
                       itemBuilder: (_) => [
-                        PopupMenuItem<void>(
-                          onTap: onShare,
-                          child: Semantics(
-                            identifier: 'intake-share-food',
+                        if (onChangeMealType != null)
+                          PopupMenuItem(
+                            value: 'type',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.swap_horiz_rounded),
+                              title: Text(s.loggingMoveMeal),
+                            ),
+                          ),
+                        if (onItemTapped != null)
+                          PopupMenuItem(
+                            value: 'amount',
+                            child: ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              leading: const Icon(Icons.scale_outlined),
+                              title: Text(s.loggingEditAmount),
+                            ),
+                          ),
+                        if (onShare != null)
+                          PopupMenuItem(
+                            value: 'share',
                             child: Text(s.shareFoodLabel),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -173,7 +215,63 @@ class IntakeCard extends StatelessWidget {
   }
 
   void onTappedItem(BuildContext context, bool usesImperialUnits) {
-    onItemTapped?.call(context, intake, usesImperialUnits);
+    showDialog<void>(
+      context: context,
+      builder: (_) => IntakeDetailsDialog(
+        intake: intake,
+        usesImperialUnits: usesImperialUnits,
+        onEditAmount: () =>
+            onItemTapped?.call(context, intake, usesImperialUnits),
+      ),
+    );
+  }
+
+  Future<void> _chooseMealType(BuildContext context) async {
+    final s = S.of(context);
+    final selected = await showDialog<IntakeTypeEntity>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: Dimens.shapeXL,
+        title: Text(s.loggingMoveMeal),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(s.loggingMoveMealHint),
+              const SizedBox(height: 12),
+              for (final type in IntakeTypeEntity.values)
+                Semantics(
+                  identifier: 'intake-move-${type.name}',
+                  child: ListTile(
+                    shape: Dimens.shapeM,
+                    selected: intake.type == type,
+                    leading: Icon(type.getIconData()),
+                    title: Text(
+                      AddMealExtension.fromIntakeTypeEntity(
+                        type,
+                      ).getTypeName(context),
+                    ),
+                    trailing: intake.type == type
+                        ? const Icon(Icons.check_rounded)
+                        : null,
+                    onTap: () => Navigator.of(dialogContext).pop(type),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(s.dialogCloseLabel),
+          ),
+        ],
+      ),
+    );
+    if (selected != null && selected != intake.type && context.mounted) {
+      onChangeMealType?.call(selected);
+    }
   }
 }
 
@@ -212,9 +310,9 @@ class _Thumbnail extends StatelessWidget {
   }
 
   Widget _fallback() => Container(
-        color: palette.surfaceMuted,
-        child: Icon(Icons.restaurant_rounded, color: palette.textMuted, size: 24),
-      );
+    color: palette.surfaceMuted,
+    child: Icon(Icons.restaurant_rounded, color: palette.textMuted, size: 24),
+  );
 }
 
 class _LocalMealImage extends StatelessWidget {
@@ -228,9 +326,13 @@ class _LocalMealImage extends StatelessWidget {
       future: UserImageStorage.absolutePath(relativePath),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
-        final file = File(snapshot.data!);
-        if (!file.existsSync()) return const SizedBox.shrink();
-        return Image.file(file, fit: BoxFit.cover);
+        if (!kIsWeb && !File(snapshot.data!).existsSync()) {
+          return const SizedBox.shrink();
+        }
+        return Image(
+          image: UserImageStorage.imageProvider(snapshot.data!),
+          fit: BoxFit.cover,
+        );
       },
     );
   }

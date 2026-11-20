@@ -112,6 +112,7 @@ class MealItemCard extends StatelessWidget {
                   backgroundColor: accent,
                   shape: const RoundedRectangleBorder(borderRadius: Dimens.borderRadiusM),
                 ),
+                tooltip: S.of(context).loggingChooseAmount,
                 icon: const Icon(Icons.add_rounded, size: 24),
                 onPressed: onQuickAdd ?? () => _onItemPressed(context),
               ),

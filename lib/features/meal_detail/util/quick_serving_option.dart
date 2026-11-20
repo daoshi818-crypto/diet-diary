@@ -1,4 +1,5 @@
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
+import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 
 /// One preset a user can tap in the meal-detail sheet to jump the
@@ -28,13 +29,26 @@ class QuickServingOption {
 /// [gramUnitLabel] is passed in so this helper stays context-free.
 List<QuickServingOption> quickServingOptionsFor(
   MealEntity product,
-  String gramUnitLabel,
-) {
+  String gramUnitLabel, {
+  bool includeWeightPresets = false,
+}) {
   final servingUnit = UnitDropdownItem.serving.toString();
   final gramUnit = UnitDropdownItem.g.toString();
   final options = <QuickServingOption>[];
 
-  if (product.scalableServingQuantity != null) {
+  if (product.portions.isNotEmpty) {
+    for (var i = 0; i < product.portions.length; i++) {
+      final portion = product.portions[i];
+      options.add(
+        QuickServingOption(
+          id: 'portion-$i',
+          quantity: 1,
+          unit: portionUnit(i),
+          label: '${portion.label} · ${portion.gramWeight} $gramUnitLabel',
+        ),
+      );
+    }
+  } else if (product.scalableServingQuantity != null) {
     options.addAll([
       QuickServingOption(
         id: 'half-serving',
@@ -60,6 +74,18 @@ List<QuickServingOption> quickServingOptionsFor(
   // so quick-add custom meals (mealUnit == 'g/ml') and liquids with no
   // serving still get the 100 g shortcut.
   if (product.isSolid || (!product.isLiquid && !product.isSolid)) {
+    if (includeWeightPresets) {
+      for (final grams in [50, 150, 200]) {
+        options.add(
+          QuickServingOption(
+            id: '${grams}g',
+            quantity: grams.toDouble(),
+            unit: gramUnit,
+            label: '$grams $gramUnitLabel',
+          ),
+        );
+      }
+    }
     options.add(
       QuickServingOption(
         id: '100g',

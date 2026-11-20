@@ -1,5 +1,4 @@
-import 'dart:io';
-import 'dart:ui' show Locale;
+import 'dart:ui' show Locale, PlatformDispatcher;
 
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -82,7 +81,9 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
       return;
     }
 
-    final defaults = LocaleUnitDefaults.fromLocale(Platform.localeName);
+    final defaults = LocaleUnitDefaults.fromLocale(
+      PlatformDispatcher.instance.locale.toString(),
+    );
     userSelection.heightUsesImperial = defaults.heightUsesImperial;
     userSelection.bodyWeightUnit = defaults.bodyWeightUnit;
     userSelection.foodUsesImperial = defaults.foodUsesImperial;
@@ -100,7 +101,7 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
       return;
     }
     userSelection.foodSourceToggles = defaultFoodSourceToggles(
-      Platform.localeName,
+      PlatformDispatcher.instance.locale.toString(),
     );
   }
 

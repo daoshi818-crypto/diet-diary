@@ -41,7 +41,7 @@ class AppLocale {
 
   static String get _systemLocaleName {
     final preferred = preferredLocales();
-    if (preferred.isEmpty) return Platform.localeName;
+    if (preferred.isEmpty) return kIsWeb ? 'en' : Platform.localeName;
     return basicLocaleListResolution(
       preferred,
       appLocales(S.supportedLocales),

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/profile_entity.dart';
 import 'package:opennutritracker/core/utils/user_image_storage.dart';
@@ -31,7 +29,7 @@ class ProfileAvatar extends StatelessWidget {
           return CircleAvatar(
             radius: radius,
             backgroundColor: theme.colorScheme.primaryContainer,
-            backgroundImage: FileImage(File(snapshot.data!)),
+            backgroundImage: UserImageStorage.imageProvider(snapshot.data!),
           );
         },
       );

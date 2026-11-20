@@ -2,11 +2,9 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/user_activity_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/activity_card.dart';
-import 'package:opennutritracker/core/presentation/widgets/placeholder_card.dart';
 import 'package:opennutritracker/core/presentation/widgets/share_qr_dialog.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
-import 'package:opennutritracker/features/add_activity/presentation/add_activity_screen.dart';
 import 'package:opennutritracker/features/home/domain/entity/shared_activity_payload.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
@@ -124,23 +122,9 @@ class _ActivityVerticalListState extends State<ActivityVerticalList> {
                 onItemDragCallback: widget.onItemDragCallback,
                 firstListElement: false,
               ),
-            PlaceholderCard(
-              day: widget.day,
-              onTap: () => _onPlaceholderCardTapped(context),
-              firstListElement: true,
-              semanticIdentifier: 'add-activity-placeholder',
-              label: S.of(context).addToSectionLabel(widget.title),
-            ),
           ],
         ),
       ],
-    );
-  }
-
-  void _onPlaceholderCardTapped(BuildContext context) {
-    Navigator.of(context).pushNamed(
-      NavigationOptions.addActivityRoute,
-      arguments: AddActivityScreenArguments(day: widget.day),
     );
   }
 }

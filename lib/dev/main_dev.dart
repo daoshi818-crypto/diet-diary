@@ -55,7 +55,12 @@ Future<void> main() async {
     markLocaleSyncSeeded: configRepo.setLocaleSyncSeeded,
     clearLocaleSyncSeeded: configRepo.clearLocaleSyncSeeded,
   );
-  final savedLocale = localeCode != null ? Locale(localeCode) : null;
+  const previewLocale = String.fromEnvironment('PREVIEW_LOCALE');
+  final savedLocale = kIsWeb && previewLocale.isNotEmpty
+      ? Locale(previewLocale)
+      : localeCode != null
+      ? Locale(localeCode)
+      : null;
   final savedAppTheme = await configRepo.getConfigAppTheme();
 
   runAppWithChangeNotifiers(

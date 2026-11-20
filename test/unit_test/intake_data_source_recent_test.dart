@@ -123,5 +123,28 @@ void main() {
 
       expect(recent.map((i) => i.id), ['c', 'b']);
     });
+
+    test(
+      'changing meal and displayed unit preserves identity, date and amount',
+      () async {
+        final at = DateTime(2026, 11, 20, 12);
+        await box.add(
+          _intake(
+            'move-me',
+            _meal(code: 'rice', source: MealSourceDBO.custom),
+            at,
+          ),
+        );
+        final updated = await dataSource.updateIntake('move-me', {
+          'type': IntakeTypeDBO.snack,
+          'unit': 'serving',
+        });
+        expect(updated!.type, IntakeTypeDBO.snack);
+        expect(updated.unit, 'serving');
+        expect(updated.amount, 100);
+        expect(updated.dateTime, at);
+        expect(box.length, 1);
+      },
+    );
   });
 }

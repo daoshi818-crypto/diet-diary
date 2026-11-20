@@ -42,11 +42,9 @@ class DashboardWidget extends StatefulWidget {
 
 class _DashboardWidgetState extends State<DashboardWidget> {
   void _openKcalGoalInfoScreen() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const KcalGoalInfoScreen(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const KcalGoalInfoScreen()));
   }
 
   @override
@@ -70,9 +68,12 @@ class _DashboardWidgetState extends State<DashboardWidget> {
     } else {
       kcalValue = widget.totalKcalLeft;
       gaugeValue =
-          (widget.totalKcalDaily - widget.totalKcalLeft) / widget.totalKcalDaily;
+          (widget.totalKcalDaily - widget.totalKcalLeft) /
+          widget.totalKcalDaily;
     }
-    final displayValue = usesKilojoules ? UnitCalc.kcalToKj(kcalValue) : kcalValue;
+    final displayValue = usesKilojoules
+        ? UnitCalc.kcalToKj(kcalValue)
+        : kcalValue;
     final displaySupplied = usesKilojoules
         ? UnitCalc.kcalToKj(widget.totalKcalSupplied)
         : widget.totalKcalSupplied;
@@ -86,42 +87,36 @@ class _DashboardWidgetState extends State<DashboardWidget> {
     final progressColor = widget.totalKcalLeft < 0
         ? Theme.of(context).colorScheme.error
         : Theme.of(context).colorScheme.primary;
+    final largeText = MediaQuery.textScalerOf(context).scale(14) > 19;
+    final radius = largeText ? 88.0 : 62.0;
+    final supplied = _MiniStat(
+      icon: Icons.arrow_downward_rounded,
+      value: '${displaySupplied.round()}',
+      label: S.of(context).suppliedLabel,
+      color: palette.proteinColor,
+    );
+    final burned = _MiniStat(
+      icon: Icons.local_fire_department_rounded,
+      value: '${displayBurned.round()}',
+      label: S.of(context).burnedLabel,
+      color: palette.carbsColor,
+      trailing: true,
+    );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Dimens.spacing16, Dimens.spacing8, Dimens.spacing16, Dimens.spacing4),
+      padding: const EdgeInsets.fromLTRB(
+        Dimens.spacing16,
+        Dimens.spacing8,
+        Dimens.spacing16,
+        Dimens.spacing4,
+      ),
       child: Column(
         children: [
           AppCard(
-            padding: const EdgeInsets.fromLTRB(Dimens.spacing24, Dimens.spacing20, Dimens.spacing24, Dimens.spacing24),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    // Two equal halves; each stat pins itself to its card
-                    // edge via its own cross-axis alignment. A Spacer next
-                    // to loose-fit Flexible children would leave the spare
-                    // width at the row end and pull "burned" off the edge.
-                    Expanded(
-                      child: _MiniStat(
-                        icon: Icons.arrow_downward_rounded,
-                        value: '${displaySupplied.round()}',
-                        label: S.of(context).suppliedLabel,
-                        color: palette.proteinColor,
-                      ),
-                    ),
-                    Expanded(
-                      child: _MiniStat(
-                        icon: Icons.local_fire_department_rounded,
-                        value: '${displayBurned.round()}',
-                        label: S.of(context).burnedLabel,
-                        color: palette.carbsColor,
-                        trailing: true,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: Dimens.spacing16),
-                Semantics(
+            padding: const EdgeInsets.all(Dimens.spacing12),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final gauge = Semantics(
                   identifier: 'home-kcal-gauge',
                   label: '${displayValue.round()} $kcalLabelText',
                   hint: S.of(context).settingsKcalGoalInfoLabel,
@@ -141,8 +136,8 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                       behavior: HitTestBehavior.opaque,
                       onTap: _openKcalGoalInfoScreen,
                       child: CircularPercentIndicator(
-                        radius: 90,
-                        lineWidth: 16,
+                        radius: radius,
+                        lineWidth: 10,
                         percent: gaugeValue.clamp(0.0, 1.0),
                         animation: true,
                         // The dashboard's first-ever build of a session (a
@@ -159,24 +154,63 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                         circularStrokeCap: CircularStrokeCap.round,
                         backgroundColor: palette.surfaceMuted,
                         progressColor: progressColor,
-                        center: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AnimatedFlipCounter(
-                              duration: const Duration(milliseconds: 800),
-                              curve: AppMotion.emphasized,
-                              value: displayValue.round(),
-                              textStyle: textTheme.displaySmall?.copyWith(height: 1),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(kcalLabelText, style: textTheme.bodyMedium?.copyWith(color: palette.textMuted)),
-                          ],
+                        center: SizedBox(
+                          width: radius * 2 - 28,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: AnimatedFlipCounter(
+                                  duration: const Duration(milliseconds: 800),
+                                  curve: AppMotion.emphasized,
+                                  value: displayValue.round(),
+                                  textStyle: textTheme.headlineMedium?.copyWith(
+                                    height: 1,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                kcalLabelText,
+                                textAlign: TextAlign.center,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-              ],
+                );
+                // Keep all three energy figures on one short row. Large
+                // text and very narrow layouts get room to stack instead.
+                if (largeText || constraints.maxWidth < 280) {
+                  return Column(
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(child: supplied),
+                          Expanded(child: burned),
+                        ],
+                      ),
+                      const SizedBox(height: Dimens.spacing8),
+                      gauge,
+                    ],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: supplied),
+                    const SizedBox(width: Dimens.spacing8),
+                    gauge,
+                    const SizedBox(width: Dimens.spacing8),
+                    Expanded(child: burned),
+                  ],
+                );
+              },
             ),
           ),
           const SizedBox(height: Dimens.spacing12),
@@ -238,18 +272,31 @@ class _MiniStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     return Column(
-      crossAxisAlignment: trailing ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: trailing
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Container(
           padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(color: color.withValues(alpha: 0.16), shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.16),
+            shape: BoxShape.circle,
+          ),
           child: Icon(icon, color: color, size: 20),
         ),
         const SizedBox(height: 6),
-        Text(value,
-            maxLines: 1, overflow: TextOverflow.ellipsis, style: textTheme.titleMedium),
-        Text(label,
-            maxLines: 1, overflow: TextOverflow.ellipsis, style: textTheme.labelSmall),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.titleMedium,
+        ),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: textTheme.labelSmall,
+        ),
       ],
     );
   }
@@ -276,31 +323,38 @@ class _MacroTile extends StatelessWidget {
     final pct = (goal <= 0) ? 0.0 : (intake / goal).clamp(0.0, 1.0);
     return AppCard(
       borderRadius: Dimens.radiusM,
-      padding: const EdgeInsets.fromLTRB(Dimens.spacing16, Dimens.spacing16, Dimens.spacing16, Dimens.spacing16),
+      padding: const EdgeInsets.all(Dimens.spacing12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Container(width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
               const SizedBox(width: 6),
               Flexible(child: Text(label, style: textTheme.labelMedium)),
             ],
           ),
-          const SizedBox(height: Dimens.spacing12),
+          const SizedBox(height: Dimens.spacing8),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
             child: LinearProgressIndicator(
               value: pct,
-              minHeight: 8,
+              minHeight: 6,
               backgroundColor: palette.surfaceMuted,
               valueColor: AlwaysStoppedAnimation(color),
             ),
           ),
-          const SizedBox(height: Dimens.spacing12),
+          const SizedBox(height: Dimens.spacing8),
           Text(
             '${intake.toInt()}/${goal.toInt()} g',
-            style: textTheme.bodySmall?.copyWith(color: palette.textStrong, fontWeight: FontWeight.w700),
+            style: textTheme.bodySmall?.copyWith(
+              color: palette.textStrong,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),

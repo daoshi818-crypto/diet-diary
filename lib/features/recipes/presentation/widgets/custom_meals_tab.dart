@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -382,11 +383,10 @@ class _MealLeadingThumbnail extends StatelessWidget {
       future: UserImageStorage.absolutePath(relative),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return fallback;
-        final file = File(snapshot.data!);
-        if (!file.existsSync()) return fallback;
+        if (!kIsWeb && !File(snapshot.data!).existsSync()) return fallback;
         return ClipRRect(
           borderRadius: Dimens.borderRadiusS,
-          child: Image.file(file, width: _size, height: _size, fit: BoxFit.cover),
+          child: Image(image: UserImageStorage.imageProvider(snapshot.data!), width: _size, height: _size, fit: BoxFit.cover),
         );
       },
     );

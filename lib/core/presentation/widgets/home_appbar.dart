@@ -11,13 +11,14 @@ class HomeAppbar extends StatelessWidget implements PreferredSizeWidget {
       title: Row(
         children: [
           const SizedBox(width: 40, child: DynamicOntLogo()),
+          const SizedBox(width: 8),
           Expanded(
             child: RichText(
               text: TextSpan(
                 text: S.of(context).appTitle,
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurface,
-                    ),
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

@@ -15,7 +15,8 @@ import 'package:opennutritracker/core/domain/entity/tracked_day_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_activity_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/activity_vertial_list.dart';
 import 'package:opennutritracker/core/presentation/widgets/edit_activity_dialog.dart';
-import 'package:opennutritracker/core/presentation/widgets/edit_dialog.dart';
+import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
+import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/core/presentation/widgets/delete_dialog.dart';
 import 'package:opennutritracker/core/presentation/widgets/disclaimer_dialog.dart';
 import 'package:opennutritracker/core/domain/usecase/import_workouts_usecase.dart';
@@ -236,15 +237,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   caloriesProfile: userCaloriesProfile,
                 ),
               ),
-            if (showActivityTracking)
-              ActivityVerticalList(
-                day: DateTime.now(),
-                title: S.of(context).activityLabel,
-                userActivityList: userActivities,
-                onItemLongPressedCallback: onActivityItemLongPressed,
-                onItemTappedCallback: onActivityItemTapped,
-                onItemDragCallback: onActivityItemDrag,
-              ),
             // #150 follow-up: a 0% share (e.g. OMAD sets snack to 0) hides an
             // empty section so the home view doesn't carry a header the user
             // explicitly opted out of. A section that holds intakes always
@@ -316,6 +308,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 usesImperialUnits: usesImperialUnits,
                 showMealMacros: showMealMacros,
                 mealKcalTarget: snackKcalTarget,
+              ),
+            if (showActivityTracking)
+              ActivityVerticalList(
+                day: DateTime.now(),
+                title: S.of(context).activityLabel,
+                userActivityList: userActivities,
+                onItemLongPressedCallback: onActivityItemLongPressed,
+                onItemTappedCallback: onActivityItemTapped,
+                onItemDragCallback: onActivityItemDrag,
               ),
             const SizedBox(height: 48.0),
           ],
@@ -463,16 +464,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     IntakeEntity intakeEntity,
     bool usesImperialUnits,
   ) async {
-    final changeIntakeAmount = await showDialog<double>(
+    final changeIntakeAmount = await showDialog<LogTrayItem>(
       context: context,
-      builder: (context) => EditDialog(
-        intakeEntity: intakeEntity,
+      builder: (context) => FoodQuantityDialog(
+        meal: intakeEntity.meal,
+        day: intakeEntity.dateTime,
+        type: intakeEntity.type,
+        editingIntake: intakeEntity,
         usesImperialUnits: usesImperialUnits,
       ),
     );
     if (changeIntakeAmount != null) {
       await _homeBloc.updateIntakeItem(intakeEntity.id, {
-        'amount': changeIntakeAmount,
+        'amount': changeIntakeAmount.amount, 'unit': changeIntakeAmount.unit,
       });
       _homeBloc.add(const LoadItemsEvent());
       if (context.mounted) {

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/utils/off_country.dart';
@@ -47,7 +47,9 @@ class ProductsRepository {
     // The country boost follows the device on purpose, not the language
     // picked in the app: a German speaker in Austria wants Austrian
     // products ranked up. Food-name language is AppLocale's job (#1214).
-    final userCountryTag = OffCountry.fromLocale(Platform.localeName);
+    final userCountryTag = OffCountry.fromLocale(
+      PlatformDispatcher.instance.locale.toString(),
+    );
     final candidates = <_RankedOffProduct>[];
     for (var i = 0; i < offWordResponse.products.length; i++) {
       final dto = offWordResponse.products[i];

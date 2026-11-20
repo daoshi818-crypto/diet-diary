@@ -125,7 +125,7 @@
   "alphaVersionName": "[Альфа]",
   "appDescription": "OpenNutriTracker — бесплатный трекер калорий и нутриентов с открытым кодом, уважающий вашу приватность.",
   "appLicenseLabel": "Лицензия GPL-3.0",
-  "appTitle": "OpenNutriTracker",
+  "appTitle": "饮食日记",
   "appVersionName": "Версия {versionNumber}",
   "@appVersionName": {
     "placeholders": {
@@ -549,7 +549,7 @@
   "notificationsDailyReminderBody": "Не забудьте занести сегодняшние приёмы пищи!",
   "notificationsDailyReminderChannelName": "Ежедневные напоминания",
   "notificationsDailyReminderChannelDescription": "Ежедневное напоминание о занесении приёмов пищи",
-  "notificationsDailyReminderTitle": "OpenNutriTracker",
+  "notificationsDailyReminderTitle": "饮食日记",
   "notificationsPermissionDeniedSnack": "В разрешении на уведомления отказано.",
   "nutrientPanelAllHiddenLabel": "Все нутриенты скрыты — включите нужные в Настройках → Нутриенты.",
   "nutrientPanelLimitLabel": "лимит",
