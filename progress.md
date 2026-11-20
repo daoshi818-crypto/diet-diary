@@ -12,6 +12,8 @@
 - 最终profile Web构建成功（84.8秒），分析无问题；静态服务与4项关键资源HTTP 200，Node/PowerShell预览脚本语法及git diff --check通过。
 - 浏览器读回：首页和日记活动区均无独立添加卡片，原有有氧舞蹈记录正常；中央加号→活动打开官方活动列表。截图build/ui-activity-no-plus.jpg与build/ui-diary-activity-no-plus.jpg（不上传构建目录）。
 - 首次暂存后的完整空白检查发现新增预览启动脚本末尾多一空行（先前未暂存检查不含新增文件）；提交尚未执行，已只删除该空行并重新检查。
+- 代码提交e3a718f6（157文件）已推送origin/main，远端API确认完整SHA与本地一致、仓库private=true、默认分支main、Actions=false；1281个已提交文件路径均无被排除配置，许可证和上游基线历史保留，工作树干净。
+- 仓库：https://github.com/daoshi818-crypto/diet-diary 。本地交互预览继续位于http://localhost:4173/；未打包APK。此后仅同步本段验收记录。
 
 - 2026-11-20：开始克隆上游，读取 UI、文件计划与验证技能。
 - 2026-11-20：确认上游已 ship 简体中文，创建独立 Vite 中文网页预览；`npm install` 和 `npm run build` 均通过。
