@@ -129,6 +129,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/foods/catalog.json
     - assets/icon/diet_diary_icon.svg
     - assets/icon/diet_diary_icon.png
     - assets/icon/ont_logo_square.svg

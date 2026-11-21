@@ -30,7 +30,10 @@ class _FakeGetMacroGoalUsecase extends Fake implements GetMacroGoalUsecase {}
 
 class _FakeGetTrackedDayUsecase extends Fake implements GetTrackedDayUsecase {}
 
-class _FakeProductsRepository extends Fake implements ProductsRepository {}
+class _FakeProductsRepository extends Fake implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+}
 
 class _FakeRemoteSearchCacheDataSource extends Fake
     implements RemoteSearchCacheDataSource {}

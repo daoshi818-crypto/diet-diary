@@ -232,7 +232,7 @@
   "additionalInfoLabelSource": "More Information at\n{sourceName}",
   "@additionalInfoLabelSource": {"placeholders": {"sourceName": {"type": "String"}}},
   "foodSourcesAlwaysEnabledLabel": "Always enabled",
-  "foodSourcesHelpText": "Search results come from these food databases. Open Food Facts powers the product and barcode search and is always enabled.",
+  "foodSourcesHelpText": "Search and barcode lookup use the bundled Chinese food library and your custom foods. No remote food database is queried.",
   "machineTranslatedNameHint": "Name translated automatically",
   "measureUnitBar": "{count, plural, one{bar} other{bars}}",
   "@measureUnitBar": {"placeholders": {"count": {"type": "num"}}},
@@ -259,7 +259,7 @@
   "measureUnitTeaspoon": "{count, plural, one{teaspoon} other{teaspoons}}",
   "@measureUnitTeaspoon": {"placeholders": {"count": {"type": "num"}}},
   "settingsFoodSourcesLabel": "Food databases",
-  "settingsFoodSourcesSubtitle": "Choose where food search results come from",
+  "settingsFoodSourcesSubtitle": "Local Chinese food library and sources",
   "onboardingOtherOptionsLabel": "Other options",
   "onboardingOtherOptionsSubtitle": "Personalize the app — you can change everything later in Settings",
   "additionalInfoLabelOFF": "More Information at\nOpenFoodFacts",
@@ -335,7 +335,7 @@
   "cholesterolLabel": "cholesterol",
   "chooseWeeklyWeightGoalLabel": "Weekly weight rate",
   "chooseWeightGoalLabel": "Choose Weight Goal",
-  "clearOffCacheConfirmContent": "Removes the locally cached search and scan results from Open Food Facts and FDC. The cache rebuilds automatically as you search and scan products. Your custom meals are not affected.",
+  "clearOffCacheConfirmContent": "Remove legacy Open Food Facts and FDC search and scan cache entries. The app now uses the local Chinese library and does not read or rebuild these remote caches. Custom foods and diary entries are preserved.",
   "clearOffCacheConfirmTitle": "Clear cached items?",
   "clearOffCacheLabel": "Clear cached items",
   "clearOffCacheSubtitle": "{count} item(s) · {size}",
@@ -636,8 +636,8 @@
   "noResultsScanBarcode": "Scan barcode",
   "noResultsCreateCustomFood": "Create custom food",
   "noResultsSearchAll": "Search all",
-  "partialResultsNotice": "One food source didn't respond. Some results might be missing.",
-  "partialResultsAllSourcesDownNotice": "No online food source responded. Showing your saved foods only.",
+  "partialResultsNotice": "Some local food data could not be read. Showing available results. Please retry.",
+  "partialResultsAllSourcesDownNotice": "The local food library could not be read. Showing saved foods only. Please retry.",
   "notAvailableLabel": "N/A",
   "nothingAddedLabel": "Nothing added",
   "notificationsDailyReminderBody": "Don't forget to log your meals today!",
@@ -1585,7 +1585,6 @@
   "loggingDescribeHint": "Describe what you ate in a sentence",
   "loggingChooseAmount": "Choose amount",
   "loggingEditAmount": "Adjust amount",
-  "loggingAmountHint": "Choose a portion or enter a weight; nothing is added until you confirm.",
   "loggingConfirmAmount": "Confirm amount",
   "loggingSaveAmount": "Save amount",
   "loggingIntakeNutrition": "Nutrition for this amount",
@@ -1594,5 +1593,17 @@
   "loggingAmountInvalid": "Enter an amount greater than 0 and at most 10000",
   "loggingMealEmpty": "Use the centre + to record food",
   "loggingCustomFoods": "Custom foods",
-  "loggingRecordTo": "Meal"
+  "loggingRecordTo": "Meal",
+  "localFoodSourcesTitle": "Local Chinese food library",
+  "localFoodSourcesDescription": "Built-in Chinese foods, available offline.",
+  "localFoodCount": "{count} foods",
+  "@localFoodCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localFoodLoadError": "Could not load the food library. Please reopen this page.",
+  "localFoodNoBarcode": "Add barcodes to custom foods to find them on your next scan."
 }

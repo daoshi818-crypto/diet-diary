@@ -237,6 +237,9 @@ class _FakeGetTrackedDay extends Fake implements GetTrackedDayUsecase {
       );
 }
 
-class _UnusedProducts extends Fake implements ProductsRepository {}
+class _UnusedProducts extends Fake implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+}
 
 class _UnusedCache extends Fake implements RemoteSearchCacheDataSource {}

@@ -1,6 +1,7 @@
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:logging/logging.dart';
+import 'package:opennutritracker/features/add_meal/data/data_sources/chinese_food_data_source.dart';
 import 'package:opennutritracker/core/utils/off_country.dart';
 import 'package:opennutritracker/features/add_meal/data/data_sources/off_data_source.dart';
 import 'package:opennutritracker/features/add_meal/data/data_sources/sp_food_data_source.dart';
@@ -29,13 +30,25 @@ class ProductsRepository {
   // appear, just lower. Tuned against live results for a GB user.
   static const _localCountryBoost = 1.3;
 
-  final OFFDataSource _offDataSource;
-  final SpFoodDataSource _spBackendDataSource;
+  final OFFDataSource? _offDataSource;
+  final SpFoodDataSource? _spBackendDataSource;
+  final ChineseFoodDataSource? _localFoods;
 
-  ProductsRepository(this._offDataSource, this._spBackendDataSource);
+  ProductsRepository(this._offDataSource, this._spBackendDataSource)
+    : _localFoods = null;
+
+  /// The shipped app only reads the bundled Chinese catalogue. The legacy
+  /// constructor remains for compatibility tests and never runs in app DI.
+  ProductsRepository.local(ChineseFoodDataSource localFoods)
+    : _localFoods = localFoods,
+      _offDataSource = null,
+      _spBackendDataSource = null;
+
+  bool get usesLocalFoods => _localFoods != null;
 
   Future<List<MealEntity>> getOFFProductsByString(String searchString) async {
-    final offWordResponse = await _offDataSource.fetchSearchWordResults(
+    if (_localFoods case final local?) return local.search(searchString);
+    final offWordResponse = await _offDataSource!.fetchSearchWordResults(
       searchString,
     );
 
@@ -111,7 +124,8 @@ class ProductsRepository {
     String searchString, {
     bool forResolution = false,
   }) async {
-    final spWordResponse = await _spBackendDataSource.fetchSearchWordResults(
+    if (_localFoods case final local?) return local.search(searchString);
+    final spWordResponse = await _spBackendDataSource!.fetchSearchWordResults(
       searchString,
       forResolution: forResolution,
     );
@@ -180,7 +194,12 @@ class ProductsRepository {
     String barcode, {
     String? knownName,
   }) async {
-    final productResponse = await _offDataSource.fetchBarcodeResults(barcode);
+    if (_localFoods case final local?) {
+      final meal = await local.barcode(barcode);
+      if (meal == null) throw ProductNotFoundException();
+      return meal;
+    }
+    final productResponse = await _offDataSource!.fetchBarcodeResults(barcode);
 
     final product = productResponse.product;
     if (product == null) throw ProductNotFoundException();

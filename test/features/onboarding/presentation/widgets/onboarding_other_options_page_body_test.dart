@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/section_group.dart';
-import 'package:opennutritracker/core/utils/off_const.dart';
 import 'package:opennutritracker/core/utils/theme_mode_provider.dart';
-import 'package:opennutritracker/features/add_meal/data/dto/sp/sp_const.dart';
 import 'package:opennutritracker/features/onboarding/presentation/widgets/onboarding_other_options_page_body.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +10,7 @@ import 'package:provider/provider.dart';
 import '../../../../helpers/test_l10n.dart';
 
 /// The "Other options" page groups its settings the way Profile and Settings
-/// do, and keeps the long database list collapsed behind a summary.
+/// do, and describes the bundled local library without remote switches.
 void main() {
   Future<void> pumpPage(
     WidgetTester tester, {
@@ -51,86 +49,28 @@ void main() {
     expect(find.byType(SectionGroup), findsNWidgets(3));
   });
 
-  testWidgets('the database list starts collapsed', (tester) async {
+  testWidgets('shows the local library without remote source switches', (tester) async {
     await pumpPage(tester);
-
-    expect(find.byType(ExpansionTile), findsOneWidget);
-    for (final source in SPConst.settingsSelectableFoodSources) {
-      expect(
-        find.text(SPConst.foodSourceDisplayNames[source]!),
-        findsNothing,
-        reason: '$source should be hidden until the tile is expanded',
-      );
-    }
+    expect(find.text(l10nEn.localFoodSourcesTitle), findsOneWidget);
+    expect(find.text(l10nEn.localFoodSourcesDescription), findsOneWidget);
+    expect(find.byType(ExpansionTile), findsNothing);
+    expect(find.text('Open Food Facts'), findsNothing);
+    expect(find.text('FoodData Central (Foundation Foods)'), findsNothing);
   });
 
-  testWidgets('the collapsed summary counts the enabled sources', (
-    tester,
-  ) async {
-    // Four of five selectable sources on, plus Open Food Facts, which is
-    // always searched and has no switch: 5 of 6.
-    await pumpPage(
-      tester,
-      toggles: {
-        'fdc_foundation': true,
-        'fdc_sr_legacy': true,
-        'fdc_survey': true,
-        'fdc_branded': false,
-        'bls': true,
-      },
-    );
-
-    expect(
-      find.text(l10nEn.onboardingFoodSourcesEnabledCount(5, 6)),
-      findsOneWidget,
-    );
+  testWidgets('legacy source preferences do not hide the Chinese library', (tester) async {
+    await pumpPage(tester, toggles: const {'fdc_branded': false, 'bls': false});
+    expect(find.text(l10nEn.localFoodSourcesTitle), findsOneWidget);
+    expect(find.bySemanticsIdentifier('onboarding-food-source-bls'), findsNothing);
   });
 
-  testWidgets('expanding reveals every source, including the fixed one', (
-    tester,
-  ) async {
-    await pumpPage(tester);
-
-    await tester.tap(find.text(l10nEn.settingsFoodSourcesLabel).last);
-    await tester.pumpAndSettle();
-
-    expect(find.text(OFFConst.offSourceName), findsOneWidget);
-    for (final source in SPConst.settingsSelectableFoodSources) {
-      expect(
-        find.text(SPConst.foodSourceDisplayNames[source]!),
-        findsOneWidget,
-      );
-    }
-  });
-
-  testWidgets('toggling a source reports it and updates the summary', (
-    tester,
-  ) async {
+  testWidgets('showing the local library leaves stored preferences intact', (tester) async {
     Map<String, bool>? reported;
-    await pumpPage(
-      tester,
-      toggles: {for (final s in SPConst.settingsSelectableFoodSources) s: true},
+    await pumpPage(tester,
+      toggles: const {'bls': false},
       onToggles: (toggles) => reported = toggles,
     );
-
-    expect(
-      find.text(l10nEn.onboardingFoodSourcesEnabledCount(6, 6)),
-      findsOneWidget,
-    );
-
-    await tester.tap(find.text(l10nEn.settingsFoodSourcesLabel).last);
-    await tester.pumpAndSettle();
-    final blsSwitch = find.bySemanticsIdentifier('onboarding-food-source-bls');
-    // The expanded list runs past the bottom of the test surface.
-    await tester.ensureVisible(blsSwitch);
-    await tester.pumpAndSettle();
-    await tester.tap(blsSwitch);
-    await tester.pumpAndSettle();
-
-    expect(reported?['bls'], isFalse);
-    expect(
-      find.text(l10nEn.onboardingFoodSourcesEnabledCount(5, 6)),
-      findsOneWidget,
-    );
+    expect(reported, isNull, reason: 'Informational library row does not rewrite config');
+    expect(tester.takeException(), isNull);
   });
 }

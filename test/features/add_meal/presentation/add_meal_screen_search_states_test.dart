@@ -44,6 +44,9 @@ import '../../../helpers/fake_favourites.dart';
 import '../../../helpers/test_l10n.dart';
 
 class _FakeProductsRepository implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   bool offThrows = false;
   bool fdcThrows = false;
   Completer<void>? offGate;

@@ -344,6 +344,9 @@ class _FakeGetTrackedDayUsecase implements GetTrackedDayUsecase {
 }
 
 class _FakeProductsRepository implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   final MealEntity? Function() hydratedProvider;
 
   _FakeProductsRepository(this.hydratedProvider);

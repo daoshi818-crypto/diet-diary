@@ -40,7 +40,7 @@ class FoodBloc extends Bloc<FoodEvent, FoodState> {
     // search. Blank to the spinner first: Retry needs visible feedback even
     // when the failed results are still on screen.
     on<RefreshFoodEvent>((event, emit) async {
-      if (_searchString.trim().length >= minQueryLength) {
+      if (isSearchQueryLongEnough(_searchString)) {
         emit(FoodLoadingState());
       }
       await _loadFood(_searchString, emit, force: true);
@@ -55,7 +55,7 @@ class FoodBloc extends Bloc<FoodEvent, FoodState> {
     Emitter<FoodState> emit, {
     bool force = false,
   }) async {
-    if (searchString.trim().length < minQueryLength) {
+    if (!isSearchQueryLongEnough(searchString)) {
       // Supersedes any search still in flight: its results would replace
       // the reset below.
       _generation++;

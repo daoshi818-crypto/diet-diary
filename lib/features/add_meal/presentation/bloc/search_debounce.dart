@@ -10,6 +10,11 @@ const searchDebounceDuration = Duration(milliseconds: 500);
 /// the search blocs to their initial state.
 const minQueryLength = 2;
 
+/// A single Chinese character can name a food; Latin input still needs two.
+bool isSearchQueryLongEnough(String query) =>
+    query.trim().length >= minQueryLength ||
+    RegExp(r'[\u3400-\u9fff]').hasMatch(query);
+
 /// Debounce keystrokes, then run the latest one as a restartable handler so an
 /// in-flight search is cancelled the moment a newer query arrives. Keeps the
 /// remote source to roughly one request per typing pause.

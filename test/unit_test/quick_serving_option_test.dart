@@ -1,7 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments_entity.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 import 'package:opennutritracker/features/meal_detail/util/quick_serving_option.dart';
+import 'package:opennutritracker/features/meal_detail/util/portion_display.dart';
 
 // Locks in what the meal-detail sheet's quick-serving chip row is meant
 // to show for each shape of food — the trio of ×-multipliers when the
@@ -25,6 +27,7 @@ MealEntity _meal({
   String? servingUnit,
   String? servingSize,
   String? mealUnit,
+  List<MealPortionEntity> portions = const [],
 }) {
   return MealEntity(
     code: 'quick-serving-test',
@@ -37,11 +40,73 @@ MealEntity _meal({
     servingSize: servingSize,
     nutriments: _nutriments,
     source: MealSourceEntity.off,
+    portions: portions,
   );
 }
 
 void main() {
   group('quickServingOptionsFor', () {
+    test('named portions replace equal-weight portions and weight presets', () {
+      final meal = _meal(
+        mealUnit: 'g',
+        portions: const [
+          MealPortionEntity(label: '小个', gramWeight: 50, localized: true),
+          MealPortionEntity(label: '50克', gramWeight: 50, localized: true),
+          MealPortionEntity(label: '大个', gramWeight: 100, localized: true),
+        ],
+      );
+      final options = quickServingOptionsFor(
+        meal,
+        'g',
+        includeWeightPresets: true,
+      );
+      expect(options.map((o) => o.id), [
+        'portion-0',
+        'portion-2',
+        '150g',
+        '200g',
+      ]);
+      expect(options.first.label, '小个 · 50 g');
+      expect(visiblePortionIndices(meal, selectedUnit: 'serving#1'), [1, 2]);
+    });
+
+    test('serving multipliers replace identical gram presets', () {
+      final options = quickServingOptionsFor(
+        _meal(servingQuantity: 100, servingUnit: 'g', mealUnit: 'g'),
+        'g',
+        includeWeightPresets: true,
+      );
+      expect(options.map((o) => o.id), [
+        'half-serving',
+        'one-serving',
+        'double-serving',
+        '150g',
+      ]);
+    });
+
+    test('portion labels do not repeat a weight already present', () {
+      for (final label in ['100克', '100 g', '一份（100克）']) {
+        expect(
+          portionDisplayLabel(
+            MealPortionEntity(label: label, gramWeight: 100, localized: true),
+            'g',
+          ),
+          label,
+        );
+      }
+      expect(
+        portionDisplayLabel(
+          const MealPortionEntity(
+            label: '半个',
+            gramWeight: 25.5,
+            localized: true,
+          ),
+          'g',
+        ),
+        '半个 · 25.5 g',
+      );
+    });
+
     test('solid food with a scalable serving offers all four presets', () {
       final options = quickServingOptionsFor(
         _meal(servingQuantity: 30, servingUnit: 'g', mealUnit: 'g'),
@@ -55,12 +120,7 @@ void main() {
         'double-serving',
         '100g',
       ]);
-      expect(options.map((o) => o.label).toList(), [
-        '½×',
-        '1×',
-        '2×',
-        '100 g',
-      ]);
+      expect(options.map((o) => o.label).toList(), ['½×', '1×', '2×', '100 g']);
       expect(options.map((o) => o.unit).toList(), [
         'serving',
         'serving',
@@ -94,16 +154,13 @@ void main() {
       expect(options.single.quantity, 100);
     });
 
-    test(
-      'meal with neither solid nor liquid unit (e.g. gml quick-add) still '
-      'gets the 100 g shortcut, mirroring the unit dropdown',
-      () {
-        final options = quickServingOptionsFor(_meal(mealUnit: null), 'g');
+    test('meal with neither solid nor liquid unit (e.g. gml quick-add) still '
+        'gets the 100 g shortcut, mirroring the unit dropdown', () {
+      final options = quickServingOptionsFor(_meal(mealUnit: null), 'g');
 
-        expect(options, hasLength(1));
-        expect(options.single.id, '100g');
-      },
-    );
+      expect(options, hasLength(1));
+      expect(options.single.id, '100g');
+    });
 
     test('purely liquid food with no serving gets no chip row', () {
       final options = quickServingOptionsFor(_meal(mealUnit: 'ml'), 'g');

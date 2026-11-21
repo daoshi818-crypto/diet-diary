@@ -261,6 +261,8 @@ void main() {
     // per-provider retention text are the load-bearing part and exist once.
     await pumpPage(tester, credentials: storage);
 
+    await tester.ensureVisible(find.bySemanticsIdentifier('onboarding-ai-assist'));
+    await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsIdentifier('onboarding-ai-assist'));
     await tester.pumpAndSettle();
 
@@ -290,6 +292,8 @@ void main() {
     await pumpPage(tester, credentials: storage);
     expect(find.textContaining(l10nEn.settingsAiAssistOnLabel), findsOneWidget);
 
+    await tester.ensureVisible(find.bySemanticsIdentifier('onboarding-ai-assist'));
+    await tester.pumpAndSettle();
     await tester.tap(find.bySemanticsIdentifier('onboarding-ai-assist'));
     await tester.pumpAndSettle();
 

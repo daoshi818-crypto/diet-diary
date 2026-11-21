@@ -101,6 +101,9 @@ class SPConst {
   /// Human-readable names of the backend food sources, keyed by
   /// food_source.code. Proper nouns — shown as-is in every app language.
   static const foodSourceDisplayNames = <String, String>{
+    'local_cn_fct': '本地·中国食物成分表',
+    'local_calshot': '本地·吃有数食物库',
+    'local_fatsecret': '本地·FatSecret 中文快照',
     'fdc_foundation': 'FoodData Central (Foundation Foods)',
     'fdc_sr_legacy': 'FoodData Central (SR Legacy)',
     'fdc_survey': 'FoodData Central (FNDDS Survey)',
@@ -118,6 +121,9 @@ class SPConst {
   /// Compact source labels for chips on list items, where the full
   /// [foodSourceDisplayNames] would not fit.
   static const foodSourceShortNames = <String, String>{
+    'local_cn_fct': '本地成分表',
+    'local_calshot': '本地食物库',
+    'local_fatsecret': '本地中文库',
     'fdc_foundation': 'FDC Foundation',
     'fdc_sr_legacy': 'FDC SR Legacy',
     'fdc_survey': 'FDC Survey',

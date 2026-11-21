@@ -125,7 +125,7 @@ class _FoodSearchTabViewState extends State<FoodSearchTabView>
         bloc: _productsBloc,
         builder: (context, state) {
         if (state is ProductsInitial) {
-          return query.trim().length >= minQueryLength
+          return isSearchQueryLongEnough(query)
               ? _pendingSpinner
               : const DefaultsResultsWidget();
         }
@@ -134,7 +134,7 @@ class _FoodSearchTabViewState extends State<FoodSearchTabView>
         }
         if (state is ProductsLoadedState) {
           if (state.products.isEmpty) {
-            return query.trim().length >= minQueryLength &&
+            return isSearchQueryLongEnough(query) &&
                     state.query != query
                 ? _pendingSpinner
                 : const NoResultsWidget();
@@ -173,7 +173,7 @@ class _FoodSearchTabViewState extends State<FoodSearchTabView>
         bloc: _foodBloc,
         builder: (context, state) {
         if (state is FoodInitial) {
-          return query.trim().length >= minQueryLength
+          return isSearchQueryLongEnough(query)
               ? _pendingSpinner
               : const DefaultsResultsWidget();
         }
@@ -182,7 +182,7 @@ class _FoodSearchTabViewState extends State<FoodSearchTabView>
         }
         if (state is FoodLoadedState) {
           if (state.food.isEmpty) {
-            return query.trim().length >= minQueryLength &&
+            return isSearchQueryLongEnough(query) &&
                     state.query != query
                 ? _pendingSpinner
                 : const NoResultsWidget();

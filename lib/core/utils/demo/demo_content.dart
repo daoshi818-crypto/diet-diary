@@ -19,6 +19,7 @@ import 'package:opennutritracker/core/utils/demo/unsplash_attribution.dart';
 import 'package:opennutritracker/core/utils/id_generator.dart';
 import 'package:opennutritracker/core/utils/locator.dart';
 import 'package:opennutritracker/core/utils/user_image_storage.dart';
+import 'package:opennutritracker/features/add_meal/data/data_sources/chinese_food_data_source.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments_entity.dart';
 
@@ -122,321 +123,44 @@ Future<String?> _importMealPhoto(String photoId, String ownerCode) async {
   }
 }
 
-/// A per-100g nutrient snapshot broad enough to cover what the diary's
-/// micronutrient panel aggregates (see `DailyNutrientPanel`, which sums
-/// straight off logged intakes' [MealNutrimentsEntity] — there's no
-/// separate "tracked micros" store to seed). Values below are
-/// approximate real-world figures for each food, not lab-precise, but
-/// plausible enough that the panel shows realistic numbers instead of
-/// zeroes.
-Future<MealEntity> _meal(
-  String name, {
-  required double kcal100,
-  required double carbs100,
-  required double fat100,
-  required double protein100,
-  double? sugars100,
-  double? satFat100,
-  double? fiber100,
-  double? monounsaturatedFat100,
-  double? polyunsaturatedFat100,
-  double? cholesterol100,
-  double? sodium100,
-  double? potassium100,
-  double? magnesium100,
-  double? calcium100,
-  double? iron100,
-  double? zinc100,
-  double? phosphorus100,
-  double? vitaminA100,
-  double? vitaminC100,
-  double? vitaminD100,
-  double? vitaminB6100,
-  double? vitaminB12100,
-  double? niacin100,
-  // A curated Unsplash photo id (see unsplash_attribution.dart) — every
-  // demo food gets one, so this isn't optional the way a real OFF/FDC
-  // search result's photo would be.
-  required String photoId,
-}) async {
-  final code = IdGenerator.getUniqueID();
-  return MealEntity(
-    code: code,
-    name: name,
-    url: null,
-    // The photo ships with the app and is copied into local meal-image
-    // storage, so both remote URLs stay null and nothing is fetched at
-    // render time. MealEntity prefers localImagePath when it is set.
-    thumbnailImageUrl: null,
-    mainImageUrl: null,
-    localImagePath: await _importMealPhoto(photoId, code),
-    mealQuantity: null,
-    mealUnit: 'g',
-    servingQuantity: null,
-    servingUnit: null,
-    servingSize: null,
-    source: MealSourceEntity.custom,
-    nutriments: MealNutrimentsEntity(
-      energyKcal100: kcal100,
-      carbohydrates100: carbs100,
-      fat100: fat100,
-      proteins100: protein100,
-      sugars100: sugars100 ?? carbs100 * 0.3,
-      saturatedFat100: satFat100 ?? fat100 * 0.35,
-      fiber100: fiber100 ?? 2.0,
-      monounsaturatedFat100: monounsaturatedFat100,
-      polyunsaturatedFat100: polyunsaturatedFat100,
-      cholesterol100: cholesterol100,
-      sodium100: sodium100,
-      potassium100: potassium100,
-      magnesium100: magnesium100,
-      calcium100: calcium100,
-      iron100: iron100,
-      zinc100: zinc100,
-      phosphorus100: phosphorus100,
-      vitaminA100: vitaminA100,
-      vitaminC100: vitaminC100,
-      vitaminD100: vitaminD100,
-      vitaminB6100: vitaminB6100,
-      vitaminB12100: vitaminB12100,
-      niacin100: niacin100,
-    ),
-  );
-}
-
-/// Builds every demo food, each with its curated Unsplash photo (see
-/// unsplash_attribution.dart) — a fixed, hand-picked set rather than a
-/// live search. The photos are bundled assets copied into local storage,
-/// so this needs no network access, but it is async because that copy is.
-Future<DemoFoods> buildDemoFoods() async {
-  final oatmeal = await _meal(
-    'Oatmeal',
-    photoId: '1548807371-30dc1bbe6cb5',
-    kcal100: 150,
-    carbs100: 27,
-    fat100: 3,
-    protein100: 5,
-    fiber100: 4,
-    sodium100: 6,
-    potassium100: 143,
-    magnesium100: 63,
-    calcium100: 21,
-    iron100: 1.7,
-    zinc100: 1.3,
-    phosphorus100: 180,
-    vitaminB6100: 0.05,
-    niacin100: 0.4,
-    monounsaturatedFat100: 1.0,
-    polyunsaturatedFat100: 1.1,
-  );
-  final brownRice = await _meal(
-    'Brown rice',
-    photoId: '1593357849627-cbbc9fda6b05',
-    kcal100: 123,
-    carbs100: 26,
-    fat100: 1,
-    protein100: 3,
-    fiber100: 1.8,
-    sodium100: 5,
-    potassium100: 86,
-    magnesium100: 43,
-    calcium100: 10,
-    iron100: 0.5,
-    zinc100: 0.6,
-    phosphorus100: 83,
-    vitaminB6100: 0.15,
-    niacin100: 1.5,
-    monounsaturatedFat100: 0.3,
-    polyunsaturatedFat100: 0.3,
-  );
-  // Deliberately not a low-carb-density food like potatoes (20g/100g) —
-  // hitting a high daily carb target with a low-density food needs an
-  // unrealistically large gram amount (900g+ was showing up in testing).
-  final wholegrainBread = await _meal(
-    'Wholegrain bread',
-    photoId: '1552056413-b8b5eed0170b',
-    kcal100: 265,
-    carbs100: 49,
-    fat100: 3.5,
-    protein100: 9,
-    fiber100: 7,
-    sodium100: 400,
-    potassium100: 230,
-    magnesium100: 65,
-    calcium100: 100,
-    iron100: 2.5,
-    zinc100: 1.5,
-    phosphorus100: 200,
-    vitaminB6100: 0.1,
-    niacin100: 4.0,
-    monounsaturatedFat100: 0.4,
-    polyunsaturatedFat100: 1.2,
-  );
-  final chickenBreast = await _meal(
-    'Chicken breast',
-    photoId: '1762631934518-f75e233413ca',
-    kcal100: 165,
-    carbs100: 0,
-    fat100: 3.6,
-    protein100: 31,
-    satFat100: 1,
-    cholesterol100: 85,
-    sodium100: 74,
-    potassium100: 256,
-    magnesium100: 29,
-    calcium100: 15,
-    iron100: 1.0,
-    zinc100: 1.0,
-    phosphorus100: 220,
-    vitaminB6100: 0.6,
-    vitaminB12100: 0.3,
-    niacin100: 13.7,
-    monounsaturatedFat100: 1.24,
-    polyunsaturatedFat100: 0.8,
-  );
-  final greekYogurt = await _meal(
-    'Greek yogurt',
-    photoId: '1571212515416-fef01fc43637',
-    kcal100: 59,
-    carbs100: 3.6,
-    fat100: 0.4,
-    protein100: 10,
-    sugars100: 3.6,
-    cholesterol100: 5,
-    sodium100: 36,
-    potassium100: 141,
-    magnesium100: 11,
-    calcium100: 110,
-    iron100: 0.05,
-    zinc100: 0.5,
-    phosphorus100: 135,
-    vitaminB6100: 0.05,
-    vitaminB12100: 0.5,
-    monounsaturatedFat100: 0.1,
-  );
-  final salmon = await _meal(
-    'Salmon fillet',
-    photoId: '1739785938237-73b3654200d5',
-    kcal100: 208,
-    carbs100: 0,
-    fat100: 13,
-    protein100: 20,
-    satFat100: 3.1,
-    cholesterol100: 55,
-    sodium100: 59,
-    potassium100: 363,
-    magnesium100: 27,
-    calcium100: 9,
-    iron100: 0.3,
-    zinc100: 0.4,
-    phosphorus100: 240,
-    vitaminD100: 11,
-    vitaminB12100: 3.2,
-    niacin100: 8.0,
-    monounsaturatedFat100: 3.8,
-    polyunsaturatedFat100: 3.9,
-  );
-  final oliveOil = await _meal(
-    'Olive oil',
-    photoId: '1757801333069-f7b3cabaec4a',
-    kcal100: 884,
-    carbs100: 0,
-    fat100: 100,
-    protein100: 0,
-    satFat100: 14,
-    monounsaturatedFat100: 73,
-    polyunsaturatedFat100: 11,
-  );
-  final almonds = await _meal(
-    'Almonds',
-    photoId: '1627820752174-acae1b399128',
-    kcal100: 579,
-    carbs100: 22,
-    fat100: 50,
-    protein100: 21,
-    fiber100: 12.5,
-    sodium100: 1,
-    potassium100: 733,
-    magnesium100: 270,
-    calcium100: 269,
-    iron100: 3.7,
-    zinc100: 3.1,
-    phosphorus100: 481,
-    vitaminB6100: 0.14,
-    niacin100: 3.6,
-    monounsaturatedFat100: 31,
-    polyunsaturatedFat100: 12,
-  );
-  final banana = await _meal(
-    'Banana',
-    photoId: '1757332050958-b797a022c910',
-    kcal100: 89,
-    carbs100: 23,
-    fat100: 0.3,
-    protein100: 1.1,
-    sugars100: 12,
-    fiber100: 2.6,
-    sodium100: 1,
-    potassium100: 358,
-    magnesium100: 27,
-    calcium100: 5,
-    iron100: 0.26,
-    zinc100: 0.15,
-    phosphorus100: 22,
-    vitaminB6100: 0.37,
-    vitaminC100: 8.7,
-    niacin100: 0.7,
-  );
-  final apple = await _meal(
-    'Apple',
-    photoId: '1567306226416-28f0efdc88ce',
-    kcal100: 52,
-    carbs100: 14,
-    fat100: 0.2,
-    protein100: 0.3,
-    sugars100: 10,
-    fiber100: 2.4,
-    sodium100: 1,
-    potassium100: 107,
-    magnesium100: 5,
-    calcium100: 6,
-    iron100: 0.12,
-    vitaminC100: 4.6,
-    niacin100: 0.09,
-  );
-  final broccoli = await _meal(
-    'Broccoli',
-    photoId: '1646161762904-043f71f256f1',
-    kcal100: 35,
-    carbs100: 7,
-    fat100: 0.4,
-    protein100: 2.4,
-    fiber100: 3.3,
-    sodium100: 33,
-    potassium100: 316,
-    magnesium100: 21,
-    calcium100: 47,
-    iron100: 0.7,
-    zinc100: 0.4,
-    phosphorus100: 66,
-    vitaminA100: 31,
-    vitaminC100: 89,
-    vitaminB6100: 0.18,
-    niacin100: 0.6,
-  );
+/// The demo uses the same private Chinese catalogue as food search. Photos
+/// remain bundled examples; nutrition is copied without inventing missing data.
+Future<DemoFoods> buildDemoFoods({ChineseFoodDataSource? catalogue}) async {
+  final source = catalogue ?? ChineseFoodDataSource();
+  Future<MealEntity> meal(String sourceId, String photoId) async {
+    final food = await source.bySourceId('calshot', sourceId);
+    return MealEntity(
+      code: food.code,
+      name: food.name,
+      brands: food.brands,
+      url: food.url,
+      mealQuantity: food.mealQuantity,
+      mealUnit: food.mealUnit,
+      servingQuantity: food.servingQuantity,
+      servingUnit: food.servingUnit,
+      servingSize: food.servingSize,
+      servingSizeIsLocalized: food.servingSizeIsLocalized,
+      nutriments: food.nutriments,
+      source: food.source,
+      backendSource: food.backendSource,
+      portions: food.portions,
+      detailed: true,
+      localImagePath: await _importMealPhoto(photoId, food.code!),
+    );
+  }
 
   return (
-    oatmeal: oatmeal,
-    brownRice: brownRice,
-    wholegrainBread: wholegrainBread,
-    chickenBreast: chickenBreast,
-    greekYogurt: greekYogurt,
-    salmon: salmon,
-    oliveOil: oliveOil,
-    almonds: almonds,
-    banana: banana,
-    apple: apple,
-    broccoli: broccoli,
+    oatmeal: await meal('460', '1548807371-30dc1bbe6cb5'),
+    brownRice: await meal('140', '1593357849627-cbbc9fda6b05'),
+    wholegrainBread: await meal('411', '1552056413-b8b5eed0170b'),
+    chickenBreast: await meal('1422', '1762631934518-f75e233413ca'),
+    greekYogurt: await meal('885', '1571212515416-fef01fc43637'),
+    salmon: await meal('324786', '1739785938237-73b3654200d5'),
+    oliveOil: await meal('962536', '1757801333069-f7b3cabaec4a'),
+    almonds: await meal('920', '1627820752174-acae1b399128'),
+    banana: await meal('340', '1757332050958-b797a022c910'),
+    apple: await meal('339', '1567306226416-28f0efdc88ce'),
+    broccoli: await meal('172', '1646161762904-043f71f256f1'),
   );
 }
 
@@ -661,8 +385,8 @@ Future<void> seedRecipes(DateTime now, DemoFoods foods) async {
   final recipes = [
     RecipeEntity(
       id: IdGenerator.getUniqueID(),
-      name: 'Protein Power Bowl',
-      description: 'Grilled chicken over brown rice, meal-prep friendly.',
+      name: '鸡胸肉糙米饭',
+      description: '鸡胸肉搭配糙米饭，适合提前备餐。',
       ingredients: [
         ingredient(foods.chickenBreast, 200),
         ingredient(foods.brownRice, 150),
@@ -676,10 +400,9 @@ Future<void> seedRecipes(DateTime now, DemoFoods foods) async {
     ),
     RecipeEntity(
       id: IdGenerator.getUniqueID(),
-      name: 'Salmon & Greens Bowl',
+      name: '三文鱼蔬菜饭',
       description:
-          'Pan-seared salmon with rice and steamed broccoli — an easy '
-          'omega-3-rich dinner for two.',
+          '三文鱼搭配糙米饭与西兰花，双人晚餐示例。',
       ingredients: [
         ingredient(foods.salmon, 180),
         ingredient(foods.brownRice, 150),
@@ -694,8 +417,8 @@ Future<void> seedRecipes(DateTime now, DemoFoods foods) async {
     ),
     RecipeEntity(
       id: IdGenerator.getUniqueID(),
-      name: 'Morning Oat Bowl',
-      description: 'Oatmeal topped with banana and almonds.',
+      name: '香蕉杏仁燕麦粥',
+      description: '燕麦粥搭配香蕉与杏仁。',
       ingredients: [
         ingredient(foods.oatmeal, 200),
         ingredient(foods.banana, 100),
@@ -710,8 +433,8 @@ Future<void> seedRecipes(DateTime now, DemoFoods foods) async {
     ),
     RecipeEntity(
       id: IdGenerator.getUniqueID(),
-      name: 'Greek Yogurt Parfait',
-      description: 'Greek yogurt layered with banana and a scattering of almonds.',
+      name: '香蕉杏仁酸奶杯',
+      description: '希腊酸奶搭配香蕉片与杏仁。',
       ingredients: [
         ingredient(foods.greekYogurt, 200),
         ingredient(foods.banana, 80),

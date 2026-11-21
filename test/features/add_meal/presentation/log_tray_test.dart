@@ -138,6 +138,9 @@ class _FakeCache extends Fake implements RemoteSearchCacheDataSource {
 
 /// Answers a barcode lookup with [full], or fails when it is null.
 class _FakeProducts extends Fake implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   MealEntity? full;
   var lookups = 0;
 

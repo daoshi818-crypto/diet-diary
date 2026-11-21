@@ -46,7 +46,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
     // search. Blank to the spinner first: Retry needs visible feedback even
     // when the failed results are still on screen.
     on<RefreshProductsEvent>((event, emit) async {
-      if (_searchString.trim().length >= minQueryLength) {
+      if (isSearchQueryLongEnough(_searchString)) {
         emit(ProductsLoadingState());
       }
       await _loadProducts(_searchString, emit, force: true);
@@ -69,7 +69,7 @@ class ProductsBloc extends Bloc<ProductsEvent, ProductsState> {
     // field text, so this is the single guard keeping a too-short input
     // from triggering a search. Reset to Initial so the "start typing"
     // default widget shows.
-    if (searchString.trim().length < minQueryLength) {
+    if (!isSearchQueryLongEnough(searchString)) {
       // Supersedes any search still in flight: its results would replace
       // the reset below.
       _generation++;

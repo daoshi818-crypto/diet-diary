@@ -23,14 +23,14 @@ void main() {
 
       expect(
         find.text(
-          "One food source didn't respond. Some results might be missing.",
+          'Some local food data could not be read. Showing available results. Please retry.',
         ),
         findsOneWidget,
       );
       expect(find.text('Retry'), findsOneWidget);
     });
 
-    testWidgets('says no online source answered when all are down', (
+    testWidgets('says the local library is unavailable when all are down', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -40,13 +40,13 @@ void main() {
 
       expect(
         find.text(
-          'No online food source responded. Showing your saved foods only.',
+          'The local food library could not be read. Showing saved foods only. Please retry.',
         ),
         findsOneWidget,
       );
       expect(
         find.text(
-          "One food source didn't respond. Some results might be missing.",
+          'Some local food data could not be read. Showing available results. Please retry.',
         ),
         findsNothing,
       );

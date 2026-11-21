@@ -23,6 +23,8 @@ Future<MealEntity?> fetchDetailedOffMeal(
   RemoteSearchCacheDataSource cache,
   ProductsRepository products,
 ) async {
+  // Retain historical diary snapshots without refreshing them from OFF.
+  if (products.usesLocalFoods) return null;
   final code = meal.code;
   if (meal.source != MealSourceEntity.off ||
       meal.detailed ||

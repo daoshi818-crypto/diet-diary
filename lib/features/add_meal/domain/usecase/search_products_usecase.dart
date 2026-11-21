@@ -117,6 +117,9 @@ class SearchProductsUseCase {
       fetchDetailedOffMeal(meal, _cachedOffMealDataSource, _productsRepository);
 
   Future<void> _cacheRemoteResults(List<MealEntity> remote) async {
+    // The catalogue is the authoritative local snapshot. Caching it would
+    // lose portion metadata and let an older snapshot shadow an update.
+    if (_productsRepository.usesLocalFoods) return;
     if (remote.isEmpty) return;
     // cacheFromSearch (vs cacheAll) preserves timestamps for entries
     // already in the cache. Important so that an item the user logged
@@ -235,6 +238,7 @@ class SearchProductsUseCase {
     };
     final fromCache = _cachedOffMealDataSource
         .getAllByMostRecentlyTouched()
+        .where((_) => !_productsRepository.usesLocalFoods)
         .map(MealEntity.fromMealDBO)
         .where((meal) => meal.source == cacheSource)
         .where((meal) =>

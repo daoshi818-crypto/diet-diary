@@ -23,6 +23,9 @@ import '../fixture/backend_sibling_fixtures.dart';
 import '../helpers/hive_test_setup.dart';
 
 class _FakeProductsRepository implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   final Map<String, List<MealEntity>> fdc = {};
   bool remoteDown = false;
 

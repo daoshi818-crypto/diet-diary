@@ -1,6 +1,7 @@
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
+import 'package:opennutritracker/features/meal_detail/util/portion_display.dart';
 
 /// One preset a user can tap in the meal-detail sheet to jump the
 /// quantity + unit inputs to a common portion without typing.
@@ -37,14 +38,14 @@ List<QuickServingOption> quickServingOptionsFor(
   final options = <QuickServingOption>[];
 
   if (product.portions.isNotEmpty) {
-    for (var i = 0; i < product.portions.length; i++) {
+    for (final i in visiblePortionIndices(product)) {
       final portion = product.portions[i];
       options.add(
         QuickServingOption(
           id: 'portion-$i',
           quantity: 1,
           unit: portionUnit(i),
-          label: '${portion.label} · ${portion.gramWeight} $gramUnitLabel',
+          label: portionDisplayLabel(portion, gramUnitLabel),
         ),
       );
     }
@@ -75,7 +76,7 @@ List<QuickServingOption> quickServingOptionsFor(
   // serving still get the 100 g shortcut.
   if (product.isSolid || (!product.isLiquid && !product.isSolid)) {
     if (includeWeightPresets) {
-      for (final grams in [50, 150, 200]) {
+      for (final grams in [50, 100, 150, 200]) {
         options.add(
           QuickServingOption(
             id: '${grams}g',
@@ -85,15 +86,29 @@ List<QuickServingOption> quickServingOptionsFor(
           ),
         );
       }
+    } else {
+      options.add(
+        QuickServingOption(
+          id: '100g',
+          quantity: 100,
+          unit: gramUnit,
+          label: '100 $gramUnitLabel',
+        ),
+      );
     }
-    options.add(
-      QuickServingOption(
-        id: '100g',
-        quantity: 100,
-        unit: gramUnit,
-        label: '100 $gramUnitLabel',
-      ),
-    );
   }
-  return options;
+  final weights = <int>{};
+  return options.where((option) {
+    double? grams;
+    if (option.unit == gramUnit) {
+      grams = option.quantity;
+    } else if (isPortionUnit(option.unit)) {
+      final index = effectivePortionIndex(option.unit);
+      final base = product.portions.isNotEmpty
+          ? product.portions[index].gramWeight
+          : product.scalableServingQuantity;
+      if (base != null) grams = base * option.quantity;
+    }
+    return grams == null || weights.add((grams * 1000000).round());
+  }).toList();
 }

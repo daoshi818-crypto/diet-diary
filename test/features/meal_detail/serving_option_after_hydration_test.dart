@@ -431,6 +431,9 @@ class _FakeGetTrackedDayUsecase implements GetTrackedDayUsecase {
 /// Hydration answers with whatever future the test hands it, so a test can
 /// hold the full record back until the screen has rendered the thin one.
 class _FakeProductsRepository implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   final Future<MealEntity> Function() hydrated;
 
   _FakeProductsRepository(this.hydrated);

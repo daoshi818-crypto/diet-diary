@@ -339,6 +339,9 @@ class _FakeRemoteSearchCacheDataSource implements RemoteSearchCacheDataSource {
 }
 
 class _FakeProductsRepository implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   MealEntity? barcodeResult;
   int getOFFProductByBarcodeCalls = 0;
 

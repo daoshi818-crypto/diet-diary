@@ -52,12 +52,15 @@ class SearchProductByBarcodeUseCase {
       return MealEntity.fromMealDBO(customMatch);
     }
 
-    final cachedMatch = _cachedOffMealDataSource.getDetailedByBarcode(barcode);
+    final cachedMatch = _productsRepository.usesLocalFoods
+        ? null
+        : _cachedOffMealDataSource.getDetailedByBarcode(barcode);
     if (cachedMatch != null) {
       return MealEntity.fromMealDBO(cachedMatch);
     }
 
     final remote = await _productsRepository.getOFFProductByBarcode(barcode);
+    if (_productsRepository.usesLocalFoods) return remote;
     await _cachedOffMealDataSource.cache(MealDBO.fromMealEntity(remote));
     // Best effort: a favourite that keeps its old snapshot must not cost
     // the user the scan.

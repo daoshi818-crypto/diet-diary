@@ -108,7 +108,10 @@ class _FakeGetTrackedDayUsecase extends Fake implements GetTrackedDayUsecase {
   Future<TrackedDayEntity?> getTrackedDay(DateTime day) async => null;
 }
 
-class _FakeProductsRepository extends Fake implements ProductsRepository {}
+class _FakeProductsRepository extends Fake implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+}
 
 class _FakeRemoteSearchCacheDataSource extends Fake
     implements RemoteSearchCacheDataSource {}

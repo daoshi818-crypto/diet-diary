@@ -298,6 +298,9 @@ class _FakeGetTrackedDayUsecase implements GetTrackedDayUsecase {
 
 class _FakeProductsRepository implements ProductsRepository {
   @override
+  bool get usesLocalFoods => false;
+
+  @override
   dynamic noSuchMethod(Invocation invocation) =>
       throw UnimplementedError('Unexpected call: ${invocation.memberName}');
 }

@@ -9,9 +9,7 @@ import 'package:opennutritracker/features/settings/presentation/widgets/ai_assis
 import 'package:opennutritracker/core/styles/accent_colors.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
-import 'package:opennutritracker/core/utils/off_const.dart';
 import 'package:opennutritracker/core/utils/theme_mode_provider.dart';
-import 'package:opennutritracker/features/add_meal/data/dto/sp/sp_const.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 import 'package:provider/provider.dart';
 
@@ -168,11 +166,6 @@ class _OnboardingOtherOptionsPageBodyState
     final theme = Provider.of<ThemeModeProvider>(context, listen: false);
     theme.updateAccentColor(argb);
     theme.updateUseMaterialYou(false);
-    _publish();
-  }
-
-  void _onSourceToggled(String sourceCode, bool enabled) {
-    setState(() => _foodSourceToggles[sourceCode] = enabled);
     _publish();
   }
 
@@ -406,47 +399,12 @@ class _OnboardingOtherOptionsPageBodyState
   /// while closed, which is the only thing most users need from it.
   Widget _buildFoodSourcesTile(BuildContext context) {
     final s = S.of(context);
-    // Open Food Facts is always searched and has no switch, so it counts
-    // towards both sides of the summary.
-    const alwaysOnCount = 1;
-    final enabled =
-        alwaysOnCount +
-        SPConst.settingsSelectableFoodSources
-            .where((source) => _foodSourceToggles[source] ?? true)
-            .length;
-    final total = alwaysOnCount + SPConst.settingsSelectableFoodSources.length;
-
     return Semantics(
       identifier: 'onboarding-food-sources',
-      child: ExpansionTile(
-        shape: const Border(),
-        collapsedShape: const Border(),
-        title: Text(
-          s.settingsFoodSourcesLabel,
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
-        subtitle: Text(s.onboardingFoodSourcesEnabledCount(enabled, total)),
-        children: [
-          SwitchListTile(
-            dense: true,
-            title: const Text(OFFConst.offSourceName),
-            subtitle: Text(s.foodSourcesAlwaysEnabledLabel),
-            value: true,
-            onChanged: null,
-          ),
-          for (final sourceCode in SPConst.settingsSelectableFoodSources)
-            Semantics(
-              identifier: 'onboarding-food-source-${sourceCode.replaceAll('_', '-')}',
-              child: SwitchListTile(
-                dense: true,
-                title: Text(
-                  SPConst.foodSourceDisplayNames[sourceCode] ?? sourceCode,
-                ),
-                value: _foodSourceToggles[sourceCode] ?? true,
-                onChanged: (value) => _onSourceToggled(sourceCode, value),
-              ),
-            ),
-        ],
+      child: ListTile(
+        leading: const Icon(Icons.storage_outlined),
+        title: Text(s.localFoodSourcesTitle),
+        subtitle: Text(s.localFoodSourcesDescription),
       ),
     );
   }

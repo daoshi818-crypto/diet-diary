@@ -21,6 +21,9 @@ import 'package:opennutritracker/features/add_meal/domain/usecase/search_product
 import '../helpers/hive_test_setup.dart';
 
 class _FakeProductsRepository implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   final Map<String, List<MealEntity>> fdc = {};
   bool remoteDown = false;
 

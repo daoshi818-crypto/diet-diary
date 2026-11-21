@@ -123,11 +123,6 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
                       widget.meal.name ?? '?',
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      s.loggingAmountHint,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
                     const SizedBox(height: 16),
                     Text(
                       EnergyDisplay.formatWithUnit(

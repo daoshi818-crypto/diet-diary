@@ -90,7 +90,10 @@ class _FakeMacroGoal extends Fake implements GetMacroGoalUsecase {
   Future<double> getProteinsGoal(double totalCalorieGoal) async => 100;
 }
 
-class _FakeProductsRepository extends Fake implements ProductsRepository {}
+class _FakeProductsRepository extends Fake implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+}
 
 class _FakeRemoteSearchCache extends Fake
     implements RemoteSearchCacheDataSource {}

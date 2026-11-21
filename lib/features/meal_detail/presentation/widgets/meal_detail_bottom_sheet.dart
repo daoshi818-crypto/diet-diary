@@ -17,6 +17,7 @@ import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dar
 import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/util/quick_serving_option.dart';
+import 'package:opennutritracker/features/meal_detail/util/portion_display.dart';
 import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
@@ -249,15 +250,21 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                                 // #629: a serving the app cannot scale
                                 // is a no-op dressed as a unit.
                                 if (widget.product.portions.isNotEmpty)
-                                  for (
-                                    var i = 0;
-                                    i < widget.product.portions.length;
-                                    i++
-                                  )
+                                  for (final i in visiblePortionIndices(
+                                    widget.product,
+                                    selectedUnit: widget.selectedUnit,
+                                  ))
                                     DropdownMenuItem<String>(
                                       value: portionUnit(i),
                                       child: Text(
-                                        '${localizeServingLabel(S.of(context), widget.product.portions[i].label)} · ${widget.product.portions[i].gramWeight} ${S.of(context).gramUnit}',
+                                        portionDisplayLabel(
+                                          widget.product.portions[i],
+                                          S.of(context).gramUnit,
+                                          localizedLabel: localizeServingLabel(
+                                            S.of(context),
+                                            widget.product.portions[i].label,
+                                          ),
+                                        ),
                                         maxLines: 3,
                                         overflow: TextOverflow.ellipsis,
                                       ),

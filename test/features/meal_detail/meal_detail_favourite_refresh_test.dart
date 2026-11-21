@@ -55,6 +55,9 @@ class _FakeGetTrackedDayUsecase extends Fake implements GetTrackedDayUsecase {
 }
 
 class _FakeProductsRepository extends Fake implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   _FakeProductsRepository(this.fresh);
 
   final MealEntity fresh;

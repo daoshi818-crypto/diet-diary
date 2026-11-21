@@ -544,7 +544,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
   /// failed states return false so the error stays visible.
   static bool _productsPending(ProductsState state, String query) {
     if (state is ProductsLoadingState) return true;
-    if (query.trim().length < minQueryLength) return false;
+    if (!isSearchQueryLongEnough(query)) return false;
     if (state is ProductsInitial) return true;
     if (state is ProductsLoadedState) return state.query != query;
     return false;
@@ -552,7 +552,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
 
   static bool _foodPending(FoodState state, String query) {
     if (state is FoodLoadingState) return true;
-    if (query.trim().length < minQueryLength) return false;
+    if (!isSearchQueryLongEnough(query)) return false;
     if (state is FoodInitial) return true;
     if (state is FoodLoadedState) return state.query != query;
     return false;
@@ -872,7 +872,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
                 // All skips queries below minQueryLength, so only offer it
                 // once the query is long enough to actually search.
                 onSearchAll:
-                    _stickOnRecent && query.trim().length >= minQueryLength
+                    _stickOnRecent && isSearchQueryLongEnough(query)
                     ? _onSearchAllPressed
                     : null,
               );

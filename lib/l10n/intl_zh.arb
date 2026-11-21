@@ -9,7 +9,7 @@
   "additionalInfoLabelFDC": "更多信息请查看\nFoodData Central",
   "additionalInfoLabelSource": "更多信息请查看\n{sourceName}",
   "foodSourcesAlwaysEnabledLabel": "始终启用",
-  "foodSourcesHelpText": "搜索结果来自这些食品数据库。Open Food Facts 提供产品和条形码搜索，始终处于启用状态。",
+  "foodSourcesHelpText": "搜索和条码查询仅使用本地中文食物库与自定义食物，不连接 Open Food Facts 或其他远程食物数据库。",
   "machineTranslatedNameHint": "名称为自动翻译",
   "measureUnitBar": "{count, plural, other{条}}",
   "@measureUnitBar": {
@@ -108,7 +108,7 @@
     }
   },
   "settingsFoodSourcesLabel": "食品数据库",
-  "settingsFoodSourcesSubtitle": "选择食品搜索结果的来源",
+  "settingsFoodSourcesSubtitle": "本地中文食物库与数据来源",
   "onboardingOtherOptionsLabel": "其他选项",
   "onboardingOtherOptionsSubtitle": "个性化应用——所有设置以后都可以在设置中更改",
   "additionalInfoLabelOFF": "更多信息请查看\nOpenFoodFacts",
@@ -153,7 +153,7 @@
   "cholesterolLabel": "胆固醇",
   "chooseWeeklyWeightGoalLabel": "每周体重速率",
   "chooseWeightGoalLabel": "选择体重目标",
-  "clearOffCacheConfirmContent": "移除本地缓存的 Open Food Facts 和 FDC 搜索及扫描结果。缓存会在您搜索和扫描产品时自动重建。您的自定义餐食不会受影响。",
+  "clearOffCacheConfirmContent": "移除旧版缓存的 Open Food Facts 和 FDC 搜索及扫描结果。当前使用本地中文食物库，不再读取或重建这些远程缓存。自定义食物和饮食记录不受影响。",
   "clearOffCacheConfirmTitle": "清除缓存？",
   "clearOffCacheLabel": "清除缓存",
   "clearOffCacheSubtitle": "{count} 项 · {size}",
@@ -1385,8 +1385,8 @@
     }
   },
   "noResultsSearchAll": "搜索全部",
-  "partialResultsNotice": "有一个食物来源未响应，部分结果可能缺失。",
-  "partialResultsAllSourcesDownNotice": "没有在线食物来源响应，仅显示已保存的食物。",
+  "partialResultsNotice": "部分本地食物数据暂时无法读取，当前显示可用结果。请重试。",
+  "partialResultsAllSourcesDownNotice": "本地食物库暂时无法读取，当前仅显示已保存的食物。请重试。",
   "paCalisthenicsVigorous": "自重训练（高强度）",
   "paCalisthenicsVigorousDesc": "高强度运动（例如：俯卧撑、仰卧起坐、引体向上、开合跳、波比跳）",
   "paCircuitTraining": "循环训练",
@@ -1442,7 +1442,6 @@
   "loggingDescribeHint": "用一句话描述吃了什么、吃了多少",
   "loggingChooseAmount": "选择用量",
   "loggingEditAmount": "调整用量",
-  "loggingAmountHint": "选择单份或输入克重，确认后才会添加。",
   "loggingConfirmAmount": "确认用量并加入清单",
   "loggingSaveAmount": "保存用量",
   "loggingIntakeNutrition": "本次摄入提供",
@@ -1451,5 +1450,17 @@
   "loggingAmountInvalid": "请输入大于 0 且不超过 10000 的用量",
   "loggingMealEmpty": "点击底部中央 + 记录餐食",
   "loggingCustomFoods": "自定义食物",
-  "loggingRecordTo": "餐次"
+  "loggingRecordTo": "餐次",
+  "localFoodSourcesTitle": "本地中文食物库",
+  "localFoodSourcesDescription": "内置中文食物，支持离线搜索。",
+  "localFoodCount": "共 {count} 条食物",
+  "@localFoodCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localFoodLoadError": "食物库加载失败，请重新打开。",
+  "localFoodNoBarcode": "自定义食物可添加条码，方便下次扫码查找。"
 }

@@ -32,7 +32,10 @@ class _FakeGetMacroGoalUsecase extends Fake implements GetMacroGoalUsecase {}
 
 class _FakeGetTrackedDayUsecase extends Fake implements GetTrackedDayUsecase {}
 
-class _FakeProductsRepository extends Fake implements ProductsRepository {}
+class _FakeProductsRepository extends Fake implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+}
 
 class _FakeRemoteSearchCacheDataSource extends Fake
     implements RemoteSearchCacheDataSource {}
@@ -307,4 +310,41 @@ void main() {
     expect(button.onPressed, isNull);
     expect(result, isNull);
   });
+
+  testWidgets(
+    'duplicate weights stay unique and preserve the selected portion',
+    (tester) async {
+      LogTrayItem? result;
+      await _pumpSheet(
+        tester,
+        product: _solidWithServing(
+          portions: const [
+            MealPortionEntity(label: '小个', gramWeight: 50, localized: true),
+            MealPortionEntity(label: '50克', gramWeight: 50, localized: true),
+          ],
+        ),
+        quantityController: TextEditingController(text: '2'),
+        initialUnit: 'serving#1',
+        onChanged: (_, _) {},
+        onConfirm: (item) async => result = item,
+      );
+      expect(find.bySemanticsIdentifier('meal-detail-chip-50g'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('meal-detail-chip-portion-1'),
+        findsNothing,
+      );
+      final dropdown = tester.widget<DropdownButton<String>>(
+        find.byType(DropdownButton<String>),
+      );
+      expect(dropdown.items!.where((item) => item.value == 'serving'), isEmpty);
+      expect(
+        dropdown.items!.where((item) => item.value == 'serving#1'),
+        hasLength(1),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Confirm amount'));
+      await tester.pumpAndSettle();
+      expect(result!.amount, 100);
+    },
+  );
 }

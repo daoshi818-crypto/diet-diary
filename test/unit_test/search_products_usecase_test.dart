@@ -18,6 +18,9 @@ import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_en
 import 'package:opennutritracker/features/add_meal/domain/usecase/search_products_usecase.dart';
 
 class _FakeProductsRepository implements ProductsRepository {
+  @override
+  bool get usesLocalFoods => false;
+
   final Map<String, List<MealEntity>> offResults = {};
   final Map<String, List<MealEntity>> fdcResults = {};
 
