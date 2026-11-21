@@ -67,7 +67,9 @@ node tool/serve_web_preview.mjs 4183
 
 ## 自动构建APK
 
-推送 `codex/chinese-food-catalog` 分支会运行 `Android APK` 工作流，验证目录和份量后构建签名的 release APK。工作流使用仓库加密的 Android 签名 secrets，签名文件不进入Git。构建产物 `diet-diary-apk-<运行编号>` 包含 `diet-diary.apk` 和 SHA-256 校验文件，在Actions页面下载，保留30天。
+推送 `main` 或 `codex/chinese-food-catalog` 分支会运行 `Android APK` 工作流，验证目录和份量后构建签名的 release APK。工作流使用仓库加密的 Android 签名 secrets，签名文件不进入Git。构建产物 `diet-diary-apk-<运行编号>` 包含 `diet-diary.apk` 和 SHA-256 校验文件，在Actions页面下载，保留30天。
+
+首个成功构建：Actions运行 `44857934349`，产物 `diet-diary-apk-1`。APK的SHA-256为 `f00ea808c8140fbc35c286cb41edd8a0ca38f3fa09020836acabed0e2bf416b3`；下载后已核对包内目录与仓库资产相同，签名证书与release密钥一致。
 
 也可直接渲染真实 Flutter 页面生成中文截图，不启动浏览器、不写个人历史：
 
