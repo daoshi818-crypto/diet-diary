@@ -60,6 +60,13 @@ android {
 
     defaultConfig {
         applicationId "com.opennutritracker.ont.opennutritracker"
+        if (project.findProperty("target-platform") == "android-arm64" &&
+                project.findProperty("split-per-abi") != "true") {
+            ndk {
+                abiFilters.clear()
+                abiFilters.add("arm64-v8a")
+            }
+        }
         // The health package's Health Connect client requires API 26; Flutter's
         // default is 24, so the floor is pinned here.
         //

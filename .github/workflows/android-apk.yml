@@ -18,6 +18,10 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+      - name: Reclaim space for Android build
+        run: |
+          sudo rm -rf -- /usr/share/dotnet /usr/share/swift /usr/local/share/powershell
+          df -h /
       - uses: actions/setup-java@v6.1.0
         with:
           distribution: temurin
@@ -88,6 +92,20 @@ jobs:
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-full-release.apk dist/diet-diary.apk
           sha256sum dist/diet-diary.apk > dist/SHA256SUMS.txt
+      - name: Verify APK architecture
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile("dist/diet-diary.apk") as apk:
+              names = set(apk.namelist())
+          abis = {name.split("/")[1] for name in names if name.startswith("lib/") and name.endswith(".so")}
+          if abis != {"arm64-v8a"}:
+              raise SystemExit(f"Unexpected APK architectures: {sorted(abis)}")
+          for library in ("libapp.so", "libflutter.so"):
+              if f"lib/arm64-v8a/{library}" not in names:
+                  raise SystemExit(f"Missing ARM64 runtime library: {library}")
+          print("APK contains only ARM64 native libraries.")
+          PY
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:
