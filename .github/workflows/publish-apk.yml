@@ -1,0 +1,79 @@
+name: Publish APK release
+
+on:
+  workflow_run:
+    workflows: [Android APK]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful Android APK run on main
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: apk-release-${{ github.event.workflow_run.id || inputs.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
+    steps:
+      - name: Download and verify signed APK
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RUN_ID" =~ ^[0-9]+$ ]]
+          run_json=$(gh api "repos/$GH_REPO/actions/runs/$RUN_ID")
+          jq -e --arg repo "$GH_REPO" '
+            .name == "Android APK" and
+            .head_branch == "main" and
+            .head_repository.full_name == $repo and
+            .status == "completed" and
+            .conclusion == "success"
+          ' <<< "$run_json"
+          run_number=$(jq -r '.run_number' <<< "$run_json")
+          head_sha=$(jq -r '.head_sha' <<< "$run_json")
+          gh run download "$RUN_ID" --repo "$GH_REPO" \
+            --name "diet-diary-apk-${run_number}" --dir dist
+          test -s dist/diet-diary.apk
+          sha256sum --check dist/SHA256SUMS.txt
+          echo "number=$run_number" >> "$GITHUB_OUTPUT"
+          echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        env:
+          RUN_NUMBER: ${{ steps.apk.outputs.number }}
+          HEAD_SHA: ${{ steps.apk.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="apk-${RUN_NUMBER}"
+          printf '下载 diet-diary.apk 安装。\n\n构建记录：https://github.com/%s/actions/runs/%s\n源码提交：%s\n' \
+            "$GH_REPO" "$RUN_ID" "$HEAD_SHA" > release-notes.md
+          if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/diet-diary.apk dist/SHA256SUMS.txt \
+              --repo "$GH_REPO" --clobber
+          else
+            gh release create "$tag" dist/diet-diary.apk dist/SHA256SUMS.txt \
+              --repo "$GH_REPO" --target "$HEAD_SHA" --draft \
+              --title "吃有数 Android APK #${RUN_NUMBER}" --notes-file release-notes.md
+          fi
+          gh release edit "$tag" --repo "$GH_REPO" --draft=false --latest
+          gh release view "$tag" --repo "$GH_REPO" --json url --jq '.url' \
+            >> "$GITHUB_STEP_SUMMARY"
