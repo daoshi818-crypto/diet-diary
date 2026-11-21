@@ -111,6 +111,60 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('quantity opens in grams and returns the entered weight', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => EnergyUnitProvider(),
+        child: MaterialApp(
+          localizationsDelegates: const [S.delegate],
+          supportedLocales: S.supportedLocales,
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () async {
+                  final item = await showDialog<dynamic>(
+                    context: context,
+                    builder: (_) => FoodQuantityDialog(
+                      meal: _meal,
+                      day: DateTime(2026, 11, 21),
+                      type: IntakeTypeEntity.lunch,
+                      usesImperialUnits: false,
+                    ),
+                  );
+                  if (context.mounted && item != null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('weight=${item.amount}')),
+                    );
+                  }
+                },
+                child: const Text('Open'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open'));
+    await tester.pumpAndSettle();
+    final field = find.byType(TextFormField);
+    expect(tester.widget<TextFormField>(field).controller!.text, '100');
+    final dropdown = tester.widget<DropdownButtonFormField<String>>(
+      find.byType(DropdownButtonFormField<String>),
+    );
+    expect(dropdown.initialValue, 'g');
+    await tester.enterText(field, '50');
+    await tester.pumpAndSettle();
+    final confirm = find.byWidgetPredicate(
+      (w) => w is Semantics && w.properties.identifier == 'meal-detail-add',
+    );
+    await tester.ensureVisible(confirm);
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(find.text('weight=50.0'), findsOneWidget);
+  });
+
   for (final size in [const Size(375, 667), const Size(812, 375)]) {
     for (final dark in [false, true]) {
       for (final surface in ['hub', 'details', 'quantity']) {

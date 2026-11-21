@@ -8,7 +8,13 @@ List<int> visiblePortionIndices(MealEntity meal, {String? selectedUnit}) {
       ? effectivePortionIndex(selectedUnit)
       : null;
   for (var i = 0; i < meal.portions.length; i++) {
-    final grams = meal.portions[i].gramWeight;
+    final portion = meal.portions[i];
+    final onlyWeight = RegExp(
+      r'^\s*\d+(?:\.\d+)?\s*(?:克|g|grams?)\s*$',
+      caseSensitive: false,
+    ).hasMatch(portion.label);
+    if (onlyWeight && i != selected) continue;
+    final grams = portion.gramWeight;
     if (!grams.isFinite || grams <= 0) continue;
     final key = (grams * 1000000).round();
     if (!indices.containsKey(key) || i == selected) indices[key] = i;

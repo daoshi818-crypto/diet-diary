@@ -58,7 +58,15 @@ def clean_food_name(text):
         raise ValueError('名称括号截断或不配对，无法确认完整名称')
     if re.search(r'\(者\)', text):
         raise ValueError('名称疑似OCR错误“者”，无法确认食物做法')
-    text = re.sub(r'\((?:代表值|平均值|均值)\)$', '', text).strip()
+    def clean_description(match):
+        tokens = re.split(r'[,，、;；]', match[1])
+        tokens = [token.strip() for token in tokens
+                  if token.strip() not in {'代表值', '平均值', '均值'}]
+        description = ','.join(tokens)
+        description = re.sub(r'\bfat\s*(\d+(?:\.\d+)?)\s*g\b',
+                             r'脂肪\1克', description, flags=re.I)
+        return f'({description})' if description else ''
+    text = re.sub(r'\(([^()]*)\)', clean_description, text).strip()
     # Only explicit equivalent descriptions; retain varieties and cooking states.
     text = {'鸡蛋(整个)': '鸡蛋', '鸡蛋(全蛋)': '鸡蛋',
             '水煮鸡蛋': '煮鸡蛋'}.get(text, text)
@@ -275,7 +283,7 @@ def build(source_root, output=ROOT):
     summary = {'schema_version': 1, 'inputs': manifest,
                'candidate_rows': len(candidates), 'food_count': len(foods),
                'merged_duplicates': merged_count, 'rejected_rows': len(rejected),
-               'cleaning_version': 2,
+               'cleaning_version': 3,
                'conflict_groups_resolved': len(conflicts),
                'conflict_rows_archived': sum(len(c['alternatives']) for c in conflicts),
                'name_corrections': len(name_corrections),

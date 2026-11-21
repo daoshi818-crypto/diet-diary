@@ -50,17 +50,17 @@ const _nutriments = MealNutrimentsEntity(
 );
 
 MealEntity _solidThirtyGramServing() => MealEntity(
-      code: 'chip-screen-test',
-      name: 'Test product',
-      url: null,
-      mealQuantity: null,
-      mealUnit: 'g',
-      servingQuantity: 30,
-      servingUnit: 'g',
-      servingSize: '30 g',
-      nutriments: _nutriments,
-      source: MealSourceEntity.custom,
-    );
+  code: 'chip-screen-test',
+  name: 'Test product',
+  url: null,
+  mealQuantity: null,
+  mealUnit: 'g',
+  servingQuantity: 30,
+  servingUnit: 'g',
+  servingSize: '30 g',
+  nutriments: _nutriments,
+  source: MealSourceEntity.custom,
+);
 
 void main() {
   final getIt = GetIt.instance;
@@ -139,8 +139,8 @@ void main() {
   }
 
   Finder chip(String id) => find.byWidgetPredicate(
-        (w) => w is Semantics && w.properties.identifier == 'meal-detail-chip-$id',
-      );
+    (w) => w is Semantics && w.properties.identifier == 'meal-detail-chip-$id',
+  );
 
   testWidgets(
     '0.5x on a 30 g serving lands 15 g in state.totalQuantityConverted',
@@ -160,27 +160,24 @@ void main() {
     },
   );
 
-  testWidgets(
-    'typing after tapping the half-serving chip keeps the chip unit '
-    'and recomputes against it',
-    (tester) async {
-      await pumpMealDetail(tester, _solidThirtyGramServing());
+  testWidgets('typing after tapping the half-serving chip keeps the chip unit '
+      'and recomputes against it', (tester) async {
+    await pumpMealDetail(tester, _solidThirtyGramServing());
 
-      await tester.tap(chip('half-serving'));
-      await tester.pumpAndSettle();
-      expect(bloc!.state.totalQuantityConverted, '15.0');
+    await tester.tap(chip('half-serving'));
+    await tester.pumpAndSettle();
+    expect(bloc!.state.totalQuantityConverted, '15.0');
 
-      // The bottom-sheet quantity field is the enabled TextFormField; typing
-      // '3' replaces the chip's 0.5 and recomputes 3 x 30 g = 90 g while the
-      // unit stays 'serving'.
-      final field = find.byType(TextFormField).first;
-      await tester.enterText(field, '3');
-      await tester.pumpAndSettle();
+    // The bottom-sheet quantity field is the enabled TextFormField; typing
+    // '3' replaces the chip's 0.5 and recomputes 3 x 30 g = 90 g while the
+    // unit stays 'serving'.
+    final field = find.byType(TextFormField).first;
+    await tester.enterText(field, '3');
+    await tester.pumpAndSettle();
 
-      expect(bloc!.state.selectedUnit, 'serving');
-      expect(bloc!.state.totalQuantityConverted, '90.0');
-    },
-  );
+    expect(bloc!.state.selectedUnit, 'serving');
+    expect(bloc!.state.totalQuantityConverted, '90.0');
+  });
 
   testWidgets(
     '100 g chip from a serving unit switches state.selectedUnit to g',
@@ -205,8 +202,7 @@ void main() {
     await pumpMealDetail(tester, meal);
     final star = find.byWidgetPredicate(
       (w) =>
-          w is Semantics &&
-          w.properties.identifier == 'meal-detail-favourite',
+          w is Semantics && w.properties.identifier == 'meal-detail-favourite',
     );
     expect(find.byTooltip(l10nEn.favouriteAddTooltip), findsOneWidget);
 
@@ -227,8 +223,13 @@ void main() {
 
 class _FakeGetConfigUsecase implements GetConfigUsecase {
   @override
-  Future<ConfigEntity> getConfig() async =>
-      const ConfigEntity(true, true, false, AppThemeEntity.system);
+  Future<ConfigEntity> getConfig() async => const ConfigEntity(
+    true,
+    true,
+    false,
+    AppThemeEntity.system,
+    defaultToRawFoodUnits: false,
+  );
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -320,8 +321,7 @@ class _FakeGetIntakeUsecase implements GetIntakeUsecase {
     DateTime day, {
     int dayStartOffsetHours = 0,
     int dayStartOffsetMinutes = 0,
-  }) async =>
-      [];
+  }) async => [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -362,8 +362,7 @@ class _FakeCacheManager implements CacheManager {
     String? key,
     Map<String, String>? headers,
     bool withProgress = false,
-  }) =>
-      const Stream<FileResponse>.empty();
+  }) => const Stream<FileResponse>.empty();
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>

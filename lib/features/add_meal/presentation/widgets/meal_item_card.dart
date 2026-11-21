@@ -3,21 +3,19 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:opennutritracker/core/presentation/widgets/app_card.dart';
-import 'package:opennutritracker/core/presentation/widgets/meal_value_unit_text.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/locator.dart';
-import 'package:opennutritracker/core/utils/off_const.dart';
+import 'package:opennutritracker/core/utils/energy_display.dart';
+import 'package:opennutritracker/core/utils/extensions.dart';
+import 'package:opennutritracker/core/presentation/widgets/meal_value_unit_text.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
-import 'package:opennutritracker/features/add_meal/data/dto/sp/sp_const.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
 import 'package:opennutritracker/features/add_meal/presentation/widgets/favourite_toggle_button.dart';
-import 'package:opennutritracker/features/add_meal/util/food_emoji_resolver.dart';
 import 'package:opennutritracker/features/meal_detail/meal_detail_screen.dart';
 import 'package:opennutritracker/generated/l10n.dart';
-import 'package:opennutritracker/core/utils/extensions.dart';
 
 class MealItemCard extends StatelessWidget {
   final DateTime day;
@@ -47,199 +45,128 @@ class MealItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final palette = isDark ? AppPalette.dark : AppPalette.light;
-    final accent = Theme.of(context).colorScheme.primary;
-    final isRecipe = mealEntity.source == MealSourceEntity.recipe;
-    // Colored emoji is reserved for FDC base-food items where the head
-    // noun reliably identifies the food ("Milk, fluid, nonfat..." → milk).
-    // OFF products are branded, so a head-noun match would often be
-    // misleading; they keep the outline icon as a placeholder.
-    final emoji = (mealEntity.thumbnailImageUrl == null && mealEntity.source == MealSourceEntity.fdc)
-        ? resolveFoodEmoji(mealEntity.name)
-        : null;
+    final palette = Theme.of(context).brightness == Brightness.dark
+        ? AppPalette.dark
+        : AppPalette.light;
+    final energy = mealEntity.nutriments.energyKcal100;
+    final s = S.of(context);
+    final packageQuantity = mealEntity.mealQuantity?.toLenientDoubleOrNull();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Dimens.spacing8),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: AppCard(
         onTap: () => _onItemPressed(context),
-        padding: const EdgeInsets.all(Dimens.spacing12),
-        child: Row(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildThumbnail(context, palette, accent, isRecipe, emoji),
-            const SizedBox(width: Dimens.spacing16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AutoSizeText.rich(
-                    TextSpan(
-                      text: mealEntity.name ?? "?",
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: palette.textStrong,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: ' ${mealEntity.brands ?? ""}',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: palette.textMuted,
-                              ),
-                        ),
-                      ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (mealEntity.thumbnailImageUrl?.isNotEmpty == true) ...[
+                  ClipRRect(
+                    borderRadius: Dimens.borderRadiusM,
+                    child: CachedNetworkImage(
+                      cacheManager: locator<CacheManager>(),
+                      fit: BoxFit.cover,
+                      width: 48,
+                      height: 48,
+                      imageUrl: mealEntity.thumbnailImageUrl!,
+                      errorWidget: (_, _, _) =>
+                          const Icon(Icons.restaurant_rounded),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: Dimens.spacing4),
-                  _buildSubtitle(context, palette, accent, isRecipe),
+                  const SizedBox(width: 12),
                 ],
-              ),
-            ),
-            const SizedBox(width: Dimens.spacing8),
-            // A builder row leaves the identifier out and its list carries
-            // one (AGENTS.md, "Dynamic lists"); the add-item sheet's fixed
-            // recent rows pass their own.
-            FavouriteToggleButton(
-              meal: mealEntity,
-              semanticsIdentifier: favouriteSemanticsIdentifier,
-            ),
-            Semantics(
-              identifier: 'meal-item-add',
-              child: IconButton(
-                style: IconButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                  backgroundColor: accent,
-                  shape: const RoundedRectangleBorder(borderRadius: Dimens.borderRadiusM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AutoSizeText(
+                        mealEntity.name ?? '?',
+                        maxLines: 2,
+                        minFontSize: 14,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: palette.textStrong,
+                            ),
+                      ),
+                      if (!(mealEntity.backendSource?.startsWith('local_') ??
+                              false) &&
+                          packageQuantity != null)
+                        MealValueUnitText(
+                          value: packageQuantity,
+                          meal: mealEntity,
+                          usesImperialUnits: usesImperialUnits,
+                        ),
+                      if (mealEntity.brands?.trim().isNotEmpty == true)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            mealEntity.brands!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: palette.textMuted),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                tooltip: S.of(context).loggingChooseAmount,
-                icon: const Icon(Icons.add_rounded, size: 24),
-                onPressed: onQuickAdd ?? () => _onItemPressed(context),
-              ),
+                const SizedBox(width: 8),
+                Semantics(
+                  identifier: 'meal-item-add',
+                  child: IconButton.filled(
+                    constraints: const BoxConstraints(
+                      minWidth: 48,
+                      minHeight: 48,
+                    ),
+                    tooltip: s.loggingChooseAmount,
+                    icon: const Icon(Icons.add_rounded),
+                    onPressed: onQuickAdd ?? () => _onItemPressed(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        energy == null
+                            ? '—'
+                            : EnergyDisplay.formatWithUnit(context, energy),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: palette.textStrong,
+                        ),
+                      ),
+                      Text(
+                        ' / 100 ${mealEntity.isLiquid ? s.milliliterUnit : s.gramUnit}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                      ),
+                      if (mealEntity.source == MealSourceEntity.recipe)
+                        Text(
+                          s.additionalInfoLabelRecipe,
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                    ],
+                  ),
+                ),
+                FavouriteToggleButton(
+                  meal: mealEntity,
+                  semanticsIdentifier: favouriteSemanticsIdentifier,
+                ),
+              ],
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildThumbnail(
-    BuildContext context,
-    AppPalette palette,
-    Color accent,
-    bool isRecipe,
-    String? emoji,
-  ) {
-    final radius = BorderRadius.circular(Dimens.radiusM);
-    if (mealEntity.thumbnailImageUrl != null) {
-      return ClipRRect(
-        borderRadius: radius,
-        child: CachedNetworkImage(
-          cacheManager: locator<CacheManager>(),
-          fit: BoxFit.cover,
-          width: Dimens.mealThumb,
-          height: Dimens.mealThumb,
-          imageUrl: mealEntity.thumbnailImageUrl ?? "",
-        ),
-      );
-    }
-    return Container(
-      width: Dimens.mealThumb,
-      height: Dimens.mealThumb,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: radius,
-        color: isRecipe ? accent.withValues(alpha: 0.16) : palette.surfaceMuted,
-      ),
-      child: emoji != null
-          ? ExcludeSemantics(
-              child: Text(emoji, style: const TextStyle(fontSize: 30)),
-            )
-          : Icon(
-              isRecipe ? Icons.menu_book_rounded : Icons.restaurant_rounded,
-              size: 26,
-              color: isRecipe ? accent : palette.textMuted,
-            ),
-    );
-  }
-
-  Widget _buildSubtitle(BuildContext context, AppPalette palette, Color accent, bool isRecipe) {
-    if (isRecipe) {
-      return _labelChip(
-        context,
-        S.of(context).additionalInfoLabelRecipe,
-        background: accent.withValues(alpha: 0.16),
-        foreground: accent,
-      );
-    }
-
-    // Remote foods carry their database of origin; show it as a muted chip
-    // (Open Food Facts, BLS, FDC SR Legacy...) so users can tell sources
-    // apart. OFF products may additionally have a package quantity — keep
-    // it visible next to the chip.
-    final sourceLabel = _sourceLabel();
-    final chip = sourceLabel != null
-        ? _labelChip(
-            context,
-            sourceLabel,
-            background: palette.textMuted.withValues(alpha: 0.12),
-            foreground: palette.textMuted,
-          )
-        : null;
-    final quantity = mealEntity.mealQuantity != null
-        ? MealValueUnitText(
-            value: mealEntity.mealQuantity?.toLenientDoubleOrNull() ?? 0,
-            meal: mealEntity,
-            usesImperialUnits: usesImperialUnits,
-          )
-        : null;
-
-    if (chip != null && quantity != null) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Flexible too: on a narrow phone the chip alone can be wider
-          // than the column the favourite star leaves it.
-          Flexible(child: chip),
-          const SizedBox(width: Dimens.spacing8),
-          Flexible(child: quantity),
-        ],
-      );
-    }
-    return chip ?? quantity ?? const SizedBox();
-  }
-
-  /// Database-of-origin label: the Supabase backend source (BLS, FDC SR
-  /// Legacy...) when known, Open Food Facts for OFF products, null for the
-  /// user's own custom meals.
-  String? _sourceLabel() {
-    final backendLabel = SPConst.foodSourceShortNames[mealEntity.backendSource];
-    if (backendLabel != null) return backendLabel;
-    if (mealEntity.source == MealSourceEntity.off) {
-      return OFFConst.offSourceName;
-    }
-    return null;
-  }
-
-  Widget _labelChip(
-    BuildContext context,
-    String label, {
-    required Color background,
-    required Color foreground,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: Dimens.spacing8, vertical: Dimens.spacing4),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: Dimens.borderRadiusS,
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-          color: foreground,
-          fontWeight: FontWeight.w700,
         ),
       ),
     );

@@ -130,7 +130,9 @@ LogTrayItem? defaultLogTrayItem(
 
   final String unit;
   final double quantity;
-  if (meal.scalableServingQuantity != null && !defaultToRawFoodUnits) {
+  if (meal.scalableServingQuantity != null &&
+      !defaultToRawFoodUnits &&
+      !(meal.backendSource?.startsWith('local_') ?? false)) {
     unit = UnitDropdownItem.serving.toString();
     quantity = 1;
   } else {

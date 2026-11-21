@@ -54,10 +54,6 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
             ? UnitCalc.mlToFlOz(quantity)
             : UnitCalc.gToOz(quantity);
       }
-    } else if (meal.scalableServingQuantity != null ||
-        meal.portions.isNotEmpty) {
-      _unit = UnitDropdownItem.serving.toString();
-      quantity = 1;
     } else {
       _unit = rawUnit.toString();
       quantity = 100;

@@ -28,7 +28,7 @@ class AddMealLoadedState extends AddMealState {
 
   const AddMealLoadedState({
     this.usesImperialUnits = false,
-    this.defaultToRawFoodUnits = false,
+    this.defaultToRawFoodUnits = true,
   });
 
   @override

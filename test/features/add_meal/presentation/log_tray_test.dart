@@ -450,6 +450,13 @@ void main() {
       await _register([_meal('Oats')]);
       final pushed = <RouteSettings>[];
       await _openAddMeal(tester, pushed, library: true);
+      await tester.ensureVisible(
+        find.bySemanticsIdentifier('food-library-meal-selector'),
+      );
+      await tester.tap(
+        find.bySemanticsIdentifier('food-library-meal-selector'),
+      );
+      await tester.pumpAndSettle();
       final snack = find.bySemanticsIdentifier('food-library-meal-snackType');
       await tester.ensureVisible(snack);
       await tester.tap(snack);
@@ -971,7 +978,7 @@ void main() {
       expect(_mealDetailBloc.writes.single.name, 'Oats');
     });
 
-    testWidgets('+ on a thin search hit uses the full record\'s serving', (
+    testWidgets('+ on a thin search hit hydrates and defaults to grams', (
       tester,
     ) async {
       await _register([_meal('Granola', source: MealSourceEntity.off)]);
@@ -991,8 +998,8 @@ void main() {
 
       expect(_products.lookups, 1);
       final write = _mealDetailBloc.writes.single;
-      expect(write.unit, 'serving');
-      expect(write.amount, '45.0');
+      expect(write.unit, 'g');
+      expect(write.amount, '100.0');
     });
 
     testWidgets('+ keeps the thin record when the lookup fails', (

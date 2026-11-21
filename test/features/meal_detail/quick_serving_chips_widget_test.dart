@@ -347,4 +347,72 @@ void main() {
       expect(result!.amount, 100);
     },
   );
+  testWidgets(
+    'changing grams to a serving selects one serving without a stale callback',
+    (tester) async {
+      final controller = TextEditingController(text: '100');
+      final changes = <(String?, String?)>[];
+      await _pumpSheet(
+        tester,
+        product: _solidWithServing(),
+        quantityController: controller,
+        initialUnit: 'g',
+        onChanged: (q, u) => changes.add((q, u)),
+      );
+      tester
+          .widget<DropdownButtonFormField<String>>(
+            find.byType(DropdownButtonFormField<String>),
+          )
+          .onChanged!('serving');
+      await tester.pumpAndSettle();
+      expect(controller.text, '1');
+      expect(changes, [('1', 'serving')]);
+    },
+  );
+
+  testWidgets('changing servings to grams keeps the actual weight', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: '2');
+    final changes = <(String?, String?)>[];
+    await _pumpSheet(
+      tester,
+      product: _solidWithServing(),
+      quantityController: controller,
+      onChanged: (q, u) => changes.add((q, u)),
+    );
+    tester
+        .widget<DropdownButtonFormField<String>>(
+          find.byType(DropdownButtonFormField<String>),
+        )
+        .onChanged!('g');
+    await tester.pumpAndSettle();
+    expect(controller.text, '60');
+    expect(changes, [('60', 'g')]);
+  });
+
+  testWidgets('plain weights are presets rather than serving units', (
+    tester,
+  ) async {
+    await _pumpSheet(
+      tester,
+      product: _solidWithServing(
+        portions: const [
+          MealPortionEntity(label: '100克', gramWeight: 100, localized: true),
+          MealPortionEntity(label: '小个', gramWeight: 50, localized: true),
+        ],
+      ),
+      quantityController: TextEditingController(text: '100'),
+      initialUnit: 'g',
+      onChanged: (_, _) {},
+    );
+    final menu = tester.widget<DropdownButton<String>>(
+      find.byType(DropdownButton<String>),
+    );
+    expect(menu.items!.where((item) => item.value == 'serving'), isEmpty);
+    expect(
+      menu.items!.where((item) => item.value == 'serving#1'),
+      hasLength(1),
+    );
+  });
 }

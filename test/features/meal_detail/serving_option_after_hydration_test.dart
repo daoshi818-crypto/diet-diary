@@ -294,7 +294,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(sheetProduct(tester).detailed, isTrue);
       expect(sheetProduct(tester).scalableServingQuantity, 31.8);
-      await tester.tap(find.text(naLabel()).last);
+      await tester.tap(find.text(l10nEn.gramUnit).last);
       await tester.pumpAndSettle();
 
       // The explicit N/A pick above stands in for the state the stale echo
@@ -303,8 +303,8 @@ void main() {
       // without the read-once guard; the pick below then walks the fixed
       // path end to end — the serving entry stays selected and scales the
       // amount, instead of vanishing from the button and logging 1 g.
-      expect(bloc!.state.selectedUnit, UnitDropdownItem.gml.toString());
-      expect(find.text(naLabel()), findsOneWidget);
+      expect(bloc!.state.selectedUnit, UnitDropdownItem.g.toString());
+      expect(find.text(l10nEn.gramUnit), findsOneWidget);
       await pickUnit(tester, '31.8g');
 
       expect(bloc!.state.selectedUnit, UnitDropdownItem.serving.toString());
@@ -373,8 +373,13 @@ void main() {
 
 class _FakeGetConfigUsecase implements GetConfigUsecase {
   @override
-  Future<ConfigEntity> getConfig() async =>
-      const ConfigEntity(true, true, false, AppThemeEntity.system);
+  Future<ConfigEntity> getConfig() async => const ConfigEntity(
+    true,
+    true,
+    false,
+    AppThemeEntity.system,
+    defaultToRawFoodUnits: false,
+  );
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>

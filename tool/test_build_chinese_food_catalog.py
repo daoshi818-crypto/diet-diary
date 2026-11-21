@@ -37,6 +37,16 @@ class FoodCatalogueTest(unittest.TestCase):
         self.assertEqual(clean_food_name('墨西哥玉米片（Nachos)加奶酪'),
                          '墨西哥玉米片（Nachos）加奶酪')
 
+    def test_metadata_tokens_are_removed_inside_mixed_descriptions(self):
+        for original, cleaned in [
+            ('米饭（蒸,代表值）', '蒸米饭'),
+            ('纯牛奶（代表值,全脂）', '纯牛奶（全脂）'),
+            ('牛肉（平均值、瘦、fat 3g）', '牛肉（瘦,脂肪3克）'),
+            ('面条（生，均值）', '面条（生）'),
+        ]:
+            self.assertEqual(clean_food_name(original), cleaned)
+        self.assertEqual(clean_food_name('平均值牌酸奶'), '平均值牌酸奶')
+
     def test_portions_merge_equivalent_labels_and_disambiguate_weights(self):
         result = clean_portions([
             {'label': '100 g', 'grams': 100},

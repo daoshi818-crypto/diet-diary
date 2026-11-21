@@ -12,6 +12,7 @@ import 'package:opennutritracker/core/utils/locator.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
 import 'package:opennutritracker/core/utils/navigation_predicates.dart';
 import 'package:opennutritracker/features/add_meal/data/repository/products_repository.dart';
+import 'package:opennutritracker/features/add_meal/data/data_sources/chinese_food_data_source.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/add_meal_bloc.dart';
@@ -156,21 +157,16 @@ class _AddMealScreenState extends State<AddMealScreen> {
         // the return to the day, or logged after being removed.
         child: AbsorbPointer(
           absorbing: _logging,
-          child: _withLogButtonAboveKeyboard(
-            context,
-            _buildScaffold(context, palette),
-          ),
+          child: _buildScaffold(context, palette),
         ),
       ),
     );
   }
 
   Widget _buildScaffold(BuildContext context, AppPalette palette) {
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
-      // Let the keyboard overlay the results rather than compress the body.
-      // In landscape the space above the keyboard is shorter than the pinned
-      // search bar + tab bar, which otherwise overflows (issue #165 testing).
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       appBar: AppBar(
         title: Text(
           _isFoodLibrary
@@ -182,7 +178,11 @@ class _AddMealScreenState extends State<AddMealScreen> {
             identifier: 'add-meal-quick-add',
             child: TextButton(
               onPressed: _onQuickAddPressed,
-              child: Text(S.of(context).quickAddCardLabel),
+              child: Text(
+                S.of(context).quickAddCardLabel,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ),
           BlocBuilder<AddMealBloc, AddMealState>(
@@ -203,85 +203,95 @@ class _AddMealScreenState extends State<AddMealScreen> {
           ),
         ],
       ),
-      // Below the results rather than over them, so the last result stays
-      // reachable while the list is waiting. While the keyboard is up it
-      // would sit under it (the body does not resize, see above), so then
-      // the button floats just above the keyboard instead (#1520).
-      bottomNavigationBar:
-          _logTray.isEmpty || MediaQuery.viewInsetsOf(context).bottom > 0
+      bottomNavigationBar: _logTray.isEmpty || keyboardVisible
           ? null
           : SafeArea(top: false, child: _buildLogButton()),
       body: SafeArea(
         top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Dimens.spacing16),
-          child: LayoutBuilder(
-            builder: (context, constraints) => Column(
-              children: [
-                const SizedBox(height: Dimens.spacing8),
-                // The entry block is bounded and scrolls past its ceiling: the
-                // tiles and the open describe panel are taller than what a
-                // landscape phone leaves above the keyboard, and the results
-                // below must keep a share of the screen (#165).
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: constraints.maxHeight * 0.5,
-                  ),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (_isFoodLibrary) ...[
-                          _buildLibraryMealSelector(context),
-                          const SizedBox(height: Dimens.spacing8),
-                        ],
-                        // The barcode lives on its own tile now, so the field
-                        // carries no suffix icon of its own.
-                        MealSearchBar(
-                          searchStringListener: _searchStringListener,
-                          onSearchSubmit: _onSearchSubmit,
-                          onSearchChanged: _onSearchChanged,
-                          onBarcodePressed: null,
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 840),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: LayoutBuilder(
+                builder: (context, constraints) => Column(
+                  children: [
+                    const SizedBox(height: 8),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxHeight: constraints.maxHeight * .5,
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            MealSearchBar(
+                              searchStringListener: _searchStringListener,
+                              onSearchSubmit: _onSearchSubmit,
+                              onSearchChanged: _onSearchChanged,
+                              onBarcodePressed: null,
+                            ),
+                            ValueListenableBuilder<String>(
+                              valueListenable: _searchStringListener,
+                              builder: (context, query, _) => Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (query.trim().isEmpty &&
+                                      !keyboardVisible) ...[
+                                    const SizedBox(height: 12),
+                                    AddFoodMethodTiles(
+                                      onBarcodePressed: _onBarcodeIconPressed,
+                                      onSnapMealPressed: () =>
+                                          _openBulkAdd(startWithPhoto: true),
+                                      onDescribePressed: () => setState(
+                                        () => _describeOpen = !_describeOpen,
+                                      ),
+                                      describeOpen: _describeOpen,
+                                      showAi: !_aiHidden,
+                                    ),
+                                  ],
+                                  if (_describeOpen) ...[
+                                    const SizedBox(height: 12),
+                                    DescribeMealPanel(
+                                      onFindFoods: (text) =>
+                                          _openBulkAdd(initialText: text),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            if (_isFoodLibrary) ...[
+                              const SizedBox(height: 8),
+                              _buildLibraryMealSelector(context),
+                            ],
+                            if (!_logTray.isEmpty) ...[
+                              const SizedBox(height: 12),
+                              LogTrayList(tray: _logTray),
+                              if (keyboardVisible &&
+                                  constraints.maxHeight < 300)
+                                _buildLogButton(),
+                            ],
+                            const SizedBox(height: 8),
+                            _buildSourceChips(context, palette),
+                          ],
                         ),
-                        const SizedBox(height: Dimens.spacing12),
-                        AddFoodMethodTiles(
-                          onBarcodePressed: _onBarcodeIconPressed,
-                          onSnapMealPressed: () =>
-                              _openBulkAdd(startWithPhoto: true),
-                          onDescribePressed: () =>
-                              setState(() => _describeOpen = !_describeOpen),
-                          describeOpen: _describeOpen,
-                          showAi: !_aiHidden,
-                        ),
-                        if (_describeOpen) ...[
-                          const SizedBox(height: Dimens.spacing12),
-                          DescribeMealPanel(
-                            onFindFoods: (text) =>
-                                _openBulkAdd(initialText: text),
-                          ),
-                        ],
-                        if (!_logTray.isEmpty) ...[
-                          const SizedBox(height: Dimens.spacing16),
-                          LogTrayList(tray: _logTray),
-                        ],
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: _searchStringListener,
+                        builder: (context, query, _) =>
+                            _buildResults(context, palette, query),
+                      ),
+                    ),
+                    if (!_logTray.isEmpty &&
+                        keyboardVisible &&
+                        constraints.maxHeight >= 300)
+                      _buildLogButton(),
+                  ],
                 ),
-                const SizedBox(height: Dimens.spacing12),
-                _buildSourceChips(context, palette),
-                const SizedBox(height: Dimens.spacing12),
-                // Rebuild on every keystroke so the empty-state logic can tell
-                // "no results for this query" apart from "a newer query is
-                // still debouncing/searching" — the latter shows a spinner.
-                Expanded(
-                  child: ValueListenableBuilder<String>(
-                    valueListenable: _searchStringListener,
-                    builder: (context, query, _) =>
-                        _buildResults(context, palette, query),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -306,32 +316,6 @@ class _AddMealScreenState extends State<AddMealScreen> {
       onPressed: _logging || _quickAdding.isNotEmpty ? null : _logAll,
     ),
   );
-
-  /// [screen] with the log button laid over it just above the keyboard,
-  /// while the keyboard is up and the list has items (#1520).
-  ///
-  /// Over the results rather than below them: making room for it would
-  /// shrink the body with the keyboard, which is what overflows a landscape
-  /// phone (#165). It goes back below the results when the keyboard closes.
-  ///
-  /// The Stack is there whether or not the button is: wrapping the screen
-  /// only while the keyboard is up would rebuild the search field under a
-  /// new parent, drop its focus and close the very keyboard that caused it.
-  Widget _withLogButtonAboveKeyboard(BuildContext context, Widget screen) {
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Stack(
-      children: [
-        Positioned.fill(child: screen),
-        if (!_logTray.isEmpty && keyboardInset > 0)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: keyboardInset,
-            child: _buildLogButton(),
-          ),
-      ],
-    );
-  }
 
   void _onProductsRefreshButtonPressed() {
     _productsBloc.add(const RefreshProductsEvent());
@@ -462,26 +446,26 @@ class _AddMealScreenState extends State<AddMealScreen> {
 
   Widget _buildLibraryMealSelector(BuildContext context) => Semantics(
     identifier: 'food-library-meal-selector',
-    child: Wrap(
-      spacing: 6,
-      runSpacing: 4,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        Text(
-          S.of(context).loggingRecordTo,
-          style: Theme.of(context).textTheme.labelLarge,
-        ),
+    child: DropdownButtonFormField<AddMealType>(
+      initialValue: _mealType,
+      decoration: InputDecoration(
+        labelText: S.of(context).loggingRecordTo,
+        border: const OutlineInputBorder(),
+      ),
+      isExpanded: true,
+      items: [
         for (final type in AddMealType.values)
-          Semantics(
-            identifier: 'food-library-meal-${type.name}',
-            child: ChoiceChip(
-              label: Text(type.getTypeName(context)),
-              selected: _mealType == type,
-              showCheckmark: false,
-              onSelected: (_) => setState(() => _mealType = type),
+          DropdownMenuItem(
+            value: type,
+            child: Semantics(
+              identifier: 'food-library-meal-${type.name}',
+              child: Text(type.getTypeName(context)),
             ),
           ),
       ],
+      onChanged: (type) {
+        if (type != null) setState(() => _mealType = type);
+      },
     ),
   );
 
@@ -517,8 +501,10 @@ class _AddMealScreenState extends State<AddMealScreen> {
               ),
             ),
             chip(_SearchSource.all, S.of(context).allItemsLabel),
-            chip(_SearchSource.products, S.of(context).searchProductsPage),
-            chip(_SearchSource.food, S.of(context).searchFoodPage),
+            if (!locator.isRegistered<ChineseFoodDataSource>()) ...[
+              chip(_SearchSource.products, S.of(context).searchProductsPage),
+              chip(_SearchSource.food, S.of(context).searchFoodPage),
+            ],
           ],
         ),
       ),
@@ -871,8 +857,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
                     _onCustomAddButtonPressed(state.usesImperialUnits),
                 // All skips queries below minQueryLength, so only offer it
                 // once the query is long enough to actually search.
-                onSearchAll:
-                    _stickOnRecent && isSearchQueryLongEnough(query)
+                onSearchAll: _stickOnRecent && isSearchQueryLongEnough(query)
                     ? _onSearchAllPressed
                     : null,
               );

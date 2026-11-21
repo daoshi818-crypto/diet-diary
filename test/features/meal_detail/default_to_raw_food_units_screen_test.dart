@@ -1,4 +1,12 @@
 import 'dart:math' as math;
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter/rendering.dart';
+import 'package:opennutritracker/core/styles/app_theme.dart';
+import 'package:opennutritracker/core/styles/app_palette.dart';
+import 'package:opennutritracker/features/add_meal/data/data_sources/chinese_food_data_source.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
@@ -28,6 +36,7 @@ import 'package:opennutritracker/features/diary/presentation/bloc/calendar_day_b
 import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dart';
 import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/meal_detail_screen.dart';
+import 'package:opennutritracker/features/meal_detail/presentation/widgets/meal_detail_nutriments_table.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 import 'package:provider/provider.dart';
@@ -49,60 +58,60 @@ const _nutriments = MealNutrimentsEntity(
 );
 
 MealEntity _solidWithServing() => MealEntity(
-      code: 'raw-units-test-solid',
-      name: 'Solid product',
-      url: null,
-      mealQuantity: '100',
-      mealUnit: 'g',
-      servingQuantity: 30,
-      servingUnit: 'g',
-      servingSize: '30 g',
-      nutriments: _nutriments,
-      source: MealSourceEntity.custom,
-    );
+  code: 'raw-units-test-solid',
+  name: 'Solid product',
+  url: null,
+  mealQuantity: '100',
+  mealUnit: 'g',
+  servingQuantity: 30,
+  servingUnit: 'g',
+  servingSize: '30 g',
+  nutriments: _nutriments,
+  source: MealSourceEntity.custom,
+);
 
 MealEntity _liquidWithServing() => MealEntity(
-      code: 'raw-units-test-liquid',
-      name: 'Liquid product',
-      url: null,
-      mealQuantity: '100',
-      mealUnit: 'ml',
-      servingQuantity: 250,
-      servingUnit: 'ml',
-      servingSize: '250 ml',
-      nutriments: _nutriments,
-      source: MealSourceEntity.custom,
-    );
+  code: 'raw-units-test-liquid',
+  name: 'Liquid product',
+  url: null,
+  mealQuantity: '100',
+  mealUnit: 'ml',
+  servingQuantity: 250,
+  servingUnit: 'ml',
+  servingSize: '250 ml',
+  nutriments: _nutriments,
+  source: MealSourceEntity.custom,
+);
 
 // Thin OFF search result: `source: off, detailed: false`, no serving fields.
 // Opening this triggers `HydrateMealEvent`, which the bloc resolves through
 // the products repository into the corresponding [_liquidHydratedOff] below.
 MealEntity _liquidThinOff() => MealEntity(
-      code: 'thin-off-liquid',
-      name: 'Thin OFF liquid',
-      url: null,
-      mealQuantity: '100',
-      mealUnit: 'ml',
-      servingQuantity: null,
-      servingUnit: null,
-      servingSize: null,
-      nutriments: _nutriments,
-      source: MealSourceEntity.off,
-    );
+  code: 'thin-off-liquid',
+  name: 'Thin OFF liquid',
+  url: null,
+  mealQuantity: '100',
+  mealUnit: 'ml',
+  servingQuantity: null,
+  servingUnit: null,
+  servingSize: null,
+  nutriments: _nutriments,
+  source: MealSourceEntity.off,
+);
 
 MealEntity _liquidHydratedOff() => MealEntity(
-      code: 'thin-off-liquid',
-      name: 'Thin OFF liquid',
-      url: null,
-      mealQuantity: '100',
-      mealUnit: 'ml',
-      servingQuantity: 250,
-      servingUnit: 'ml',
-      servingSize: '250 ml',
-      nutriments: _nutriments,
-      source: MealSourceEntity.off,
-      detailed: true,
-    );
+  code: 'thin-off-liquid',
+  name: 'Thin OFF liquid',
+  url: null,
+  mealQuantity: '100',
+  mealUnit: 'ml',
+  servingQuantity: 250,
+  servingUnit: 'ml',
+  servingSize: '250 ml',
+  nutriments: _nutriments,
+  source: MealSourceEntity.off,
+  detailed: true,
+);
 
 double _maxScrollOffset(WidgetTester tester) {
   final states = tester.stateList<ScrollableState>(find.byType(Scrollable));
@@ -110,6 +119,26 @@ double _maxScrollOffset(WidgetTester tester) {
 }
 
 void main() {
+  setUpAll(() async {
+    if (!const bool.fromEnvironment('FOOD_UI_CAPTURE')) return;
+    for (final family in ['FoodUiCapture', 'Nunito']) {
+      final font = FontLoader(family)
+        ..addFont(
+          File(
+            Platform.environment['FOOD_PREVIEW_FONT'] ??
+                'C:/Windows/Fonts/msyh.ttc',
+          ).readAsBytes().then(ByteData.sublistView),
+        );
+      await font.load();
+    }
+    final icons = FontLoader('MaterialIcons')
+      ..addFont(
+        File(
+          Platform.environment['FOOD_PREVIEW_ICON_FONT']!,
+        ).readAsBytes().then(ByteData.sublistView),
+      );
+    await icons.load();
+  });
   final getIt = GetIt.instance;
   MealDetailBloc? bloc;
   late bool defaultToRawFoodUnits;
@@ -149,12 +178,21 @@ void main() {
     await getIt.reset();
   });
 
-  Future<void> pumpMealDetail(WidgetTester tester, MealEntity meal) async {
+  Future<void> pumpMealDetail(
+    WidgetTester tester,
+    MealEntity meal, {
+    Size size = const Size(600, 800),
+    double scale = 1,
+    bool dark = false,
+    double keyboard = 0,
+  }) async {
     // 600x800 leaves the CustomScrollView with a real maxScrollExtent, so
     // the scroll-offset assertion below can actually fail if the race guard
     // regresses. A taller viewport clamps `animateTo` to 0 and the test
     // passes vacuously.
-    tester.view.physicalSize = const Size(600, 800);
+    tester.view.physicalSize = size;
+    tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
 
@@ -171,7 +209,31 @@ void main() {
         create: (_) => EnergyUnitProvider(),
         child: MaterialApp(
           navigatorKey: navigatorKey,
-          localizationsDelegates: const [S.delegate],
+          theme: buildAppTheme(dark ? AppPalette.dark : AppPalette.light)
+              .copyWith(
+                textTheme: const bool.fromEnvironment('FOOD_UI_CAPTURE')
+                    ? buildAppTheme(
+                        dark ? AppPalette.dark : AppPalette.light,
+                      ).textTheme.apply(fontFamily: 'FoodUiCapture')
+                    : null,
+              ),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(scale),
+              disableAnimations: true,
+            ),
+            child: RepaintBoundary(
+              key: const ValueKey('detail-capture'),
+              child: child!,
+            ),
+          ),
+          locale: const Locale('zh'),
+          localizationsDelegates: const [
+            S.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+          ],
           supportedLocales: S.supportedLocales,
           initialRoute: NavigationOptions.mealDetailRoute,
           onGenerateInitialRoutes: (_) => [
@@ -194,6 +256,157 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final size in [
+    const Size(320, 640),
+    const Size(375, 667),
+    const Size(812, 375),
+    const Size(768, 1024),
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final dark in [false, true]) {
+        testWidgets(
+          'local library grams and accessible detail: $size scale=$scale dark=$dark',
+          (tester) async {
+            defaultToRawFoodUnits = false;
+            final source = ChineseFoodDataSource(
+              read: () => File('assets/foods/catalog.json').readAsString(),
+            );
+            final meal = (await tester.runAsync(
+              () => source.search('蒸米饭'),
+            ))!.first;
+            await pumpMealDetail(
+              tester,
+              meal,
+              size: size,
+              scale: scale,
+              dark: dark,
+            );
+            expect(bloc!.state.selectedUnit, 'g');
+            expect(bloc!.state.totalQuantityConverted, '100.0');
+            expect(
+              tester.widget<Scaffold>(find.byType(Scaffold)).bottomSheet,
+              isNull,
+            );
+            final field = find.byType(TextFormField).first;
+            await tester.ensureVisible(field);
+            await tester.enterText(field, '50');
+            await tester.pumpAndSettle();
+            expect(bloc!.state.totalQuantityConverted, '50.0');
+            expect(
+              bloc!.state.totalKcal,
+              closeTo(meal.nutriments.energyKcal100! / 2, .001),
+            );
+            final table = find.byType(MealDetailNutrimentsTable);
+            await tester.scrollUntilVisible(
+              table,
+              180,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(const ValueKey('meal-detail-content')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            final add = find.byWidgetPredicate(
+              (w) =>
+                  w is Semantics &&
+                  w.properties.identifier == 'meal-detail-add',
+            );
+            if (add.evaluate().isEmpty) {
+              await tester.scrollUntilVisible(
+                add,
+                180,
+                maxScrolls: 80,
+                scrollable: find
+                    .descendant(
+                      of: find.byKey(const ValueKey('meal-detail-content')),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+              );
+            } else {
+              await tester.ensureVisible(add);
+            }
+            await tester.pumpAndSettle();
+            expect(add.hitTestable(), findsOneWidget);
+            expect(tester.takeException(), isNull);
+            if (const bool.fromEnvironment('FOOD_UI_CAPTURE') &&
+                scale == 1 &&
+                size.width == 375) {
+              await tester.drag(
+                find.byKey(const ValueKey('meal-detail-content')),
+                const Offset(0, 2000),
+              );
+              await tester.pumpAndSettle();
+              final boundary = tester.renderObject<RenderRepaintBoundary>(
+                find.byKey(const ValueKey('detail-capture')),
+              );
+              await tester.runAsync(() async {
+                final picture = await boundary.toImage(pixelRatio: 2);
+                final bytes = await picture.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                const folder = String.fromEnvironment(
+                  'FOOD_UI_CAPTURE_DIR',
+                  defaultValue: 'build/food-ui-checks',
+                );
+                await Directory(folder).create(recursive: true);
+                await File(
+                  '$folder/detail-${dark ? 'dark' : 'light'}.png',
+                ).writeAsBytes(bytes!.buffer.asUint8List());
+                picture.dispose();
+              });
+            }
+          },
+        );
+      }
+    }
+  }
+
+  testWidgets(
+    'keyboard leaves quantity and confirmation reachable at large text',
+    (tester) async {
+      final source = ChineseFoodDataSource(
+        read: () => File('assets/foods/catalog.json').readAsString(),
+      );
+      final meal = (await tester.runAsync(() => source.search('鸡蛋')))!.first;
+      await pumpMealDetail(
+        tester,
+        meal,
+        size: const Size(320, 640),
+        scale: 2,
+        keyboard: 300,
+      );
+      final field = find.byType(TextFormField).first;
+      await tester.ensureVisible(field);
+      await tester.enterText(field, '50');
+      await tester.pumpAndSettle();
+      expect(bloc!.state.totalQuantityConverted, '50.0');
+      final add = find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.identifier == 'meal-detail-add',
+      );
+      if (add.evaluate().isEmpty) {
+        await tester.scrollUntilVisible(
+          add,
+          180,
+          maxScrolls: 80,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('meal-detail-content')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+      } else {
+        await tester.ensureVisible(add);
+      }
+      await tester.pumpAndSettle();
+      expect(add.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets(
     'off (default): scalable serving still selects the serving unit',
     (tester) async {
@@ -209,28 +422,26 @@ void main() {
     },
   );
 
-  testWidgets(
-    'on: solid with a scalable serving lands on grams with 100 g',
-    (tester) async {
-      defaultToRawFoodUnits = true;
-      await pumpMealDetail(tester, _solidWithServing());
-      expect(bloc!.state.selectedUnit, 'g');
-      expect(bloc!.state.totalQuantityConverted, '100.0');
-      expect(_maxScrollOffset(tester), 0.0);
-    },
-  );
+  testWidgets('on: solid with a scalable serving lands on grams with 100 g', (
+    tester,
+  ) async {
+    defaultToRawFoodUnits = true;
+    await pumpMealDetail(tester, _solidWithServing());
+    expect(bloc!.state.selectedUnit, 'g');
+    expect(bloc!.state.totalQuantityConverted, '100.0');
+    expect(_maxScrollOffset(tester), 0.0);
+  });
 
-  testWidgets(
-    'on: liquid with a scalable serving lands on ml with 100 ml',
-    (tester) async {
-      defaultToRawFoodUnits = true;
-      await pumpMealDetail(tester, _liquidWithServing());
+  testWidgets('on: liquid with a scalable serving lands on ml with 100 ml', (
+    tester,
+  ) async {
+    defaultToRawFoodUnits = true;
+    await pumpMealDetail(tester, _liquidWithServing());
 
-      expect(bloc!.state.selectedUnit, 'ml');
-      expect(bloc!.state.totalQuantityConverted, '100.0');
-      expect(_maxScrollOffset(tester), 0.0);
-    },
-  );
+    expect(bloc!.state.selectedUnit, 'ml');
+    expect(bloc!.state.totalQuantityConverted, '100.0');
+    expect(_maxScrollOffset(tester), 0.0);
+  });
 
   testWidgets(
     'off: thin OFF liquid hydrates to a serving-carrying full product '
@@ -246,19 +457,16 @@ void main() {
     },
   );
 
-  testWidgets(
-    'on: thin OFF liquid hydrates but the raw-units preference still '
-    'wins, landing on ml/100',
-    (tester) async {
-      defaultToRawFoodUnits = true;
-      hydratedFor = _liquidHydratedOff();
-      await pumpMealDetail(tester, _liquidThinOff());
+  testWidgets('on: thin OFF liquid hydrates but the raw-units preference still '
+      'wins, landing on ml/100', (tester) async {
+    defaultToRawFoodUnits = true;
+    hydratedFor = _liquidHydratedOff();
+    await pumpMealDetail(tester, _liquidThinOff());
 
-      expect(bloc!.state.selectedUnit, 'ml');
-      expect(bloc!.state.totalQuantityConverted, '100.0');
-      expect(_maxScrollOffset(tester), 0.0);
-    },
-  );
+    expect(bloc!.state.selectedUnit, 'ml');
+    expect(bloc!.state.totalQuantityConverted, '100.0');
+    expect(_maxScrollOffset(tester), 0.0);
+  });
 }
 
 class _FakeGetConfigUsecase implements GetConfigUsecase {
@@ -389,8 +597,7 @@ class _FakeGetIntakeUsecase implements GetIntakeUsecase {
     DateTime day, {
     int dayStartOffsetHours = 0,
     int dayStartOffsetMinutes = 0,
-  }) async =>
-      [];
+  }) async => [];
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -431,8 +638,7 @@ class _FakeCacheManager implements CacheManager {
     String? key,
     Map<String, String>? headers,
     bool withProgress = false,
-  }) =>
-      const Stream<FileResponse>.empty();
+  }) => const Stream<FileResponse>.empty();
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>

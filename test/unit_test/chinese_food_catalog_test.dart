@@ -334,6 +334,11 @@ void main() {
         hasLength(1),
       );
       expect(rows.any((f) => (f['name'] as String).contains('（者）')), false);
+      expect(
+        rows.any((f) => RegExp('代表值|平均值|均值').hasMatch(f['name'] as String)),
+        false,
+      );
+      expect(rows.where((f) => f['name'] == '蒸米饭'), isNotEmpty);
       expect(rows.any((f) => (f['name'] as String).contains('\ufffd')), false);
       for (final row in rows) {
         final portions = row['portions'] as List;

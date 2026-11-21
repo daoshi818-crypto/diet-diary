@@ -48,8 +48,11 @@ jobs:
             test/unit_test/chinese_food_catalog_test.dart \
             test/unit_test/quick_serving_option_test.dart \
             test/unit_test/demo_meal_photos_test.dart \
-            test/features/meal_detail/quick_serving_chips_widget_test.dart \
-            test/features/meal_detail/quick_serving_chips_screen_test.dart \
+            test/features/meal_detail \
+            test/features/add_meal/presentation/add_meal_screen_methods_test.dart \
+            test/features/add_meal/presentation/meal_item_card_quantity_test.dart \
+            test/features/add_meal/presentation/log_tray_test.dart \
+            test/unit_test/config_default_to_raw_food_units_test.dart \
             test/core/presentation/widgets/logging_dialog_layout_test.dart
       - name: Prepare release signing
         env:

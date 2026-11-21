@@ -269,7 +269,7 @@ class ConfigEntity extends Equatable {
     this.healthDeletedWorkouts = const <String, DateTime>{},
     this.legacyHealthDeletedExternalIds = const <String>{},
     this.policyNoticeRevisionSeen = 0,
-    this.defaultToRawFoodUnits = false,
+    this.defaultToRawFoodUnits = true,
   });
 
   /// The multiplier the importer actually applies. Falls back to crediting
@@ -391,7 +391,7 @@ class ConfigEntity extends Equatable {
     legacyHealthDeletedExternalIds: dbo.healthDeletedExternalIds != null
         ? Set<String>.from(dbo.healthDeletedExternalIds!)
         : const <String>{},
-    defaultToRawFoodUnits: dbo.defaultToRawFoodUnits ?? false,
+    defaultToRawFoodUnits: dbo.defaultToRawFoodUnits ?? true,
   );
 
   /// Returns the recommended kcal target for [mealKey] given a daily goal.

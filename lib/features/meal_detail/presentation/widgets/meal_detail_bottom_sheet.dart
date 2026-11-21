@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/domain/entity/intake_entity.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
@@ -44,6 +43,8 @@ class MealDetailBottomSheet extends StatefulWidget {
   final LogTray? logTray;
   final Future<void> Function(LogTrayItem)? onSelectionConfirmed;
   final String? confirmLabel;
+  final Widget Function(BuildContext, Widget editor, Widget actions)?
+  layoutBuilder;
 
   const MealDetailBottomSheet({
     super.key,
@@ -58,6 +59,7 @@ class MealDetailBottomSheet extends StatefulWidget {
     this.logTray,
     this.onSelectionConfirmed,
     this.confirmLabel,
+    this.layoutBuilder,
   });
 
   @override
@@ -138,6 +140,29 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     widget.onQuantityOrUnitChanged(quantityText, option.unit);
   }
 
+  void _onUnitSelected(String? unit) {
+    if (unit == null || unit == widget.selectedUnit) return;
+    final entered = double.tryParse(
+      widget.quantityTextController.text.replaceAll(',', '.'),
+    );
+    final base = entered != null && entered.isFinite
+        ? convertQuantityToBaseUnit(
+            entered,
+            widget.selectedUnit,
+            widget.product,
+          )
+        : 100.0;
+    final quantity = isPortionUnit(unit)
+        ? 1.0
+        : base / convertQuantityToBaseUnit(1, unit, widget.product);
+    widget.quantityTextController.removeListener(_onQuantityChanged);
+    widget.quantityTextController.text = _formatQuantity(
+      double.parse(quantity.toStringAsFixed(2)),
+    );
+    widget.quantityTextController.addListener(_onQuantityChanged);
+    widget.onQuantityOrUnitChanged(widget.quantityTextController.text, unit);
+  }
+
   String _formatQuantity(double value) {
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
@@ -147,255 +172,231 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final productMissingRequiredInfo = _hasRequiredProductInfoMissing();
-    final logTray = widget.logTray;
-    final addsToList = _addsToList;
-    final enteredQuantity = double.tryParse(
+    final s = S.of(context);
+    final missing = _hasRequiredProductInfoMissing();
+    final quantity = double.tryParse(
       widget.quantityTextController.text.replaceAll(',', '.'),
     );
     final canSubmit =
-        !productMissingRequiredInfo &&
+        !missing &&
         !_submitting &&
-        enteredQuantity != null &&
-        enteredQuantity.isFinite &&
-        enteredQuantity > 0 &&
-        enteredQuantity <= 10000;
-    final missingFieldsText = S
-        .of(context)
-        .missingProductInfoFields(_missingRequiredProductInfo().join(', '));
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final palette = isDark ? AppPalette.dark : AppPalette.light;
-    return BottomSheet(
-      elevation: 0,
-      onClosing: () {},
-      enableDrag: false,
-      builder: (context) {
-        // Quick-quantity presets — one tap to a common portion instead of
-        // typing. Uses the food's own serving when it has one and 100 g
-        // for solids. Computed once so the collection-if below can drop
-        // the row entirely when nothing applies (no orphan SizedBox).
-        final quickOptions = productMissingRequiredInfo
-            ? const <QuickServingOption>[]
-            : quickServingOptionsFor(
-                widget.product,
-                S.of(context).gramUnit,
-                includeWeightPresets: widget.onSelectionConfirmed != null,
-              );
-        return Container(
-          decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(color: palette.border, width: Dimens.hairline),
-            ),
-            color: palette.surface,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(Dimens.radiusL),
-              topRight: Radius.circular(Dimens.radiusL),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: Wrap(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16.0, 32.0, 16.0, 8.0),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              enabled: !productMissingRequiredInfo,
-                              controller: widget.quantityTextController,
-                              focusNode: _quantityFocusNode,
-                              onTap: _selectAllQuantityText,
-                              keyboardType: TextInputType.numberWithOptions(
-                                decimal: true,
-                              ),
-                              inputFormatters: [
-                                FilteringTextInputFormatter.allow(
-                                  RegExp(r'^\d+([.,]\d{0,2})?$'),
-                                ),
-                              ],
-                              decoration: InputDecoration(
-                                border: const OutlineInputBorder(
-                                  borderRadius: Dimens.borderRadiusM,
-                                ),
-                                labelText: S.of(context).quantityLabel,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 16.0),
-                          Expanded(
-                            child: DropdownButtonFormField(
-                              isExpanded: true,
-                              itemHeight: null,
-                              // A dense field keeps the chosen serving to one
-                              // line, cutting off its weight at a large font.
-                              // The 4 pt padding keeps it as tall as the
-                              // quantity field at the default size.
-                              isDense: false,
-                              initialValue: widget.selectedUnit,
-                              key: ValueKey(widget.selectedUnit),
-                              decoration: InputDecoration(
-                                border: const OutlineInputBorder(
-                                  borderRadius: Dimens.borderRadiusM,
-                                ),
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
-                                ),
-                                labelText: S.of(context).unitLabel,
-                              ),
-                              items: <DropdownMenuItem<String>>[
-                                // #629: a serving the app cannot scale
-                                // is a no-op dressed as a unit.
-                                if (widget.product.portions.isNotEmpty)
-                                  for (final i in visiblePortionIndices(
-                                    widget.product,
-                                    selectedUnit: widget.selectedUnit,
-                                  ))
-                                    DropdownMenuItem<String>(
-                                      value: portionUnit(i),
-                                      child: Text(
-                                        portionDisplayLabel(
-                                          widget.product.portions[i],
-                                          S.of(context).gramUnit,
-                                          localizedLabel: localizeServingLabel(
-                                            S.of(context),
-                                            widget.product.portions[i].label,
-                                          ),
-                                        ),
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    )
-                                else if (widget
-                                        .product
-                                        .scalableServingQuantity !=
-                                    null)
-                                  _getServingDropdownItem(context),
-                                if (widget.product.isSolid ||
-                                    !widget.product.isLiquid &&
-                                        !widget.product.isSolid)
-                                  ..._getSolidUnitDropdownItems(context),
-                                if (widget.product.isLiquid ||
-                                    !widget.product.isLiquid &&
-                                        !widget.product.isSolid)
-                                  ..._getLiquidUnitDropdownItems(context),
-                                ..._getOtherDropdownItems(context),
-                              ],
-                              onChanged: (value) {
-                                widget.onQuantityOrUnitChanged(
-                                  widget.quantityTextController.text,
-                                  value,
-                                );
-                              },
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (quickOptions.isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: Dimens.spacing12),
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Wrap(
-                              spacing: Dimens.spacing8,
-                              children: [
-                                for (final option in quickOptions)
-                                  Semantics(
-                                    identifier: 'meal-detail-chip-${option.id}',
-                                    child: ActionChip(
-                                      label: Text(option.label),
-                                      onPressed: () =>
-                                          _onQuickServingSelected(option),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: Dimens.spacing16),
-                      Semantics(
-                        identifier: 'meal-detail-add',
-                        child: SizedBox(
-                          width: double.infinity, // Make button full width
-                          child: FilledButton.icon(
-                            onPressed: canSubmit
-                                ? () => onAddButtonPressed(
-                                    context,
-                                    toList: _addsToList,
-                                  )
-                                : null,
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: Dimens.spacing16,
-                              ),
-                              shape: const RoundedRectangleBorder(
-                                borderRadius: Dimens.borderRadiusM,
-                              ),
-                            ),
-                            icon: Icon(
-                              widget.onSelectionConfirmed != null
-                                  ? Icons.check_rounded
-                                  : Icons.add_rounded,
-                            ),
-                            label: Text(
-                              widget.confirmLabel ??
-                                  (addsToList
-                                      ? S.of(context).addToListLabel
-                                      : S.of(context).addLabel),
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (logTray != null && !addsToList)
-                        Padding(
-                          padding: const EdgeInsets.only(top: Dimens.spacing8),
-                          child: Semantics(
-                            identifier: 'meal-detail-add-to-list',
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: canSubmit
-                                    ? () => onAddButtonPressed(
-                                        context,
-                                        toList: true,
-                                      )
-                                    : null,
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: Dimens.spacing12,
-                                  ),
-                                  shape: const RoundedRectangleBorder(
-                                    borderRadius: Dimens.borderRadiusM,
-                                  ),
-                                ),
-                                icon: const Icon(Icons.playlist_add_rounded),
-                                label: Text(S.of(context).addToListLabel),
-                              ),
-                            ),
-                          ),
-                        ),
-                      productMissingRequiredInfo
-                          ? Text(
-                              '${S.of(context).missingProductInfo}\n'
-                              '$missingFieldsText',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(
-                                    color: Theme.of(context).colorScheme.error,
-                                  ),
-                            )
-                          : const SizedBox(),
-                    ],
+        quantity != null &&
+        quantity.isFinite &&
+        quantity > 0 &&
+        quantity <= 10000;
+    final options = missing
+        ? const <QuickServingOption>[]
+        : quickServingOptionsFor(
+            widget.product,
+            s.gramUnit,
+            includeWeightPresets: widget.onSelectionConfirmed != null,
+          );
+    final editor = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final quantityField = Semantics(
+              identifier: 'meal-detail-quantity',
+              container: true,
+              child: TextFormField(
+                enabled: !missing,
+                controller: widget.quantityTextController,
+                focusNode: _quantityFocusNode,
+                onTap: _selectAllQuantityText,
+                textInputAction: TextInputAction.done,
+                onFieldSubmitted: (_) => _quantityFocusNode.unfocus(),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(
+                    RegExp(r'^\d+([.,]\d{0,2})?$'),
+                  ),
+                ],
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(
+                    borderRadius: Dimens.borderRadiusM,
+                  ),
+                  labelText: s.quantityLabel,
+                  labelStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
+              ),
+            );
+            final unitField = Semantics(
+              identifier: 'meal-detail-unit',
+              container: true,
+              child: DropdownButtonFormField<String>(
+                isExpanded: true,
+                itemHeight: null,
+                menuMaxHeight: MediaQuery.sizeOf(context).height * .5,
+                isDense: false,
+                initialValue: widget.selectedUnit,
+                key: ValueKey(widget.selectedUnit),
+                decoration: InputDecoration(
+                  border: const OutlineInputBorder(
+                    borderRadius: Dimens.borderRadiusM,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
+                  labelText: s.unitLabel,
+                  labelStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                items: [
+                  if (widget.product.isSolid || !widget.product.isLiquid)
+                    ..._getSolidUnitDropdownItems(context),
+                  if (widget.product.isLiquid || !widget.product.isSolid)
+                    ..._getLiquidUnitDropdownItems(context),
+                  if (widget.product.portions.isNotEmpty)
+                    for (final i in visiblePortionIndices(
+                      widget.product,
+                      selectedUnit: widget.selectedUnit,
+                    ))
+                      DropdownMenuItem<String>(
+                        value: portionUnit(i),
+                        child: Text(
+                          portionDisplayLabel(
+                            widget.product.portions[i],
+                            s.gramUnit,
+                            localizedLabel: localizeServingLabel(
+                              s,
+                              widget.product.portions[i].label,
+                            ),
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      )
+                  else if (widget.product.scalableServingQuantity != null)
+                    _getServingDropdownItem(context),
+                  if (widget.selectedUnit == UnitDropdownItem.gml.toString())
+                    ..._getOtherDropdownItems(context),
+                ],
+                onChanged: missing ? null : _onUnitSelected,
+              ),
+            );
+            if (constraints.maxWidth < 280 ||
+                MediaQuery.textScalerOf(context).scale(16) > 22) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  quantityField,
+                  const SizedBox(height: 16),
+                  unitField,
+                ],
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: quantityField),
+                const SizedBox(width: 16),
+                Expanded(child: unitField),
+              ],
+            );
+          },
+        ),
+        if (options.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final option in options.take(4))
+                  Semantics(
+                    identifier: 'meal-detail-chip-${option.id}',
+                    child: ActionChip(
+                      label: Text(option.label),
+                      onPressed: () => _onQuickServingSelected(option),
+                    ),
+                  ),
               ],
             ),
           ),
-        );
-      },
+        if (missing)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              '${s.missingProductInfo}\n${s.missingProductInfoFields(_missingRequiredProductInfo().join(', '))}',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+      ],
     );
+    final actions = SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              identifier: 'meal-detail-add',
+              child: FilledButton.icon(
+                onPressed: canSubmit
+                    ? () => onAddButtonPressed(context, toList: _addsToList)
+                    : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 14,
+                  ),
+                ),
+                icon: Icon(
+                  widget.onSelectionConfirmed != null
+                      ? Icons.check_rounded
+                      : Icons.add_rounded,
+                ),
+                label: Text(
+                  widget.confirmLabel ??
+                      (_addsToList ? s.addToListLabel : s.addLabel),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            if (widget.logTray != null && !_addsToList)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Semantics(
+                  identifier: 'meal-detail-add-to-list',
+                  child: OutlinedButton.icon(
+                    onPressed: canSubmit
+                        ? () => onAddButtonPressed(context, toList: true)
+                        : null,
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                    ),
+                    icon: const Icon(Icons.playlist_add_rounded),
+                    label: Text(s.addToListLabel),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    return widget.layoutBuilder?.call(context, editor, actions) ??
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+              child: editor,
+            ),
+            actions,
+          ],
+        );
   }
 
   bool _hasRequiredProductInfoMissing() =>
@@ -440,13 +441,9 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     );
     final quantity = double.tryParse(quantityText);
 
-    if (quantity == null || quantity <= 0) {
+    if (quantity == null || !quantity.isFinite || quantity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${S.of(context).quantityLabel} must be greater than 0',
-          ),
-        ),
+        SnackBar(content: Text(S.of(context).loggingAmountInvalid)),
       );
       return;
     }
@@ -454,11 +451,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     // Reasonable maximum limit per meal (#210)
     if (quantity > 10000) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '${S.of(context).quantityLabel} seems unrealistically high',
-          ),
-        ),
+        SnackBar(content: Text(S.of(context).loggingAmountInvalid)),
       );
       return;
     }
