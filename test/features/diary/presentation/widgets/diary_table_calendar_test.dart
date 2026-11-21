@@ -5,41 +5,42 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/core/domain/entity/tracked_day_entity.dart';
 import 'package:opennutritracker/features/diary/presentation/widgets/diary_table_calendar.dart';
 import 'package:opennutritracker/generated/l10n.dart';
+import 'package:table_calendar/table_calendar.dart';
 
 Widget _app({
   double textScale = 1.0,
   Locale locale = const Locale('en'),
   Map<String, TrackedDayEntity> trackedDaysMap = const {},
   Set<String> daysWithEntries = const {},
-}) =>
-    MediaQuery(
-      data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
-      child: MaterialApp(
-        locale: locale,
-        localizationsDelegates: const [
-          S.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: S.supportedLocales,
-        home: Scaffold(
-          body: DiaryTableCalendar(
-            onDateSelected: (_, _) {},
-            calendarDurationDays: const Duration(days: 365),
-            focusedDate: DateTime(2026, 8, 24),
-            currentDate: DateTime(2026, 8, 24),
-            selectedDate: DateTime(2026, 8, 24),
-            trackedDaysMap: trackedDaysMap,
-            daysWithEntries: daysWithEntries,
-          ),
-        ),
+}) => MediaQuery(
+  data: MediaQueryData(textScaler: TextScaler.linear(textScale)),
+  child: MaterialApp(
+    locale: locale,
+    localizationsDelegates: const [
+      S.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: S.supportedLocales,
+    home: Scaffold(
+      body: DiaryTableCalendar(
+        onDateSelected: (_, _) {},
+        calendarDurationDays: const Duration(days: 365),
+        focusedDate: DateTime(2026, 8, 24),
+        currentDate: DateTime(2026, 8, 24),
+        selectedDate: DateTime(2026, 8, 24),
+        trackedDaysMap: trackedDaysMap,
+        daysWithEntries: daysWithEntries,
       ),
-    );
+    ),
+  ),
+);
 
 void main() {
-  testWidgets('the weekday headings are not clipped at large font sizes',
-      (tester) async {
+  testWidgets('the weekday headings are not clipped at large font sizes', (
+    tester,
+  ) async {
     // #766. `TableCalendar`'s `daysOfWeekHeight` defaults to a flat 16.0,
     // and the headings are `labelSmall` — 11sp on a 1.45 line height, which
     // is exactly 16 logical pixels. The row therefore has *no* slack at the
@@ -69,7 +70,8 @@ void main() {
       expect(
         given,
         greaterThanOrEqualTo(wanted),
-        reason: 'at ${scale}x a heading needs ${wanted}px and its row gives '
+        reason:
+            'at ${scale}x a heading needs ${wanted}px and its row gives '
             '${given}px, so the top and bottom of the label are cut off',
       );
     }
@@ -99,8 +101,9 @@ void main() {
     },
   );
 
-  testWidgets('the month header stays English when the app is English',
-      (tester) async {
+  testWidgets('the month header stays English when the app is English', (
+    tester,
+  ) async {
     await tester.pumpWidget(_app(locale: const Locale('en')));
     await tester.pumpAndSettle();
 
@@ -111,51 +114,72 @@ void main() {
   // for its goals (#1440). The marker follows what is logged on a day, not
   // the row's totals, which say neither thing reliably.
   TrackedDayEntity row(int date, double tracked) => TrackedDayEntity(
-        day: DateTime(2026, 8, date),
-        calorieGoal: 2000,
-        caloriesTracked: tracked,
-        carbsTracked: tracked / 10,
-        fatTracked: 0,
-        proteinTracked: 0,
-      );
+    day: DateTime(2026, 8, date),
+    calorieGoal: 2000,
+    caloriesTracked: tracked,
+    carbsTracked: tracked / 10,
+    fatTracked: 0,
+    proteinTracked: 0,
+  );
   final markers = find.byWidgetPredicate(
     (w) =>
         w is Container &&
         w.constraints == const BoxConstraints.tightFor(width: 5, height: 5),
   );
 
-  testWidgets('a row kept with no entries gets no marker (#1440)',
-      (tester) async {
-    await tester.pumpWidget(_app(
-      trackedDaysMap: {'2026-08-20': row(20, 1800), '2026-08-21': row(21, 0)},
-      daysWithEntries: {'2026-08-20'},
-    ));
+  testWidgets('a row kept with no entries gets no marker (#1440)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _app(
+        trackedDaysMap: {'2026-08-20': row(20, 1800), '2026-08-21': row(21, 0)},
+        daysWithEntries: {'2026-08-20'},
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<TableCalendar>(
+            find.byWidgetPredicate((w) => w is TableCalendar),
+          )
+          .calendarFormat,
+      CalendarFormat.week,
+    );
+    await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();
 
     expect(markers, findsOneWidget);
   });
 
-  testWidgets('a day of only zero-calorie entries is still marked',
-      (tester) async {
+  testWidgets('a day of only zero-calorie entries is still marked', (
+    tester,
+  ) async {
     // Black coffee, water, a food with no nutrients filled in: nothing
     // counted, but something was logged.
-    await tester.pumpWidget(_app(
-      trackedDaysMap: {'2026-08-20': row(20, 0)},
-      daysWithEntries: {'2026-08-20'},
-    ));
+    await tester.pumpWidget(
+      _app(
+        trackedDaysMap: {'2026-08-20': row(20, 0)},
+        daysWithEntries: {'2026-08-20'},
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();
 
     expect(markers, findsOneWidget);
   });
 
-  testWidgets('a rounding residue on an emptied day leaves no marker',
-      (tester) async {
+  testWidgets('a rounding residue on an emptied day leaves no marker', (
+    tester,
+  ) async {
     // Deleting an entry subtracts it from the row's running totals, which
     // can stop just short of zero.
     final residue = row(20, 0.1 + 0.2 - 0.3);
     expect(residue.hasConsumed, isTrue);
 
     await tester.pumpWidget(_app(trackedDaysMap: {'2026-08-20': residue}));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Month'));
     await tester.pumpAndSettle();
 
     expect(markers, findsNothing);

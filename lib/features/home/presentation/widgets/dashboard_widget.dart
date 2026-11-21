@@ -1,5 +1,8 @@
 import 'package:animated_flip_counter/animated_flip_counter.dart';
+import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/utils/energy_display.dart';
+import 'package:opennutritracker/features/settings/presentation/widgets/nutrition_goals_screen.dart';
 import 'package:opennutritracker/core/presentation/widgets/app_card.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
@@ -12,6 +15,7 @@ import 'package:provider/provider.dart';
 
 class DashboardWidget extends StatefulWidget {
   final double totalKcalDaily;
+  final double? tdeeKcal;
   final double totalKcalLeft;
   final double totalKcalSupplied;
   final double totalKcalBurned;
@@ -27,6 +31,7 @@ class DashboardWidget extends StatefulWidget {
     required this.totalKcalSupplied,
     required this.totalKcalBurned,
     required this.totalKcalDaily,
+    this.tdeeKcal,
     required this.totalKcalLeft,
     required this.totalCarbsIntake,
     required this.totalFatsIntake,
@@ -69,7 +74,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
       kcalValue = widget.totalKcalLeft;
       gaugeValue =
           (widget.totalKcalDaily - widget.totalKcalLeft) /
-          widget.totalKcalDaily;
+          (widget.totalKcalDaily <= 0 ? 1 : widget.totalKcalDaily);
     }
     final displayValue = usesKilojoules
         ? UnitCalc.kcalToKj(kcalValue)
@@ -98,7 +103,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
     final burned = _MiniStat(
       icon: Icons.local_fire_department_rounded,
       value: '${displayBurned.round()}',
-      label: S.of(context).burnedLabel,
+      label: S.of(context).goalExerciseRecord,
       color: palette.carbsColor,
       trailing: true,
     );
@@ -213,11 +218,59 @@ class _DashboardWidgetState extends State<DashboardWidget> {
               },
             ),
           ),
+          if (widget.tdeeKcal != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Semantics(
+                identifier: 'home-edit-goals',
+                child: AppCard(
+                  onTap: () => openNutritionGoals(context),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Wrap(
+                              spacing: 12,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  '${S.of(context).goalIntakeLabel} ${EnergyDisplay.formatWithUnit(context, widget.totalKcalDaily)}',
+                                  style: textTheme.bodySmall,
+                                ),
+                                Text(
+                                  'TDEE ${EnergyDisplay.formatWithUnit(context, widget.tdeeKcal!)}',
+                                  style: textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${widget.tdeeKcal! < widget.totalKcalDaily ? S.of(context).goalExpectedSurplus : S.of(context).goalExpectedDeficit} '
+                              '${EnergyDisplay.formatWithUnit(context, (widget.tdeeKcal! - widget.totalKcalDaily).abs())}',
+                              style: textTheme.labelLarge,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.tune_rounded, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           const SizedBox(height: Dimens.spacing12),
           Row(
             children: [
               Expanded(
                 child: _MacroTile(
+                  identifier: 'home-macro-carbs',
                   label: S.of(context).carbsLabel,
                   intake: widget.totalCarbsIntake,
                   goal: widget.totalCarbsGoal,
@@ -228,6 +281,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
               const SizedBox(width: Dimens.spacing12),
               Expanded(
                 child: _MacroTile(
+                  identifier: 'home-macro-fat',
                   label: S.of(context).fatLabel,
                   intake: widget.totalFatsIntake,
                   goal: widget.totalFatsGoal,
@@ -238,6 +292,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
               const SizedBox(width: Dimens.spacing12),
               Expanded(
                 child: _MacroTile(
+                  identifier: 'home-macro-protein',
                   label: S.of(context).proteinLabel,
                   intake: widget.totalProteinsIntake,
                   goal: widget.totalProteinsGoal,
@@ -303,6 +358,7 @@ class _MiniStat extends StatelessWidget {
 }
 
 class _MacroTile extends StatelessWidget {
+  final String identifier;
   final String label;
   final double intake;
   final double goal;
@@ -310,6 +366,7 @@ class _MacroTile extends StatelessWidget {
   final AppPalette palette;
 
   const _MacroTile({
+    required this.identifier,
     required this.label,
     required this.intake,
     required this.goal,
@@ -321,43 +378,61 @@ class _MacroTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final pct = (goal <= 0) ? 0.0 : (intake / goal).clamp(0.0, 1.0);
-    return AppCard(
-      borderRadius: Dimens.radiusM,
-      padding: const EdgeInsets.all(Dimens.spacing12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 9,
-                height: 9,
-                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    return Semantics(
+      identifier: identifier,
+      child: AppCard(
+        onTap: () => openNutritionGoals(context),
+        borderRadius: Dimens.radiusM,
+        padding: const EdgeInsets.all(Dimens.spacing12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 9,
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: AutoSizeText(
+                    label,
+                    maxLines: 1,
+                    minFontSize: 10,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Dimens.spacing8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: pct,
+                minHeight: 6,
+                backgroundColor: palette.surfaceMuted,
+                valueColor: AlwaysStoppedAnimation(color),
               ),
-              const SizedBox(width: 6),
-              Flexible(child: Text(label, style: textTheme.labelMedium)),
-            ],
-          ),
-          const SizedBox(height: Dimens.spacing8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: pct,
-              minHeight: 6,
-              backgroundColor: palette.surfaceMuted,
-              valueColor: AlwaysStoppedAnimation(color),
             ),
-          ),
-          const SizedBox(height: Dimens.spacing8),
-          Text(
-            '${intake.toInt()}/${goal.toInt()} g',
-            style: textTheme.bodySmall?.copyWith(
-              color: palette.textStrong,
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: Dimens.spacing8),
+            Text(
+              '${_grams(intake)} / ${_grams(goal)} g',
+              style: textTheme.bodySmall?.copyWith(
+                color: palette.textStrong,
+                fontWeight: FontWeight.w700,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
+
+  String _grams(double value) =>
+      value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
 }

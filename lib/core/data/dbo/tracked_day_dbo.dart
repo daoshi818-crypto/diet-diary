@@ -64,6 +64,11 @@ class TrackedDayDBO extends HiveObject {
   @HiveField(18)
   double? magnesiumGoal;
 
+  @HiveField(19)
+  bool? activityIncludedInGoal;
+
+  bool get usesLegacyActivityBudget => activityIncludedInGoal ?? true;
+
   TrackedDayDBO({
     required this.day,
     required this.calorieGoal,
@@ -84,6 +89,7 @@ class TrackedDayDBO extends HiveObject {
     this.vitaminDGoal,
     this.vitaminB12Goal,
     this.magnesiumGoal,
+    this.activityIncludedInGoal,
   });
 
   factory TrackedDayDBO.fromTrackedDayEntity(TrackedDayEntity entity) {
@@ -107,6 +113,7 @@ class TrackedDayDBO extends HiveObject {
       vitaminDGoal: entity.vitaminDGoal,
       vitaminB12Goal: entity.vitaminB12Goal,
       magnesiumGoal: entity.magnesiumGoal,
+      activityIncludedInGoal: entity.activityIncludedInGoal,
     );
   }
 

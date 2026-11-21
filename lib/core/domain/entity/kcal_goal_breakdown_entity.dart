@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:equatable/equatable.dart';
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
@@ -53,9 +54,10 @@ class KcalGoalBreakdownEntity extends Equatable {
 
   // Step 4 — kcal burned by today's logged activities.
   final double activityKcal;
+  final NutritionGoalPlan? plan;
 
   /// The resulting goal; always equals
-  /// TDEE + effective adjustment + manual offset + activity kcal, and always
+  /// TDEE + effective adjustment + manual offset, and always
   /// equals [CalorieGoalCalc.getTotalKcalGoal] for the same inputs.
   final double totalKcalGoal;
 
@@ -91,6 +93,7 @@ class KcalGoalBreakdownEntity extends Equatable {
     required this.effectiveAdjustmentKcal,
     required this.manualKcalAdjustment,
     required this.activityKcal,
+    this.plan,
     required this.totalKcalGoal,
     required this.carbsFractionGoal,
     required this.fatsFractionGoal,
@@ -115,6 +118,7 @@ class KcalGoalBreakdownEntity extends Equatable {
     double? userCarbsGoalPct,
     double? userFatsGoalPct,
     double? userProteinsGoalPct,
+    NutritionGoalPlan? plan,
   }) {
     final palValue = PalCalc.getPALValueFromActivityCategory(user);
 
@@ -179,20 +183,22 @@ class KcalGoalBreakdownEntity extends Equatable {
       totalKcalActivities,
       kcalUserAdjustment: userKcalAdjustment,
       caloriesTaperEnabled: user.caloriesTaperEnabled,
+      plan: plan,
     );
 
-    final carbsGrams = MacroCalc.getTotalCarbsGoal(
-      totalGoal,
-      userCarbsGoal: userCarbsGoalPct,
-    );
-    final fatsGrams = MacroCalc.getTotalFatsGoal(
-      totalGoal,
-      userFatsGoal: userFatsGoalPct,
-    );
-    final proteinsGrams = MacroCalc.getTotalProteinsGoal(
-      totalGoal,
-      userProteinsGoal: userProteinsGoalPct,
-    );
+    final plannedMacros = plan?.macroGoals(totalGoal);
+    final carbsGrams =
+        plannedMacros?.carbs ??
+        MacroCalc.getTotalCarbsGoal(totalGoal, userCarbsGoal: userCarbsGoalPct);
+    final fatsGrams =
+        plannedMacros?.fat ??
+        MacroCalc.getTotalFatsGoal(totalGoal, userFatsGoal: userFatsGoalPct);
+    final proteinsGrams =
+        plannedMacros?.protein ??
+        MacroCalc.getTotalProteinsGoal(
+          totalGoal,
+          userProteinsGoal: userProteinsGoalPct,
+        );
 
     return KcalGoalBreakdownEntity(
       age: user.age,
@@ -211,12 +217,16 @@ class KcalGoalBreakdownEntity extends Equatable {
       tdeeMaleReferenceKcal: tdeeMale,
       tdeeFemaleReferenceKcal: tdeeFemale,
       tdeeKcal: tdee,
-      baseAdjustmentKcal: baseAdjustment,
-      effectiveAdjustmentKcal: effectiveAdjustment,
-      manualKcalAdjustment: userKcalAdjustment ?? 0,
+      baseAdjustmentKcal: plan == null ? baseAdjustment : totalGoal - tdee,
+      effectiveAdjustmentKcal: plan == null
+          ? effectiveAdjustment
+          : totalGoal - tdee,
+      manualKcalAdjustment: plan == null ? userKcalAdjustment ?? 0 : 0,
+      plan: plan,
       activityKcal: totalKcalActivities,
       totalKcalGoal: totalGoal,
-      carbsFractionGoal: userCarbsGoalPct ?? MacroCalc.defaultCarbsPercentageGoal,
+      carbsFractionGoal:
+          userCarbsGoalPct ?? MacroCalc.defaultCarbsPercentageGoal,
       fatsFractionGoal: userFatsGoalPct ?? MacroCalc.defaultFatsPercentageGoal,
       proteinsFractionGoal:
           userProteinsGoalPct ?? MacroCalc.defaultProteinsPercentageGoal,
@@ -248,6 +258,7 @@ class KcalGoalBreakdownEntity extends Equatable {
     effectiveAdjustmentKcal,
     manualKcalAdjustment,
     activityKcal,
+    plan,
     totalKcalGoal,
     carbsFractionGoal,
     fatsFractionGoal,

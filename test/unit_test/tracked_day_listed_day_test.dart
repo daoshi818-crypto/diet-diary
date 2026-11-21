@@ -57,6 +57,7 @@ class _FakeKcalGoal extends Fake implements GetKcalGoalUsecase {
     dynamic userEntity,
     double? totalKcalActivitiesParam,
     double? kcalUserAdjustment,
+    DateTime? day,
   }) async => 2000;
 }
 
@@ -72,6 +73,7 @@ class _GatedKcalGoal extends _FakeKcalGoal {
     dynamic userEntity,
     double? totalKcalActivitiesParam,
     double? kcalUserAdjustment,
+    DateTime? day,
   }) async {
     if (!reached.isCompleted) reached.complete();
     await release.future;
@@ -81,13 +83,18 @@ class _GatedKcalGoal extends _FakeKcalGoal {
 
 class _FakeMacroGoal extends Fake implements GetMacroGoalUsecase {
   @override
-  Future<double> getCarbsGoal(double totalCalorieGoal) async => 250;
+  Future<double> getCarbsGoal(double totalCalorieGoal, {DateTime? day}) async =>
+      250;
 
   @override
-  Future<double> getFatsGoal(double totalCalorieGoal) async => 70;
+  Future<double> getFatsGoal(double totalCalorieGoal, {DateTime? day}) async =>
+      70;
 
   @override
-  Future<double> getProteinsGoal(double totalCalorieGoal) async => 100;
+  Future<double> getProteinsGoal(
+    double totalCalorieGoal, {
+    DateTime? day,
+  }) async => 100;
 }
 
 class _FakeProductsRepository extends Fake implements ProductsRepository {
@@ -271,7 +278,7 @@ void main() {
       expect(day.intakes, 1);
       expect(day.activities, 1);
       expect(day.row!.caloriesTracked, 200);
-      expect(day.row!.calorieGoal, 2150);
+      expect(day.row!.calorieGoal, 2000);
     });
   });
 
@@ -298,15 +305,15 @@ void main() {
       expect(nextDay.row, isNull, reason: 'nothing is listed on the 5th');
     });
 
-    test('an activity logged from Home at 02:00 raises the goal of the day '
-        'the Diary lists it under', () async {
+    test('an activity logged from Home at 02:00 keeps a fixed budget on '
+        'the day the Diary lists it under', () async {
       final at = DateTime(2026, 10, 5, 2);
       await logActivity.logActivity(activityAt(at), day: at);
 
       final day = await diaryDay(DateTime.utc(2026, 10, 4), boundaryHours: 4);
       expect(day.activities, 1);
       expect(day.row, isNotNull);
-      expect(day.row!.calorieGoal, 2150);
+      expect(day.row!.calorieGoal, 2000);
       expect(
         (await diaryDay(DateTime.utc(2026, 10, 5), boundaryHours: 4)).row,
         isNull,
@@ -526,8 +533,8 @@ void main() {
     Future<TrackedDayGoals> currentGoals() async =>
         (kcal: 2000.0, carbs: 250.0, fat: 70.0, protein: 100.0);
 
-    test('gets the row of a day with entries, from the current goal raised '
-        'by its activity, totals summed from its entries', () async {
+    test('gets the row of a day with entries with a fixed current budget '
+        'and totals summed from its entries', () async {
       await addLoggedIntake('legacy-toast', label);
       await activityRepository.addUserActivity(activityAt(label));
       expect(await getTrackedDay.getTrackedDay(label), isNull);
@@ -537,8 +544,8 @@ void main() {
       final row = (await diaryDay(label)).row!;
       expect(row.caloriesTracked, 200);
       expect(row.carbsTracked, 40);
-      expect(row.calorieGoal, 2150);
-      expect(row.carbsGoal, 250 + MacroCalc.getTotalCarbsGoal(150));
+      expect(row.calorieGoal, 2000);
+      expect(row.carbsGoal, 250);
     });
 
     test('a day with nothing logged stays without a row', () async {
@@ -548,8 +555,7 @@ void main() {
   });
 
   group('a profile that was not active when the boundary moved', () {
-    test('has its activity energy moved on activation, not credited '
-        'twice', () async {
+    test('keeps its activity budget unchanged on activation', () async {
       // Activated under the 00:00 boundary, which goes on record.
       await reconcile();
       expect(recordedOffset(), 0);
@@ -559,11 +565,15 @@ void main() {
       // Another profile moves the app-wide boundary; these rows stay put.
       await setBoundary(4);
 
-      expect(await reconcile(), 2);
+      expect(await reconcile(), 0);
 
       final day = await diaryDay(DateTime.utc(2026, 10, 4), boundaryHours: 4);
       expect(day.activities, 1);
-      expect(day.row!.calorieGoal, 2150, reason: '2000 plus the walk, once');
+      expect(
+        day.row!.calorieGoal,
+        2000,
+        reason: 'activity is recorded without increasing the budget',
+      );
       expect(day.row!.caloriesTracked, 200);
       // The 5th has nothing listed: its row is back at the base goal and
       // draws no marker.
@@ -624,29 +634,32 @@ void main() {
       expect(await reconcile(), 0, reason: 'activation finds nothing to do');
     });
 
-    test('moves the energy an activity burned with it, and back', () async {
-      final at = DateTime(2026, 10, 5, 2);
-      await addFood(DateTime(2026, 10, 4, 12));
-      await logActivity.logActivity(activityAt(at), day: at);
+    test(
+      'moves an activity between days without increasing either budget',
+      () async {
+        final at = DateTime(2026, 10, 5, 2);
+        await addFood(DateTime(2026, 10, 4, 12));
+        await logActivity.logActivity(activityAt(at), day: at);
 
-      await setDayBoundary.setDayBoundary(4, 0);
+        await setDayBoundary.setDayBoundary(4, 0);
 
-      final day = await diaryDay(DateTime.utc(2026, 10, 4), boundaryHours: 4);
-      expect(day.activities, 1);
-      expect(day.row!.calorieGoal, 2150);
-      // The walk's credit moved off the 5th, whose row keeps its base goal.
-      expectKeptEmpty('2026-10-05', calorieGoal: 2000);
+        final day = await diaryDay(DateTime.utc(2026, 10, 4), boundaryHours: 4);
+        expect(day.activities, 1);
+        expect(day.row!.calorieGoal, 2000);
+        // The empty day retains its fixed goal.
+        expectKeptEmpty('2026-10-05', calorieGoal: 2000);
 
-      await setDayBoundary.setDayBoundary(0, 0);
+        await setDayBoundary.setDayBoundary(0, 0);
 
-      final back = await diaryDay(DateTime.utc(2026, 10, 4));
-      expect(back.row!.calorieGoal, 2000);
-      expect(back.row!.caloriesTracked, 200);
-      final nextDay = await diaryDay(DateTime.utc(2026, 10, 5));
-      expect(nextDay.activities, 1);
-      expect(nextDay.row!.calorieGoal, 2150);
-      expect(nextDay.row!.caloriesTracked, 0);
-    });
+        final back = await diaryDay(DateTime.utc(2026, 10, 4));
+        expect(back.row!.calorieGoal, 2000);
+        expect(back.row!.caloriesTracked, 200);
+        final nextDay = await diaryDay(DateTime.utc(2026, 10, 5));
+        expect(nextDay.activities, 1);
+        expect(nextDay.row!.calorieGoal, 2000);
+        expect(nextDay.row!.caloriesTracked, 0);
+      },
+    );
 
     test('a day that keeps entries of its own keeps its row', () async {
       await addFood(DateTime(2026, 10, 5, 2));
@@ -763,31 +776,37 @@ void main() {
       expect(totalTracked(), 400);
     });
 
-    test('an activity logged across a boundary move raises one goal, '
-        'once', () async {
-      await addFood(DateTime(2026, 10, 4, 12));
-      final gate = _GatedKcalGoal();
-      final logHeld = LogUserActivityUsecase(
-        AddUserActivityUsecase(activityRepository),
-        addTrackedDay,
-        gate,
-        _FakeMacroGoal(),
-      );
+    test(
+      'an activity logged across a boundary move preserves fixed goals',
+      () async {
+        await addFood(DateTime(2026, 10, 4, 12));
+        final gate = _GatedKcalGoal();
+        final logHeld = LogUserActivityUsecase(
+          AddUserActivityUsecase(activityRepository),
+          addTrackedDay,
+          gate,
+          _FakeMacroGoal(),
+        );
 
-      final at = DateTime(2026, 10, 5, 2);
-      final logging = logHeld.logActivity(activityAt(at), day: at);
-      await gate.reached.future;
-      expect(activityBox.length, 1, reason: 'stored, its goal not raised');
-      final moving = setDayBoundary.setDayBoundary(4, 0);
-      gate.release.complete();
-      await Future.wait([logging, moving]);
+        final at = DateTime(2026, 10, 5, 2);
+        final logging = logHeld.logActivity(activityAt(at), day: at);
+        await gate.reached.future;
+        expect(activityBox.length, 1, reason: 'stored, its goal not raised');
+        final moving = setDayBoundary.setDayBoundary(4, 0);
+        gate.release.complete();
+        await Future.wait([logging, moving]);
 
-      final day = await diaryDay(DateTime.utc(2026, 10, 4), boundaryHours: 4);
-      expect(day.activities, 1);
-      expect(day.row!.calorieGoal, 2150, reason: 'not 2300');
-      // The walk's credit left the 5th with the walk.
-      expectKeptEmpty('2026-10-05', calorieGoal: 2000);
-    });
+        final day = await diaryDay(DateTime.utc(2026, 10, 4), boundaryHours: 4);
+        expect(day.activities, 1);
+        expect(
+          day.row!.calorieGoal,
+          2000,
+          reason: 'activity cannot inflate the budget',
+        );
+        // Both days keep their original budgets.
+        expectKeptEmpty('2026-10-05', calorieGoal: 2000);
+      },
+    );
 
     test('a food logged across a profile activation is counted once', () async {
       await setBoundary(4);

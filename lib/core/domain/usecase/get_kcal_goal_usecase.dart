@@ -21,6 +21,7 @@ class GetKcalGoalUsecase {
     UserEntity? userEntity,
     double? totalKcalActivitiesParam,
     double? kcalUserAdjustment,
+    DateTime? day,
   }) async {
     final user = userEntity ?? await _userRepository.getUserData();
     final config = await _configRepository.getConfig();
@@ -45,6 +46,16 @@ class GetKcalGoalUsecase {
       totalKcalActivities,
       kcalUserAdjustment: config.userKcalAdjustment,
       caloriesTaperEnabled: user.caloriesTaperEnabled,
+      plan: config.nutritionGoalSchedule.onDay(
+        day == null
+            ? DayBoundaryCalc.currentLogicalDayMinutes(
+                config.dayStartOffsetTotalMinutes,
+              )
+            : DayBoundaryCalc.dayLabelOf(
+                day,
+                config.dayStartOffsetTotalMinutes,
+              ),
+      ),
     );
   }
 }

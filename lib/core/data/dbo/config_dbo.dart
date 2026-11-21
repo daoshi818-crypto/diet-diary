@@ -221,12 +221,16 @@ class ConfigDBO extends HiveObject {
   @HiveField(42)
   bool? hasLeftTip;
 
+  @HiveField(43)
+  String? nutritionGoalScheduleJson;
+
   ConfigDBO(
     this.hasAcceptedDisclaimer,
     this.hasAcceptedPolicy,
     this.hasAcceptedSendAnonymousData,
     this.selectedAppTheme, {
     this.usesImperialUnits = false,
+    this.nutritionGoalScheduleJson,
     this.userKcalAdjustment,
     this.showActivityTracking,
     this.showMealMacros,
@@ -272,6 +276,7 @@ class ConfigDBO extends HiveObject {
     entity.hasAcceptedPolicy,
     entity.hasAcceptedSendAnonymousData,
     AppThemeDBO.fromAppThemeEntity(entity.appTheme),
+    nutritionGoalScheduleJson: entity.nutritionGoalSchedule.encode(),
     usesImperialUnits: entity.usesImperialUnits,
     usesImperialFoodUnits: entity.usesImperialFoodUnits,
     usesImperialHeightUnits: entity.usesImperialHeightUnits,

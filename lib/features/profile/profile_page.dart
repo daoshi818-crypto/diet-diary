@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/settings/presentation/widgets/nutrition_goals_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:opennutritracker/core/domain/entity/body_weight_unit_entity.dart';
@@ -10,7 +11,6 @@ import 'package:opennutritracker/core/domain/entity/user_weight_goal_entity.dart
 import 'package:opennutritracker/core/domain/entity/weight_log_entity.dart';
 import 'package:opennutritracker/core/domain/usecase/add_weight_log_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/get_user_usecase.dart';
-import 'package:opennutritracker/core/presentation/widgets/app_card.dart';
 import 'package:opennutritracker/core/presentation/widgets/section_group.dart';
 import 'package:opennutritracker/core/presentation/widgets/calories_profile_info_dialog.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
@@ -121,6 +121,15 @@ class _ProfilePageState extends State<ProfilePage> {
           palette: palette,
           tiles: [
             _ProfileTile(
+              identifier: 'profile-nutrition-goals',
+              palette: palette,
+              icon: Icons.tune_rounded,
+              title: S.of(context).nutritionGoalsTitle,
+              subtitle: S.of(context).nutritionGoalsSubtitle,
+              showChevron: true,
+              onTap: () => openNutritionGoals(context),
+            ),
+            _ProfileTile(
               identifier: 'profile-activity',
               palette: palette,
               icon: Icons.directions_walk_rounded,
@@ -142,11 +151,8 @@ class _ProfilePageState extends State<ProfilePage> {
               icon: Icons.trending_down_rounded,
               title: S.of(context).weeklyWeightGoalLabel,
               subtitle: _weeklyGoalSubtitle(context, user, bodyWeightUnit),
-              onTap: () => _showSetWeeklyWeightGoalDialog(
-                context,
-                user,
-                bodyWeightUnit,
-              ),
+              onTap: () =>
+                  _showSetWeeklyWeightGoalDialog(context, user, bodyWeightUnit),
             ),
           ],
         ),
@@ -173,9 +179,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       lbLabel: S.of(context).lbsLabel,
                       stLabel: S.of(context).stLabel,
                     ),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: palette.textMuted,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodyMedium?.copyWith(color: palette.textMuted),
                   ),
                   // #119: When the user has set a concrete target weight, surface
                   // the distance to it directly below the current weight. The
@@ -184,9 +190,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   if (user.targetWeightKg != null)
                     Text(
                       _targetWeightSubLabel(context, user, bodyWeightUnit),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: palette.textMuted,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
                     ),
                 ],
               ),
@@ -241,8 +247,9 @@ class _ProfilePageState extends State<ProfilePage> {
               icon: Icons.timer_rounded,
               title: S.of(context).profileFastingEntry,
               showChevron: true,
-              onTap: () =>
-                  Navigator.of(context).pushNamed(NavigationOptions.fastingRoute),
+              onTap: () => Navigator.of(
+                context,
+              ).pushNamed(NavigationOptions.fastingRoute),
             ),
           ],
         ),
@@ -268,10 +275,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
         const SizedBox(height: Dimens.spacing24),
-        SectionHeader(
-          label: S.of(context).profileLabel,
-          palette: palette,
-        ),
+        SectionHeader(label: S.of(context).profileLabel, palette: palette),
         const SizedBox(height: Dimens.spacing12),
         SectionGroup(
           palette: palette,
@@ -318,8 +322,9 @@ class _ProfilePageState extends State<ProfilePage> {
                 palette: palette,
                 icon: Icons.tune_rounded,
                 title: S.of(context).caloriesProfileInfoTitle,
-                subtitle: (user.caloriesProfile ?? CaloriesProfileEntity.averaged)
-                    .getName(context),
+                subtitle:
+                    (user.caloriesProfile ?? CaloriesProfileEntity.averaged)
+                        .getName(context),
                 onTap: () {
                   _showCaloriesProfileDialog(context, user);
                 },
@@ -338,36 +343,27 @@ class _ProfilePageState extends State<ProfilePage> {
               icon: Icons.menu_book_rounded,
               title: S.of(context).recipesLabel,
               showChevron: true,
-              onTap: () =>
-                  Navigator.of(context).pushNamed(NavigationOptions.recipesRoute),
+              onTap: () => Navigator.of(
+                context,
+              ).pushNamed(NavigationOptions.recipesRoute),
             ),
           ],
         ),
         const SizedBox(height: Dimens.spacing24),
-        // The full settings surface lives inline so You is the single home for
-        // identity, goals and app preferences — but collapsed by default so the
-        // tab stays scannable. Reuses SettingsScreen unchanged; the pushed route
-        // still works for any other caller.
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              shape: const Border(),
-              collapsedShape: const Border(),
-              tilePadding: const EdgeInsets.symmetric(
-                horizontal: Dimens.spacing16,
-                vertical: Dimens.spacing4,
+        SectionGroup(
+          palette: palette,
+          tiles: [
+            _ProfileTile(
+              identifier: 'profile-app-settings',
+              palette: palette,
+              icon: Icons.settings_rounded,
+              title: S.of(context).profileSettingsEntry,
+              showChevron: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
               ),
-              leading: Icon(Icons.settings_rounded, color: palette.textMuted),
-              title: Text(
-                S.of(context).settingsLabel,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              childrenPadding: const EdgeInsets.only(bottom: Dimens.spacing8),
-              children: const [SettingsScreen(embedded: true)],
             ),
-          ),
+          ],
         ),
       ],
     );
@@ -398,11 +394,15 @@ class _ProfilePageState extends State<ProfilePage> {
     switch (bodyWeightUnit) {
       case BodyWeightUnit.kg:
         final sign = goal > 0 ? '+' : '';
-        return S.of(context).weeklyWeightGoalKgPerWeek('$sign${goal.toStringAsFixed(2)}');
+        return S
+            .of(context)
+            .weeklyWeightGoalKgPerWeek('$sign${goal.toStringAsFixed(2)}');
       case BodyWeightUnit.lb:
         final displayLb = goal * 2.20462;
         final sign = displayLb > 0 ? '+' : '';
-        return S.of(context).weeklyWeightGoalLbsPerWeek('$sign${displayLb.toStringAsFixed(2)}');
+        return S
+            .of(context)
+            .weeklyWeightGoalLbsPerWeek('$sign${displayLb.toStringAsFixed(2)}');
       case BodyWeightUnit.st:
         final displaySt = goal * 2.20462 / 14;
         final sign = displaySt > 0 ? '+' : '';
@@ -476,10 +476,8 @@ class _ProfilePageState extends State<ProfilePage> {
   ) async {
     final newKg = await showDialog<double>(
       context: context,
-      builder: (context) => SetWeightDialog(
-        initialKg: userEntity.weightKG,
-        unit: bodyWeightUnit,
-      ),
+      builder: (context) =>
+          SetWeightDialog(initialKg: userEntity.weightKG, unit: bodyWeightUnit),
     );
     if (newKg != null) {
       final now = DateTime.now();
@@ -685,12 +683,17 @@ class _ProfileTile extends StatelessWidget {
     return Semantics(
       identifier: identifier,
       child: ListTile(
-        leading: _IconChip(palette: palette, icon: icon, iconWidget: iconWidget),
+        leading: _IconChip(
+          palette: palette,
+          icon: icon,
+          iconWidget: iconWidget,
+        ),
         title: Text(
           title,
           style: text.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
-        subtitle: subtitleWidget ??
+        subtitle:
+            subtitleWidget ??
             (subtitle != null
                 ? Text(
                     subtitle!,

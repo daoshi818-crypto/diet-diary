@@ -41,17 +41,16 @@ class DiaryTableCalendar extends StatefulWidget {
 /// equals a heading's height by coincidence — it is `labelSmall`'s line
 /// height today — and scaling it lands fractionally short at some scales
 /// (20.8 against the 21.0 wanted at 1.3x), which clips just as surely.
-double _weekdayRowHeight(BuildContext context, TextStyle style) =>
-    (TextPainter(
-      // Any single line measures the same: the height comes from the font's
-      // metrics, not from which glyphs are in it.
-      text: TextSpan(text: 'Mon', style: style),
-      textDirection: Directionality.of(context),
-      textScaler: MediaQuery.textScalerOf(context),
-    )..layout())
-        .height;
+double _weekdayRowHeight(BuildContext context, TextStyle style) => (TextPainter(
+  // Any single line measures the same: the height comes from the font's
+  // metrics, not from which glyphs are in it.
+  text: TextSpan(text: 'Mon', style: style),
+  textDirection: Directionality.of(context),
+  textScaler: MediaQuery.textScalerOf(context),
+)..layout()).height;
 
 class _DiaryTableCalendarState extends State<DiaryTableCalendar> {
+  CalendarFormat _format = CalendarFormat.week;
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -60,7 +59,7 @@ class _DiaryTableCalendarState extends State<DiaryTableCalendar> {
     final textTheme = Theme.of(context).textTheme;
     final weekdayStyle =
         textTheme.labelSmall?.copyWith(color: palette.textMuted) ??
-            const TextStyle();
+        const TextStyle();
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -77,6 +76,12 @@ class _DiaryTableCalendarState extends State<DiaryTableCalendar> {
           Dimens.spacing12,
         ),
         child: TableCalendar(
+          calendarFormat: _format,
+          availableCalendarFormats: {
+            CalendarFormat.month: S.of(context).diaryMonthView,
+            CalendarFormat.week: S.of(context).diaryWeekView,
+          },
+          onFormatChanged: (format) => setState(() => _format = format),
           // Without this, `table_calendar` falls back to `en_US` and the
           // month header, day-of-week headings and selected-day label stay
           // English while the rest of the Diary follows the app locale
@@ -86,8 +91,9 @@ class _DiaryTableCalendarState extends State<DiaryTableCalendar> {
           locale: Localizations.localeOf(context).toLanguageTag(),
           headerStyle: HeaderStyle(
             titleCentered: true,
-            formatButtonVisible: false,
-            titleTextStyle: textTheme.titleMedium?.copyWith(
+            formatButtonVisible: true,
+            titleTextStyle:
+                textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: palette.textStrong,
                 ) ??
@@ -104,7 +110,9 @@ class _DiaryTableCalendarState extends State<DiaryTableCalendar> {
               size: 26,
               semanticLabel: S.of(context).calendarNextMonthLabel,
             ),
-            headerPadding: const EdgeInsets.symmetric(vertical: Dimens.spacing8),
+            headerPadding: const EdgeInsets.symmetric(
+              vertical: Dimens.spacing8,
+            ),
           ),
           daysOfWeekStyle: DaysOfWeekStyle(
             weekdayStyle: weekdayStyle,
@@ -131,10 +139,17 @@ class _DiaryTableCalendarState extends State<DiaryTableCalendar> {
           },
           calendarStyle: CalendarStyle(
             markersMaxCount: 1,
-            defaultTextStyle: textTheme.bodyMedium?.copyWith(color: palette.textStrong) ?? const TextStyle(),
-            weekendTextStyle: textTheme.bodyMedium?.copyWith(color: palette.textStrong) ?? const TextStyle(),
-            outsideTextStyle: textTheme.bodyMedium?.copyWith(color: palette.textMuted) ?? const TextStyle(),
-            todayTextStyle: textTheme.bodyMedium?.copyWith(
+            defaultTextStyle:
+                textTheme.bodyMedium?.copyWith(color: palette.textStrong) ??
+                const TextStyle(),
+            weekendTextStyle:
+                textTheme.bodyMedium?.copyWith(color: palette.textStrong) ??
+                const TextStyle(),
+            outsideTextStyle:
+                textTheme.bodyMedium?.copyWith(color: palette.textMuted) ??
+                const TextStyle(),
+            todayTextStyle:
+                textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: accent,
                 ) ??
@@ -143,7 +158,8 @@ class _DiaryTableCalendarState extends State<DiaryTableCalendar> {
               border: Border.all(color: accent, width: 2.0),
               shape: BoxShape.circle,
             ),
-            selectedTextStyle: textTheme.bodyMedium?.copyWith(
+            selectedTextStyle:
+                textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: Theme.of(context).colorScheme.onPrimary,
                 ) ??

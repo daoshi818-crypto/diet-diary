@@ -101,6 +101,7 @@ class TrackedDayDataSource {
 
     if (updateDay != null) {
       updateDay.calorieGoal = calorieGoal;
+      updateDay.activityIncludedInGoal = false;
       await updateDay.save();
     }
   }
@@ -109,7 +110,7 @@ class TrackedDayDataSource {
     log.fine('Increasing tracked day total calories');
     final updateDay = await getTrackedDay(day);
 
-    if (updateDay != null) {
+    if (updateDay != null && updateDay.usesLegacyActivityBudget) {
       updateDay.calorieGoal += amount;
       await updateDay.save();
     }
@@ -119,7 +120,7 @@ class TrackedDayDataSource {
     log.fine('Reducing tracked day total calories');
     final updateDay = await getTrackedDay(day);
 
-    if (updateDay != null) {
+    if (updateDay != null && updateDay.usesLegacyActivityBudget) {
       updateDay.calorieGoal -= amount;
       await updateDay.save();
     }
@@ -181,7 +182,7 @@ class TrackedDayDataSource {
     log.fine('Increasing tracked day macro goals');
     final updateDay = await getTrackedDay(day);
 
-    if (updateDay != null) {
+    if (updateDay != null && updateDay.usesLegacyActivityBudget) {
       if (carbsAmount != null) {
         updateDay.carbsGoal = (updateDay.carbsGoal ?? 0) + carbsAmount;
       }
@@ -204,7 +205,7 @@ class TrackedDayDataSource {
     log.fine('Reducing tracked day macro goals');
     final updateDay = await getTrackedDay(day);
 
-    if (updateDay != null) {
+    if (updateDay != null && updateDay.usesLegacyActivityBudget) {
       if (carbsAmount != null) {
         updateDay.carbsGoal = (updateDay.carbsGoal ?? 0) - carbsAmount;
       }

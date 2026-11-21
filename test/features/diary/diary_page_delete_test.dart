@@ -358,7 +358,14 @@ void main() {
           DateTime(tomorrow.year, tomorrow.month, tomorrow.day, 0, 30);
       locator<DiaryBloc>().add(const LoadDiaryYearEvent());
       await settle(tester);
-      expect(find.text('Toast'), findsNothing, reason: 'followed today');
+      expect(
+        find.descendant(
+          of: find.byType(DayInfoWidget),
+          matching: find.text('Toast'),
+        ),
+        findsNothing,
+        reason: 'the diary followed today while the edit dialog stayed open',
+      );
     }
 
     testWidgets('an edit adjusts the row of the day the entry is on', (
@@ -368,9 +375,11 @@ void main() {
 
       await tester.tap(find.text('Toast'));
       await settle(tester);
+      await tester.tap(find.bySemanticsIdentifier('intake-detail-edit-amount'));
+      await settle(tester);
       await tester.enterText(find.byType(TextFormField), '50');
       await passMidnight(tester);
-      await tester.tap(find.text(l10nEn.dialogOKLabel));
+      await tester.tap(find.text(l10nEn.loggingSaveAmount));
       await settle(tester);
 
       expect(intakeBox.values.single.amount, 50);

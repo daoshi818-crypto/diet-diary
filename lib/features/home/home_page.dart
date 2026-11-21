@@ -111,6 +111,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             state.snackSharePct,
             state.waterMlToday,
             state.waterGoalMl,
+            state.tdeeKcal,
           );
         } else {
           return _getLoadingContent();
@@ -168,6 +169,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     int snackSharePct,
     int waterMlToday,
     int waterGoalMl,
+    double? tdeeKcal,
   ) {
     if (showDisclaimerDialog) {
       _showDisclaimerDialog(context);
@@ -176,35 +178,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       children: [
         ListView(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Dimens.spacing16,
-                Dimens.spacing16,
-                Dimens.spacing16,
-                Dimens.spacing4,
-              ),
-              // Wrap rather than Row so the two chips drop onto a second line
-              // at large text scale instead of overflowing off the edge.
-              child: Wrap(
-                spacing: Dimens.spacing12,
-                runSpacing: Dimens.spacing8,
-                children: [
-                  QuickWeightWidget(
-                    weightKg: userWeightKg,
-                    bodyWeightUnit: bodyWeightUnit,
-                  ),
-                  QuickWaterWidget(
-                    waterMlToday: waterMlToday,
-                    waterGoalMl: waterGoalMl,
-                    usesImperialUnits: usesImperialUnits,
-                  ),
-                ],
-              ),
-            ),
-            const FastingHomeChip(),
-            const SizedBox(height: Dimens.spacing8),
             DashboardWidget(
               totalKcalDaily: totalKcalDaily,
+              tdeeKcal: tdeeKcal,
               totalKcalLeft: totalKcalLeft,
               totalKcalSupplied: totalKcalSupplied,
               totalKcalBurned: totalKcalBurned,
@@ -318,6 +294,33 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 onItemTappedCallback: onActivityItemTapped,
                 onItemDragCallback: onActivityItemDrag,
               ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Dimens.spacing16,
+                Dimens.spacing16,
+                Dimens.spacing16,
+                Dimens.spacing4,
+              ),
+              // Wrap rather than Row so the two chips drop onto a second line
+              // at large text scale instead of overflowing off the edge.
+              child: Wrap(
+                spacing: Dimens.spacing12,
+                runSpacing: Dimens.spacing8,
+                children: [
+                  QuickWeightWidget(
+                    weightKg: userWeightKg,
+                    bodyWeightUnit: bodyWeightUnit,
+                  ),
+                  QuickWaterWidget(
+                    waterMlToday: waterMlToday,
+                    waterGoalMl: waterGoalMl,
+                    usesImperialUnits: usesImperialUnits,
+                  ),
+                ],
+              ),
+            ),
+            const FastingHomeChip(),
+            const SizedBox(height: Dimens.spacing8),
             const SizedBox(height: 48.0),
           ],
         ),
@@ -476,7 +479,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
     if (changeIntakeAmount != null) {
       await _homeBloc.updateIntakeItem(intakeEntity.id, {
-        'amount': changeIntakeAmount.amount, 'unit': changeIntakeAmount.unit,
+        'amount': changeIntakeAmount.amount,
+        'unit': changeIntakeAmount.unit,
       });
       _homeBloc.add(const LoadItemsEvent());
       if (context.mounted) {

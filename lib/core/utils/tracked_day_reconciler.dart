@@ -194,7 +194,10 @@ Future<int> reconcileTrackedDays(
   Map<String, _ListedDay>? before(Object? key) =>
       previousKeys == null || previousKeys.contains(key) ? listedBefore : null;
   // The burned energy each row's goal includes as it stands.
-  double burnedOn(String key) => creditedBurned != null
+  double burnedOn(String key) =>
+      rows.get(key)?.usesLegacyActivityBudget == false
+      ? 0
+      : creditedBurned != null
       ? creditedBurned[key] ?? 0
       : (before(key) ?? listed)[key]?.burned ?? 0;
   final movesCredit = listedBefore != null || creditedBurned != null;
@@ -236,7 +239,9 @@ Future<int> reconcileTrackedDays(
       changed = true;
     }
     final burnedMoved = day.burned - burnedOn(key);
-    if (movesCredit && burnedMoved.abs() > _epsilon) {
+    if (row.usesLegacyActivityBudget &&
+        movesCredit &&
+        burnedMoved.abs() > _epsilon) {
       row
         ..calorieGoal += burnedMoved
         ..carbsGoal =
@@ -305,17 +310,20 @@ TrackedDayDBO? _newRow(
   }
   if (base == null) return null;
 
-  double? more(double? goal, double amount) =>
+  final legacy = nearest?.usesLegacyActivityBudget ?? false;
+  final burned = legacy ? day.burned : 0.0;
+  double? plus(double? goal, double amount) =>
       goal == null ? null : goal + amount;
   return TrackedDayDBO(
     day: date,
-    calorieGoal: base.kcal + day.burned,
+    activityIncludedInGoal: legacy,
+    calorieGoal: base.kcal + burned,
     caloriesTracked: day.kcal,
-    carbsGoal: more(base.carbs, MacroCalc.getTotalCarbsGoal(day.burned)),
+    carbsGoal: plus(base.carbs, MacroCalc.getTotalCarbsGoal(burned)),
     carbsTracked: day.carbs,
-    fatGoal: more(base.fat, MacroCalc.getTotalFatsGoal(day.burned)),
+    fatGoal: plus(base.fat, MacroCalc.getTotalFatsGoal(burned)),
     fatTracked: day.fat,
-    proteinGoal: more(base.protein, MacroCalc.getTotalProteinsGoal(day.burned)),
+    proteinGoal: plus(base.protein, MacroCalc.getTotalProteinsGoal(burned)),
     proteinTracked: day.protein,
     fibreGoal: nearest?.fibreGoal,
     satFatGoal: nearest?.satFatGoal,
@@ -369,8 +377,9 @@ Future<int> ensureTrackedDaysMatchEntries(
 }) async {
   TrackedDayGoals? goals;
   if (currentGoals != null &&
-      db.trackedDayBox.isEmpty &&
-      (db.intakeBox.isNotEmpty || db.userActivityBox.isNotEmpty)) {
+      (db.trackedDayBox.isNotEmpty ||
+          db.intakeBox.isNotEmpty ||
+          db.userActivityBox.isNotEmpty)) {
     try {
       goals = await currentGoals();
     } catch (e, stack) {
@@ -391,8 +400,21 @@ Future<int> ensureTrackedDaysMatchEntries(
     final recorded = recordedBy == offset
         ? null
         : configDataSource.setConfigTrackedDaysOffsetMinutes(offset);
-    final changed = await rowsWritten;
+    var changed = await rowsWritten;
     await recorded;
+    final today = DayBoundaryCalc.currentLogicalDayMinutes(offset);
+    final key = DayBoundaryCalc.dayKeyOf(today, 0);
+    final row = db.trackedDayBox.get(key);
+    if (goals != null && row != null && row.usesLegacyActivityBudget) {
+      row
+        ..calorieGoal = goals.kcal
+        ..carbsGoal = goals.carbs
+        ..fatGoal = goals.fat
+        ..proteinGoal = goals.protein
+        ..activityIncludedInGoal = false;
+      await row.save();
+      changed++;
+    }
     return changed;
   });
   if (changed > 0) {

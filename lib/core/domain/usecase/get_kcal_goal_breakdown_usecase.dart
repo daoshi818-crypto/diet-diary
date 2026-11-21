@@ -38,6 +38,11 @@ class GetKcalGoalBreakdownUsecase {
         )).map((activity) => activity.burnedKcal).toList().sum;
     return KcalGoalBreakdownEntity.compute(
       user: user,
+      plan: config.nutritionGoalSchedule.onDay(
+        DayBoundaryCalc.currentLogicalDayMinutes(
+          config.dayStartOffsetTotalMinutes,
+        ),
+      ),
       userKcalAdjustment: config.userKcalAdjustment,
       totalKcalActivities: totalKcalActivities,
       userCarbsGoalPct: config.userCarbGoalPct,

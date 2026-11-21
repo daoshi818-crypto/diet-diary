@@ -22,6 +22,7 @@ class ConfigDBOAdapter extends TypeAdapter<ConfigDBO> {
         fields[2] as bool,
         fields[3] as AppThemeDBO,
         usesImperialUnits: fields[4] == null ? false : fields[4] as bool?,
+        nutritionGoalScheduleJson: fields[43] as String?,
         userKcalAdjustment: (fields[5] as num?)?.toDouble(),
         showActivityTracking: fields[9] as bool?,
         showMealMacros: fields[14] as bool?,
@@ -66,7 +67,7 @@ class ConfigDBOAdapter extends TypeAdapter<ConfigDBO> {
   @override
   void write(BinaryWriter writer, ConfigDBO obj) {
     writer
-      ..writeByte(43)
+      ..writeByte(44)
       ..writeByte(0)
       ..write(obj.hasAcceptedDisclaimer)
       ..writeByte(1)
@@ -152,7 +153,9 @@ class ConfigDBOAdapter extends TypeAdapter<ConfigDBO> {
       ..writeByte(41)
       ..write(obj.localeSyncSeeded)
       ..writeByte(42)
-      ..write(obj.hasLeftTip);
+      ..write(obj.hasLeftTip)
+      ..writeByte(43)
+      ..write(obj.nutritionGoalScheduleJson);
   }
 
   @override
@@ -177,6 +180,7 @@ ConfigDBO _$ConfigDBOFromJson(Map<String, dynamic> json) =>
         json['hasAcceptedSendAnonymousData'] as bool,
         $enumDecode(_$AppThemeDBOEnumMap, json['selectedAppTheme']),
         usesImperialUnits: json['usesImperialUnits'] as bool? ?? false,
+        nutritionGoalScheduleJson: json['nutritionGoalScheduleJson'] as String?,
         userKcalAdjustment: (json['userKcalAdjustment'] as num?)?.toDouble(),
         showActivityTracking: json['showActivityTracking'] as bool?,
         showMealMacros: json['showMealMacros'] as bool?,
@@ -282,6 +286,7 @@ Map<String, dynamic> _$ConfigDBOToJson(ConfigDBO instance) => <String, dynamic>{
   'trackedDaysOffsetMinutes': instance.trackedDaysOffsetMinutes,
   'localeSyncSeeded': instance.localeSyncSeeded,
   'hasLeftTip': instance.hasLeftTip,
+  'nutritionGoalScheduleJson': instance.nutritionGoalScheduleJson,
 };
 
 const _$AppThemeDBOEnumMap = {

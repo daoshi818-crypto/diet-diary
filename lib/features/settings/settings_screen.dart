@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:opennutritracker/features/settings/presentation/widgets/nutrition_goals_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
@@ -47,9 +49,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:opennutritracker/core/utils/safe_url_launcher.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/diary_day_boundary_dialog.dart';
-import 'package:opennutritracker/features/settings/presentation/widgets/kcal_adjustment_dialog.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/kcal_goal_info_screen.dart';
-import 'package:opennutritracker/features/settings/presentation/widgets/macro_split_dialog.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/nutrient_goals_screen.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/per_meal_kcal_share_dialog.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/settings_rows.dart';
@@ -337,22 +337,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                   ),
-                  SettingsTile(
-                    identifier: 'settings-kcal-adjustment',
-                    palette: palette,
-                    icon: Icons.calculate_rounded,
-                    title: state.usesKilojoules
-                        ? S.of(context).settingsKjAdjustmentLabel
-                        : S.of(context).settingsKcalAdjustmentLabel,
-                    onTap: () => _showKcalAdjustmentDialog(context),
-                  ),
-                  SettingsTile(
-                    identifier: 'settings-macro-split',
-                    palette: palette,
-                    icon: Icons.pie_chart_rounded,
-                    title: S.of(context).settingsMacroSplitLabel,
-                    onTap: () => _showMacroSplitDialog(context),
-                  ),
+                SettingsTile(
+                  identifier: 'settings-nutrition-goals',
+                  palette: palette,
+                  icon: Icons.tune_rounded,
+                  title: S.of(context).nutritionGoalsTitle,
+                  showChevron: true,
+                  onTap: () => openNutritionGoals(context),
+                ),
                   SettingsTile(
                     identifier: 'settings-per-meal-share',
                     palette: palette,
@@ -1029,25 +1021,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ).updateUsesKilojoules(selectedUsesKilojoules);
       }
     }
-  }
-
-  void _showKcalAdjustmentDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => KcalAdjustmentDialog(
-        settingsBloc: _settingsBloc,
-        profileBloc: _profileBloc,
-        homeBloc: _homeBloc,
-      ),
-    );
-  }
-
-  void _showMacroSplitDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) =>
-          MacroSplitDialog(settingsBloc: _settingsBloc, homeBloc: _homeBloc),
-    );
   }
 
   void _showPerMealKcalShareDialog(BuildContext context) {

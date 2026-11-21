@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/domain/usecase/get_macro_goal_usecase.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:opennutritracker/core/domain/entity/body_weight_unit_entity.dart';
@@ -104,16 +105,25 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
   }
 
   Future<void> _updateTrackedDayCalorieGoal(UserEntity user, DateTime day) =>
-      // The goal counts the day's activities, so it is read and written
-      // with no boundary move between (#1317).
       withTrackedDayLock(() async {
         final hasTrackedDay = await _addTrackedDayUsecase.hasTrackedDay(day);
         if (hasTrackedDay) {
           final totalKcalGoal = await _getKcalGoalUsecase.getKcalGoal(
             userEntity: user,
+            day: day,
           );
 
+          final macros = await locator<GetMacroGoalUsecase>().getGoals(
+            totalKcalGoal,
+            day: day,
+          );
           await _addTrackedDayUsecase.updateDayCalorieGoal(day, totalKcalGoal);
+          await _addTrackedDayUsecase.updateDayMacroGoals(
+            day,
+            carbsGoal: macros.carbs,
+            fatGoal: macros.fat,
+            proteinGoal: macros.protein,
+          );
         }
       });
 }

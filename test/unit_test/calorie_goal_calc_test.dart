@@ -27,9 +27,8 @@ void main() {
           200.0,
         );
 
-        // TDEE: 2662, Activities: 200, Adjustment: + 0
-        // 2662 + 200 + 0 = 2862
-        int expectedKcal = 2862;
+        int expectedKcal = 2662;
+        expect(resultCalorieGoal, CalorieGoalCalc.getTotalKcalGoal(user, 0));
 
         expect(resultCalorieGoal.toInt(), expectedKcal);
       },
@@ -45,9 +44,8 @@ void main() {
           550.0,
         );
 
-        // TDEE: 2373, Activities: 550, Adjustment: -500
-        // 2373 + 550 - 500 = 2423
-        int expectedKcal = 2423;
+        int expectedKcal = 1873;
+        expect(resultCalorieGoal, CalorieGoalCalc.getTotalKcalGoal(user, 0));
 
         expect(resultCalorieGoal.toInt(), expectedKcal);
       },
@@ -80,26 +78,28 @@ void main() {
     });
 
     test(
-        'weekly weight goal in kg overrides the lose/gain default adjustment',
-        () {
-      // -0.5 kg/week → -550 kcal/day (vs -500 default for loseWeight)
-      final base = UserEntityFixtures.middleAgedActiveFemaleWantingToLoseWeight;
-      final user = UserEntity(
-        birthday: base.birthday,
-        heightCM: base.heightCM,
-        weightKG: base.weightKG,
-        gender: base.gender,
-        goal: base.goal,
-        pal: base.pal,
-        weeklyWeightGoalKg: -0.5,
-      );
+      'weekly weight goal in kg overrides the lose/gain default adjustment',
+      () {
+        // -0.5 kg/week → -550 kcal/day (vs -500 default for loseWeight)
+        final base =
+            UserEntityFixtures.middleAgedActiveFemaleWantingToLoseWeight;
+        final user = UserEntity(
+          birthday: base.birthday,
+          heightCM: base.heightCM,
+          weightKG: base.weightKG,
+          gender: base.gender,
+          goal: base.goal,
+          pal: base.pal,
+          weeklyWeightGoalKg: -0.5,
+        );
 
-      final adjustment = CalorieGoalCalc.getKcalGoalAdjustment(
-        user.goal,
-        weeklyWeightGoalKg: user.weeklyWeightGoalKg,
-      );
-      expect(adjustment, equals(-550));
-    });
+        final adjustment = CalorieGoalCalc.getKcalGoalAdjustment(
+          user.goal,
+          weeklyWeightGoalKg: user.weeklyWeightGoalKg,
+        );
+        expect(adjustment, equals(-550));
+      },
+    );
 
     test('positive weekly weight goal yields a positive adjustment', () {
       final adjustment = CalorieGoalCalc.getKcalGoalAdjustment(
@@ -116,7 +116,8 @@ void main() {
       );
       expect(
         CalorieGoalCalc.getKcalGoalAdjustment(
-            UserWeightGoalEntity.maintainWeight),
+          UserWeightGoalEntity.maintainWeight,
+        ),
         equals(0),
       );
       expect(

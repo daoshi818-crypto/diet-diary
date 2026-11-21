@@ -98,6 +98,9 @@ class ConfigRepository {
     await _configDataSource.setConfigFatGoalPct(fat);
   }
 
+  Future<void> setNutritionGoalSchedule(String? json) =>
+      _configDataSource.setNutritionGoalSchedule(json);
+
   Future<void> setConfigGoalSettings({
     required double? kcalAdjustment,
     required double? carbGoalPct,
@@ -105,6 +108,7 @@ class ConfigRepository {
     required double? fatGoalPct,
     required Map<String, int>? mealKcalSharesPct,
     required int? dailyWaterGoalMl,
+    String? nutritionGoalScheduleJson,
   }) async {
     await _configDataSource.setConfigGoalSettings(
       kcalAdjustment: kcalAdjustment,
@@ -113,6 +117,7 @@ class ConfigRepository {
       fatGoalPct: fatGoalPct,
       mealKcalSharesPct: mealKcalSharesPct,
       dailyWaterGoalMl: dailyWaterGoalMl,
+      nutritionGoalScheduleJson: nutritionGoalScheduleJson,
     );
   }
 

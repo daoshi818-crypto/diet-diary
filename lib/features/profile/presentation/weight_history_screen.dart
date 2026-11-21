@@ -136,26 +136,23 @@ class _WeightHistoryScreenState extends State<WeightHistoryScreen> {
             identifier: 'weight-history-range-selector',
             child: SegmentedButton<_ChartRange>(
               showSelectedIcon: false,
-              style: const ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
+
               segments: [
-                const ButtonSegment(
+                ButtonSegment(
                   value: _ChartRange.days30,
-                  label: Text('30d'),
+                  label: Text(S.of(context).trendDaysLabel(30)),
                 ),
-                const ButtonSegment(
+                ButtonSegment(
                   value: _ChartRange.days60,
-                  label: Text('60d'),
+                  label: Text(S.of(context).trendDaysLabel(60)),
                 ),
-                const ButtonSegment(
+                ButtonSegment(
                   value: _ChartRange.days180,
-                  label: Text('180d'),
+                  label: Text(S.of(context).trendDaysLabel(180)),
                 ),
-                const ButtonSegment(
+                ButtonSegment(
                   value: _ChartRange.days365,
-                  label: Text('365d'),
+                  label: Text(S.of(context).trendDaysLabel(365)),
                 ),
                 ButtonSegment(
                   value: _ChartRange.all,

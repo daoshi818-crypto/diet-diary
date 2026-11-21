@@ -200,7 +200,7 @@ void main() {
       hasLength(loadsOnEntry + 1),
     );
   });
-  testWidgets('in kJ mode the adjustment row names kJ (#1368)', (tester) async {
+  testWidgets('in kJ mode goals have a single settings entry', (tester) async {
     settingsBloc.push(
       const SettingsLoadedState(
         '1.0.0',
@@ -214,7 +214,8 @@ void main() {
     await tester.pumpWidget(_app());
     await tester.pumpAndSettle();
 
-    expect(find.text(l10nEn.settingsKjAdjustmentLabel), findsOneWidget);
+    expect(find.text(l10nEn.nutritionGoalsTitle), findsOneWidget);
+    expect(find.text(l10nEn.settingsKjAdjustmentLabel), findsNothing);
     expect(find.text(l10nEn.settingsKcalAdjustmentLabel), findsNothing);
   });
 }

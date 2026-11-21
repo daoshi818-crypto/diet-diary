@@ -1,5 +1,9 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
@@ -16,6 +20,9 @@ import 'package:percent_indicator/circular_percent_indicator.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../fixture/user_entity_fixtures.dart';
+
+final _capture = GlobalKey();
+const _visual = bool.fromEnvironment('GENERATE_GOAL_PREVIEW');
 
 class _FakeBreakdownUsecase extends Fake
     implements GetKcalGoalBreakdownUsecase {
@@ -44,6 +51,23 @@ Widget _wrap(Widget child) {
 }
 
 void main() {
+  setUpAll(() async {
+    if (_visual) {
+      await (FontLoader('Nunito')..addFont(
+            File(
+              'C:/Windows/Fonts/msyh.ttc',
+            ).readAsBytes().then(ByteData.sublistView),
+          ))
+          .load();
+      final iconFont = Platform.environment['FOOD_PREVIEW_ICON_FONT'];
+      if (iconFont != null) {
+        await (FontLoader(
+              'MaterialIcons',
+            )..addFont(File(iconFont).readAsBytes().then(ByteData.sublistView)))
+            .load();
+      }
+    }
+  });
   setUp(() {
     // The gauge navigates to KcalGoalInfoScreen, which pulls its usecase
     // from the locator when none is injected.
@@ -61,17 +85,21 @@ void main() {
     GetIt.instance.reset();
   });
 
-  DashboardWidget dashboardWidget({required double totalKcalLeft}) {
+  DashboardWidget dashboardWidget({
+    required double totalKcalLeft,
+    bool showPlan = false,
+  }) {
     return DashboardWidget(
       totalKcalSupplied: 2800,
       totalKcalBurned: 200,
       totalKcalDaily: 2500,
+      tdeeKcal: showPlan ? 2800 : null,
       totalKcalLeft: totalKcalLeft,
       totalCarbsIntake: 100,
       totalFatsIntake: 30,
       totalProteinsIntake: 60,
       totalCarbsGoal: 375,
-      totalFatsGoal: 69,
+      totalFatsGoal: 69.5,
       totalProteinsGoal: 93,
     );
   }
@@ -107,11 +135,14 @@ void main() {
                     textScaler: TextScaler.linear(scale),
                     disableAnimations: true,
                   ),
-                  child: child!,
+                  child: RepaintBoundary(key: _capture, child: child!),
                 ),
                 home: Scaffold(
                   body: SingleChildScrollView(
-                    child: dashboardWidget(totalKcalLeft: -12345),
+                    child: dashboardWidget(
+                      totalKcalLeft: -12345,
+                      showPlan: true,
+                    ),
                   ),
                 ),
               ),
@@ -124,13 +155,31 @@ void main() {
             expect(tester.getSize(gauge).height, lessThanOrEqualTo(130));
             expect(
               tester.getSize(find.byType(DashboardWidget)).height,
-              lessThan(280),
+              lessThan(400),
             );
           }
           expect(find.text('碳水'), findsOneWidget);
           expect(find.text('脂肪'), findsOneWidget);
           expect(find.text('蛋白质'), findsOneWidget);
           expect(find.bySemanticsIdentifier('home-kcal-gauge'), findsOneWidget);
+          expect(find.bySemanticsIdentifier('home-edit-goals'), findsOneWidget);
+          expect(find.text('30 / 69.5 g'), findsOneWidget);
+          if (_visual && size == const Size(360, 640)) {
+            await tester.runAsync(() async {
+              final boundary =
+                  _capture.currentContext!.findRenderObject()
+                      as RenderRepaintBoundary;
+              final rendered = await boundary.toImage(pixelRatio: 2);
+              final bytes = await rendered.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              final dir = const String.fromEnvironment('GOAL_PREVIEW_DIR');
+              await File(
+                '$dir/dashboard-$dark-$scale.png',
+              ).writeAsBytes(bytes!.buffer.asUint8List());
+              rendered.dispose();
+            });
+          }
         });
       }
     }

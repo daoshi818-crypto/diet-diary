@@ -250,7 +250,9 @@ class _AddMealScreenState extends State<AddMealScreen> {
                                       showAi: !_aiHidden,
                                     ),
                                   ],
-                                  if (_describeOpen) ...[
+                                  if (_describeOpen &&
+                                      query.trim().isEmpty &&
+                                      !keyboardVisible) ...[
                                     const SizedBox(height: 12),
                                     DescribeMealPanel(
                                       onFindFoods: (text) =>
@@ -266,7 +268,23 @@ class _AddMealScreenState extends State<AddMealScreen> {
                             ],
                             if (!_logTray.isEmpty) ...[
                               const SizedBox(height: 12),
-                              LogTrayList(tray: _logTray),
+                              Semantics(
+                                identifier: 'add-meal-review-tray',
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: TextButton.icon(
+                                    onPressed: _reviewLogTray,
+                                    icon: const Icon(
+                                      Icons.receipt_long_rounded,
+                                    ),
+                                    label: Text(
+                                      S
+                                          .of(context)
+                                          .logTrayTitle(_logTray.length),
+                                    ),
+                                  ),
+                                ),
+                              ),
                               if (keyboardVisible &&
                                   constraints.maxHeight < 300)
                                 _buildLogButton(),
@@ -314,6 +332,36 @@ class _AddMealScreenState extends State<AddMealScreen> {
       // on the list mid-write, miss the write, and be cleared with the
       // rest.
       onPressed: _logging || _quickAdding.isNotEmpty ? null : _logAll,
+    ),
+  );
+
+  Future<void> _reviewLogTray() => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      top: false,
+      child: FractionallySizedBox(
+        heightFactor: .7,
+        child: ListenableBuilder(
+          listenable: _logTray,
+          builder: (context, _) => SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  S.of(context).foodTrayReview,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                LogTrayList(tray: _logTray),
+              ],
+            ),
+          ),
+        ),
+      ),
     ),
   );
 

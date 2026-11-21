@@ -50,11 +50,7 @@ class ActivityDetailBloc
       final user = await _getUserUsecase.getUserData();
       final totalBurnedKcal = isCustom
           ? 0.0
-          : getTotalKcalBurned(
-              user,
-              event.physicalActivity,
-              quantityDefault,
-            );
+          : getTotalKcalBurned(user, event.physicalActivity, quantityDefault);
 
       emit(
         ActivityDetailLoadedState(
@@ -143,15 +139,19 @@ class ActivityDetailBloc
       // If the tracked day does not exist, create a new one
       final totalKcalGoal = await _getKcalGoalUsecase.getKcalGoal(
         totalKcalActivitiesParam: 0,
+        day: day,
       ); // Exclude persisted activities
       final totalCarbsGoal = await _getMacroGoalUsecase.getCarbsGoal(
         totalKcalGoal,
+        day: day,
       );
       final totalFatGoal = await _getMacroGoalUsecase.getFatsGoal(
         totalKcalGoal,
+        day: day,
       );
       final totalProteinGoal = await _getMacroGoalUsecase.getProteinsGoal(
         totalKcalGoal,
+        day: day,
       );
 
       await _addTrackedDayUsecase.addNewTrackedDayIfAbsent(

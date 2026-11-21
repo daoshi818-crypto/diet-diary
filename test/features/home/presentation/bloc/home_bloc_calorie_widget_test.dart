@@ -98,18 +98,24 @@ class _KcalGoal extends Fake implements GetKcalGoalUsecase {
     UserEntity? userEntity,
     double? totalKcalActivitiesParam,
     double? kcalUserAdjustment,
+    DateTime? day,
   }) async => 2000;
 }
 
 class _MacroGoal extends Fake implements GetMacroGoalUsecase {
   @override
-  Future<double> getCarbsGoal(double totalCalorieGoal) async => 0;
+  Future<double> getCarbsGoal(double totalCalorieGoal, {DateTime? day}) async =>
+      0;
 
   @override
-  Future<double> getFatsGoal(double totalCalorieGoal) async => 0;
+  Future<double> getFatsGoal(double totalCalorieGoal, {DateTime? day}) async =>
+      0;
 
   @override
-  Future<double> getProteinsGoal(double totalCalorieGoal) async => 0;
+  Future<double> getProteinsGoal(
+    double totalCalorieGoal, {
+    DateTime? day,
+  }) async => 0;
 }
 
 /// Drops a write from before a clear, as [HomeWidgetCalorieStore] does.
@@ -236,12 +242,17 @@ class _UnusedDeleteIntakeUsecase extends Fake implements DeleteIntakeUsecase {}
 
 class _UnusedUpdateIntakeUsecase extends Fake implements UpdateIntakeUsecase {}
 
-class _UnusedDeleteUserActivityUsecase extends Fake implements DeleteUserActivityUsecase {}
+class _UnusedDeleteUserActivityUsecase extends Fake
+    implements DeleteUserActivityUsecase {}
 
-class _UnusedAddTrackedDayUsecase extends Fake implements AddTrackedDayUsecase {}
+class _UnusedAddTrackedDayUsecase extends Fake
+    implements AddTrackedDayUsecase {}
 
-class _UnusedUpdateUserActivityUsecase extends Fake implements UpdateUserActivityUsecase {}
+class _UnusedUpdateUserActivityUsecase extends Fake
+    implements UpdateUserActivityUsecase {}
 
-class _UnusedAddWaterIntakeUsecase extends Fake implements AddWaterIntakeUsecase {}
+class _UnusedAddWaterIntakeUsecase extends Fake
+    implements AddWaterIntakeUsecase {}
 
-class _UnusedDeleteWaterIntakeUsecase extends Fake implements DeleteWaterIntakeUsecase {}
+class _UnusedDeleteWaterIntakeUsecase extends Fake
+    implements DeleteWaterIntakeUsecase {}

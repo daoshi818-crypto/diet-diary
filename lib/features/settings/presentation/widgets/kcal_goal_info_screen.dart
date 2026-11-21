@@ -79,8 +79,10 @@ class _KcalGoalInfoScreenState extends State<KcalGoalInfoScreen> {
               _TdeeCard(breakdown: breakdown),
               const SizedBox(height: Dimens.spacing12),
               _AdjustmentCard(breakdown: breakdown),
-              const SizedBox(height: Dimens.spacing12),
-              _ManualAdjustmentCard(breakdown: breakdown),
+              if (breakdown.plan == null) ...[
+                const SizedBox(height: Dimens.spacing12),
+                _ManualAdjustmentCard(breakdown: breakdown),
+              ],
               const SizedBox(height: Dimens.spacing12),
               _ActivityCard(breakdown: breakdown),
               const SizedBox(height: Dimens.spacing12),
@@ -142,10 +144,7 @@ class _InputsCard extends StatelessWidget {
     return _SectionCard(
       title: l10n.kcalGoalInfoInputsSection,
       children: [
-        _ValueRow(
-          label: l10n.ageLabel,
-          value: l10n.yearsLabel(breakdown.age),
-        ),
+        _ValueRow(label: l10n.ageLabel, value: l10n.yearsLabel(breakdown.age)),
         _ValueRow(
           label: l10n.heightLabel,
           value: '${breakdown.heightCM.toStringAsFixed(0)} ${l10n.cmLabel}',
@@ -288,7 +287,9 @@ class _AdjustmentCard extends StatelessWidget {
       title: l10n.kcalGoalInfoAdjustmentSection,
       children: [
         Text(
-          usesWeeklyRate
+          breakdown.plan != null
+              ? l10n.nutritionGoalsSubtitle
+              : usesWeeklyRate
               ? l10n.kcalGoalInfoAdjustmentExplanationWeekly
               : l10n.kcalGoalInfoAdjustmentExplanationFlat,
           style: Theme.of(context).textTheme.bodyMedium,
@@ -362,7 +363,7 @@ class _ActivityCard extends StatelessWidget {
         const Divider(height: Dimens.spacing20),
         _ValueRow(
           label: l10n.activityLabel,
-          value: _signedEnergy(context, breakdown.activityKcal),
+          value: EnergyDisplay.formatWithUnit(context, breakdown.activityKcal),
           emphasized: true,
         ),
       ],
@@ -391,14 +392,11 @@ class _ResultCard extends StatelessWidget {
           label: l10n.kcalGoalInfoAppliedAdjustmentLabel,
           value: _signedEnergy(context, breakdown.effectiveAdjustmentKcal),
         ),
-        _ValueRow(
-          label: l10n.settingsKcalAdjustmentLabel,
-          value: _signedEnergy(context, breakdown.manualKcalAdjustment),
-        ),
-        _ValueRow(
-          label: l10n.activityLabel,
-          value: _signedEnergy(context, breakdown.activityKcal),
-        ),
+        if (breakdown.plan == null)
+          _ValueRow(
+            label: l10n.settingsKcalAdjustmentLabel,
+            value: _signedEnergy(context, breakdown.manualKcalAdjustment),
+          ),
         const Divider(height: Dimens.spacing20),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -441,33 +439,39 @@ class _MacroCard extends StatelessWidget {
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: Dimens.spacing12),
-        _FormulaText.raw(
-          text: '${l10n.carbsLabel}: '
-              '${_macroLine(goalKcal, breakdown.carbsFractionGoal, MacroCalc.carbsKcalPerGram, breakdown.carbsGoalGrams)}\n'
-              '${l10n.fatLabel}: '
-              '${_macroLine(goalKcal, breakdown.fatsFractionGoal, MacroCalc.fatKcalPerGram, breakdown.fatsGoalGrams)}\n'
-              '${l10n.proteinLabel}: '
-              '${_macroLine(goalKcal, breakdown.proteinsFractionGoal, MacroCalc.proteinKcalPerGram, breakdown.proteinsGoalGrams)}',
-        ),
+        if (breakdown.plan == null)
+          _FormulaText.raw(
+            text:
+                '${l10n.carbsLabel}: '
+                '${_macroLine(goalKcal, breakdown.carbsFractionGoal, MacroCalc.carbsKcalPerGram, breakdown.carbsGoalGrams)}\n'
+                '${l10n.fatLabel}: '
+                '${_macroLine(goalKcal, breakdown.fatsFractionGoal, MacroCalc.fatKcalPerGram, breakdown.fatsGoalGrams)}\n'
+                '${l10n.proteinLabel}: '
+                '${_macroLine(goalKcal, breakdown.proteinsFractionGoal, MacroCalc.proteinKcalPerGram, breakdown.proteinsGoalGrams)}',
+          ),
         const Divider(height: Dimens.spacing20),
         _ValueRow(
           label: l10n.carbsLabel,
-          value: '${breakdown.carbsGoalGrams.toInt()} g',
+          value: '${_grams(breakdown.carbsGoalGrams)} g',
           emphasized: true,
         ),
         _ValueRow(
           label: l10n.fatLabel,
-          value: '${breakdown.fatsGoalGrams.toInt()} g',
+          value: '${_grams(breakdown.fatsGoalGrams)} g',
           emphasized: true,
         ),
         _ValueRow(
           label: l10n.proteinLabel,
-          value: '${breakdown.proteinsGoalGrams.toInt()} g',
+          value: '${_grams(breakdown.proteinsGoalGrams)} g',
           emphasized: true,
         ),
       ],
     );
   }
+
+  String _grams(double value) => breakdown.plan == null
+      ? value.toInt().toString()
+      : value.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '');
 
   /// One substituted line of the gram computation, e.g.
   /// `2100 × 60 % ÷ 4 = 315 g`. Percentages are shown rounded the way the
@@ -564,19 +568,20 @@ class _FormulaText extends StatelessWidget {
   final String? rawText;
 
   const _FormulaText({required this.formula, required this.resultKcal})
-      : rawText = null;
+    : rawText = null;
 
   /// Renders pre-assembled monospace lines (used by the macro card, whose
   /// per-line results are grams rather than a single kcal value).
   const _FormulaText.raw({required String text})
-      : rawText = text,
-        formula = null,
-        resultKcal = null;
+    : rawText = text,
+      formula = null,
+      resultKcal = null;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final text = rawText ??
+    final text =
+        rawText ??
         '$formula\n= ${resultKcal!.round()} ${S.of(context).kcalLabel}';
     return Container(
       width: double.infinity,

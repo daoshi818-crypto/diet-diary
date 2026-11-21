@@ -52,6 +52,7 @@ class ConfigDataSource {
         ? ConfigDBO.fromJson(app.toJson())
         : ConfigDBO.empty();
     if (profile != null) {
+      merged.nutritionGoalScheduleJson = profile.nutritionGoalScheduleJson;
       merged.userKcalAdjustment = profile.userKcalAdjustment;
       merged.userCarbGoalPct = profile.userCarbGoalPct;
       merged.userProteinGoalPct = profile.userProteinGoalPct;
@@ -69,6 +70,7 @@ class ConfigDataSource {
       // app box after a profile reset. A fresh profile therefore reads as
       // opted out of the health import with no watermark of its own, which
       // is what it is.
+      merged.nutritionGoalScheduleJson = null;
       merged.userKcalAdjustment = null;
       merged.userCarbGoalPct = null;
       merged.userProteinGoalPct = null;
@@ -367,9 +369,10 @@ class ConfigDataSource {
     await _update((c) => c.dailyWaterGoalMl = goalMl);
   }
 
-  /// Replaces every per-profile goal at once, as a restore from a backup
-  /// does (#1363). One write, so the goals cannot end up half restored. A
-  /// null clears that override and the app falls back to its default.
+  Future<void> setNutritionGoalSchedule(String? json) =>
+      _update((c) => c.nutritionGoalScheduleJson = json);
+
+  /// Restores per-profile goals together; null resets an override.
   Future<void> setConfigGoalSettings({
     required double? kcalAdjustment,
     required double? carbGoalPct,
@@ -377,6 +380,7 @@ class ConfigDataSource {
     required double? fatGoalPct,
     required Map<String, int>? mealKcalSharesPct,
     required int? dailyWaterGoalMl,
+    String? nutritionGoalScheduleJson,
   }) async {
     await _update((c) {
       c.userKcalAdjustment = kcalAdjustment;
@@ -387,6 +391,7 @@ class ConfigDataSource {
           ? null
           : Map<String, int>.from(mealKcalSharesPct);
       c.dailyWaterGoalMl = dailyWaterGoalMl;
+      c.nutritionGoalScheduleJson = nutritionGoalScheduleJson;
     });
   }
 

@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
+import 'package:opennutritracker/core/utils/calc/day_boundary_calc.dart';
+import 'package:opennutritracker/core/utils/tracked_day_lock.dart';
 
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
@@ -749,6 +752,7 @@ void main() {
 
       expect(GoalSettingsBackup.fromConfigDBO(stored).toJson().keys, {
         'version',
+        'nutritionGoalSchedule',
         'kcalAdjustment',
         'carbGoalPct',
         'proteinGoalPct',
@@ -757,5 +761,123 @@ void main() {
         'dailyWaterGoalMl',
       });
     });
+  });
+
+  NutritionGoalPlan planOn(DateTime day, {double energy = 1800}) =>
+      NutritionGoalPlan(
+        effectiveFrom: day,
+        energyMode: EnergyGoalMode.fixed,
+        energyValue: energy,
+        macroMode: MacroGoalMode.perKg,
+        carbs: 3,
+        protein: 1.6,
+        fat: .7,
+        referenceWeightKg: 65,
+      );
+
+  test(
+    'v2 goal schedule survives export and reset, without leaking into a fresh profile',
+    () async {
+      final schedule = NutritionGoalSchedule().save(
+        planOn(DateTime(2026, 11, 21)),
+      );
+      await config.setNutritionGoalSchedule(schedule.encode());
+      final backup = GoalSettingsBackup.fromConfigDBO(await config.getConfig());
+      expect(backup.toJson()['version'], 2);
+      await profileConfigBox.clear();
+      expect((await config.getConfig()).nutritionGoalScheduleJson, isNull);
+      await config.initializeConfig();
+      writeZip({
+        ExportImportBloc.goalSettingsJsonFileName: jsonEncode(backup.toJson()),
+      });
+      expect(await importJson(), isTrue);
+      expect(
+        (await config.getConfig()).nutritionGoalScheduleJson,
+        schedule.encode(),
+      );
+    },
+  );
+
+  test('v1 backup clears an existing modern schedule', () async {
+    await config.setNutritionGoalSchedule(
+      NutritionGoalSchedule().save(planOn(DateTime(2026, 11, 21))).encode(),
+    );
+    writeZip({
+      ExportImportBloc.goalSettingsJsonFileName: jsonEncode(_goalsJson()),
+    });
+    expect(await importJson(), isTrue);
+    expect((await config.getConfig()).nutritionGoalScheduleJson, isNull);
+  });
+
+  test('corrupt v2 schedule rejects the complete archive', () async {
+    await setCustomGoals();
+    final before = await goals();
+    writeZip({
+      ExportImportBloc.goalSettingsJsonFileName: jsonEncode({
+        ..._goalsJson(),
+        'version': 2,
+        'nutritionGoalSchedule': '{broken',
+      }),
+    });
+    await expectLater(importJson(), throwsA(isA<ExportImportFailure>()));
+    expect(await goals(), before);
+  });
+
+  test(
+    'saving goals updates only the current logical day, with fixed macros',
+    () async {
+      final originalClock = DayBoundaryCalc.clock;
+      DayBoundaryCalc.clock = () => DateTime(2026, 11, 22, 2);
+      addTearDown(() => DayBoundaryCalc.clock = originalClock);
+      await config.setConfigDayStartOffset(4, 0);
+      final today = DateTime(2026, 11, 21);
+      final yesterday = DateTime(2026, 11, 20);
+      await trackedDayBox.put(
+        yesterday.toParsedDay(),
+        TrackedDayDBO(
+          day: yesterday,
+          calorieGoal: 2200,
+          caloriesTracked: 900,
+          carbsGoal: 300,
+          fatGoal: 60,
+          proteinGoal: 100,
+        ),
+      );
+      await trackedDayBox.put(
+        today.toParsedDay(),
+        TrackedDayDBO(day: today, calorieGoal: 2500, caloriesTracked: 400),
+      );
+      expect(
+        await settingsBloc.saveNutritionGoals(
+          planOn(today),
+          startedOn: ProfileStamp.now(),
+        ),
+        isTrue,
+      );
+      final row = trackedDayBox.get(today.toParsedDay())!;
+      expect(row.calorieGoal, 1800);
+      expect(row.carbsGoal, 195);
+      expect(row.proteinGoal, 104);
+      expect(row.fatGoal, 45.5);
+      expect(row.caloriesTracked, 400);
+      expect(row.activityIncludedInGoal, isFalse);
+      expect(trackedDayBox.get(yesterday.toParsedDay())!.calorieGoal, 2200);
+      expect(await kcalGoal.getKcalGoal(day: DateTime(2026, 11, 22, 2)), 1800);
+      expect(
+        await macroGoal.getCarbsGoal(1800, day: DateTime(2026, 11, 22, 2)),
+        195,
+      );
+    },
+  );
+
+  test('a profile switch invalidates a pending goal save', () async {
+    final stamp = ProfileStamp.now();
+    await withProfileSwitchLock(() async {});
+    final today = DayBoundaryCalc.currentLogicalDayMinutes(0);
+    expect(
+      await settingsBloc.saveNutritionGoals(planOn(today), startedOn: stamp),
+      isFalse,
+    );
+    expect((await config.getConfig()).nutritionGoalScheduleJson, isNull);
   });
 }

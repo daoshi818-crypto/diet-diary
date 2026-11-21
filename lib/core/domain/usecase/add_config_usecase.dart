@@ -56,6 +56,9 @@ class AddConfigUsecase {
     await _configRepository.setConfigKcalAdjustment(kcalAdjustment);
   }
 
+  Future<void> setNutritionGoalSchedule(String? json) =>
+      _configRepository.setNutritionGoalSchedule(json);
+
   Future<void> setConfigMacroGoalPct(
     double carbGoalPct,
     double proteinGoalPct,

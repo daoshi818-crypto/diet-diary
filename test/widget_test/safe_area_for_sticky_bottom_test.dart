@@ -53,7 +53,8 @@ const _screensWithStickyBottomUi = <String>[
   // Scaffolds with a `bottomSheet:` — the bottom sheet sticks to the very
   // bottom of the screen with no scroll padding.
   'lib/features/activity_detail/activity_detail_screen.dart',
-  'lib/features/meal_detail/meal_detail_screen.dart',
+  // MealDetailScreen delegates its persistent actions to
+  // MealDetailBottomSheet below, which owns their SafeArea.
 
   // The bottom-sheet widgets themselves — these are the widgets actually
   // hosting the "Add" button. They wrap their content in

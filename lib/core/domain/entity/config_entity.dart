@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/data/dbo/config_dbo.dart';
 import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
 import 'package:opennutritracker/core/domain/entity/body_weight_unit_entity.dart';
@@ -36,6 +37,7 @@ class ConfigEntity extends Equatable {
   final bool usesImperialFoodUnits;
   final bool usesImperialHeightUnits;
   final BodyWeightUnit bodyWeightUnit;
+  final NutritionGoalSchedule nutritionGoalSchedule;
   final double? userKcalAdjustment;
   final double? userCarbGoalPct;
   final double? userProteinGoalPct;
@@ -239,6 +241,7 @@ class ConfigEntity extends Equatable {
     this.usesImperialFoodUnits = false,
     this.usesImperialHeightUnits = false,
     this.bodyWeightUnit = BodyWeightUnit.kg,
+    this.nutritionGoalSchedule = const NutritionGoalSchedule(),
     this.userKcalAdjustment,
     this.userCarbGoalPct,
     this.userProteinGoalPct,
@@ -351,6 +354,9 @@ class ConfigEntity extends Equatable {
         : ((dbo.usesImperialUnits ?? false)
               ? BodyWeightUnit.lb
               : BodyWeightUnit.kg),
+    nutritionGoalSchedule: NutritionGoalSchedule.tryDecode(
+      dbo.nutritionGoalScheduleJson,
+    ),
     userKcalAdjustment: dbo.userKcalAdjustment,
     userCarbGoalPct: dbo.userCarbGoalPct,
     userProteinGoalPct: dbo.userProteinGoalPct,
@@ -466,6 +472,7 @@ class ConfigEntity extends Equatable {
     usesImperialFoodUnits,
     usesImperialHeightUnits,
     bodyWeightUnit,
+    nutritionGoalSchedule,
     userKcalAdjustment,
     userCarbGoalPct,
     userProteinGoalPct,

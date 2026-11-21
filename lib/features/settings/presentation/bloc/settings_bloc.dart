@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:logging/logging.dart';
@@ -303,44 +304,47 @@ class SettingsBloc extends Bloc<SettingsEvent, SettingsState> {
     );
   }
 
+  Future<bool> saveNutritionGoals(
+    NutritionGoalPlan plan, {
+    required ProfileStamp startedOn,
+  }) async {
+    final saved = await withTrackedDayLockOnProfile(() async {
+      final config = await _getConfigUsecase.getConfig();
+      final today = DayBoundaryCalc.currentLogicalDayMinutes(
+        config.dayStartOffsetTotalMinutes,
+      );
+      if (today != plan.effectiveFrom) return false;
+      await _addConfigUsecase.setNutritionGoalSchedule(
+        config.nutritionGoalSchedule.save(plan).encode(),
+      );
+      await updateTrackedDay(today);
+      return true;
+    }, startedOn: startedOn);
+    return saved == true;
+  }
+
   Future<void> updateTrackedDay(DateTime day) =>
-      // The goal counts the day's activities, so it is read and written
-      // with no boundary move between (#1317).
       withTrackedDayLockOnProfile(() async {
-        final totalKcalGoal = await _getKcalGoalUsecase.getKcalGoal();
-        final totalCarbsGoal = await _getMacroGoalUsecase.getCarbsGoal(
+        final totalKcalGoal = await _getKcalGoalUsecase.getKcalGoal(day: day);
+        final macros = await _getMacroGoalUsecase.getGoals(
           totalKcalGoal,
+          day: day,
         );
-        final totalFatGoal = await _getMacroGoalUsecase.getFatsGoal(
-          totalKcalGoal,
-        );
-        final totalProteinGoal = await _getMacroGoalUsecase.getProteinsGoal(
-          totalKcalGoal,
-        );
-
-        final hasTrackedDay = await _addTrackedDayUsecase.hasTrackedDay(day);
-
-        if (hasTrackedDay) {
+        if (await _addTrackedDayUsecase.hasTrackedDay(day)) {
           await _addTrackedDayUsecase.updateDayCalorieGoal(day, totalKcalGoal);
           await _addTrackedDayUsecase.updateDayMacroGoals(
             day,
-            carbsGoal: totalCarbsGoal,
-            fatGoal: totalFatGoal,
-            proteinGoal: totalProteinGoal,
+            carbsGoal: macros.carbs,
+            fatGoal: macros.fat,
+            proteinGoal: macros.protein,
           );
         } else {
-          // No diary entry yet for this day (e.g. first thing in the
-          // morning, or right after onboarding). Create the row from the
-          // current goals, as callers rely on: without it, follow-up
-          // writes like setTodayNutrientGoals find no row and are
-          // silently skipped (#1348). Same creation pattern as
-          // MealDetailBloc/ActivityDetailBloc.
           await _addTrackedDayUsecase.addNewTrackedDay(
             day,
             totalKcalGoal,
-            totalCarbsGoal,
-            totalFatGoal,
-            totalProteinGoal,
+            macros.carbs,
+            macros.fat,
+            macros.protein,
           );
         }
       });

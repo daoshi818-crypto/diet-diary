@@ -170,15 +170,11 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
       // removes every route (including this sheet's), so reading from
       // context afterwards would be looking up a deactivated widget.
       final addedMessage = S.of(context).quickAddAddedSnack(mealTypeLabel);
-      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
-        NavigationOptions.mainRoute,
-        (route) => false,
-      );
-      scaffoldMessenger.showSnackBar(
-        SnackBar(
-          content: Text(addedMessage),
-        ),
-      );
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushNamedAndRemoveUntil(NavigationOptions.mainRoute, (route) => false);
+      scaffoldMessenger.showSnackBar(SnackBar(content: Text(addedMessage)));
     } catch (e, st) {
       _log.severe('Quick Add save failed', e, st);
       Sentry.captureException(e, stackTrace: st);
@@ -231,14 +227,16 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
     final addTrackedDay = locator<AddTrackedDayUsecase>();
     final hasTrackedDay = await addTrackedDay.hasTrackedDay(widget.day);
     if (!hasTrackedDay) {
-      final kcalGoal = await locator<GetKcalGoalUsecase>().getKcalGoal();
+      final kcalGoal = await locator<GetKcalGoalUsecase>().getKcalGoal(
+        day: widget.day,
+      );
       final macroGoal = locator<GetMacroGoalUsecase>();
       await addTrackedDay.addNewTrackedDayIfAbsent(
         widget.day,
         kcalGoal,
-        await macroGoal.getCarbsGoal(kcalGoal),
-        await macroGoal.getFatsGoal(kcalGoal),
-        await macroGoal.getProteinsGoal(kcalGoal),
+        await macroGoal.getCarbsGoal(kcalGoal, day: widget.day),
+        await macroGoal.getFatsGoal(kcalGoal, day: widget.day),
+        await macroGoal.getProteinsGoal(kcalGoal, day: widget.day),
       );
     }
     await addTrackedDay.addDayCaloriesTracked(widget.day, intake.totalKcal);
@@ -269,9 +267,7 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
     final s = S.of(context);
 
     return Padding(
-      padding: EdgeInsets.only(
-        bottom: sheetBottomInset(context),
-      ),
+      padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         child: Column(
@@ -297,7 +293,9 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
             _field(
               controller: _energyController,
               identifier: 'quick-add-energy',
-              label: usesKj ? s.quickAddEnergyLabelKj : s.quickAddEnergyLabelKcal,
+              label: usesKj
+                  ? s.quickAddEnergyLabelKj
+                  : s.quickAddEnergyLabelKcal,
               isRequired: true,
               numeric: true,
             ),
@@ -374,7 +372,9 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
           keyboardType: numeric
               ? const TextInputType.numberWithOptions(decimal: true)
               : TextInputType.text,
-          inputFormatters: numeric ? CustomTextInputFormatter.doubleOnly() : null,
+          inputFormatters: numeric
+              ? CustomTextInputFormatter.doubleOnly()
+              : null,
           decoration: InputDecoration(
             labelText: isRequired ? '$label *' : label,
             border: const OutlineInputBorder(),

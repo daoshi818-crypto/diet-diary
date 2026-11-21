@@ -215,6 +215,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         HomeLoadedState(
           showDisclaimerDialog: showDisclaimerDialog,
           totalKcalDaily: totalKcalGoal,
+          tdeeKcal: CalorieGoalCalc.getTdee(user),
           totalKcalLeft: totalKcalLeft,
           totalKcalSupplied: totalKcalIntake,
           totalKcalBurned: totalKcalActivities,

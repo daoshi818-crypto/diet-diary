@@ -33,8 +33,8 @@ class TrackedDayRepository {
     DateTime start,
     DateTime end,
   ) async {
-    final List<TrackedDayDBO> trackedDaysDBO =
-        await _trackedDayDataSource.getTrackedDaysInRange(start, end);
+    final List<TrackedDayDBO> trackedDaysDBO = await _trackedDayDataSource
+        .getTrackedDaysInRange(start, end);
 
     return trackedDaysDBO
         .map(
@@ -106,6 +106,7 @@ class TrackedDayRepository {
   ) => TrackedDayDBO(
     day: day,
     calorieGoal: totalKcalGoal,
+    activityIncludedInGoal: false,
     caloriesTracked: 0,
     carbsGoal: totalCarbsGoal,
     carbsTracked: 0,
@@ -238,9 +239,19 @@ class TrackedDayRepository {
     );
   }
 
-  Future<void> reconcileDayTracked(DateTime day,
-      double calories, double carbs, double fat, double protein) async {
+  Future<void> reconcileDayTracked(
+    DateTime day,
+    double calories,
+    double carbs,
+    double fat,
+    double protein,
+  ) async {
     await _trackedDayDataSource.reconcileCaloriesAndMacrosTracked(
-        day, calories, carbs, fat, protein);
+      day,
+      calories,
+      carbs,
+      fat,
+      protein,
+    );
   }
 }

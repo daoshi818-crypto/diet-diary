@@ -235,7 +235,8 @@ keeps its own goals. Those older builds ignore the file when they meet it.
 
 ```jsonc
 {
-  "version": 1,                     // format version, see below
+  "version": 2,                     // format version, see below
+  "nutritionGoalSchedule": null,    // encoded, versioned goal history (see below)
   "kcalAdjustment": -300.0,         // kcal added to the daily goal, -1000..1000
   "carbGoalPct": 0.4,               // macro split as fractions of the kcal goal:
   "proteinGoalPct": 0.3,            //   all three set and adding up to 1
@@ -259,6 +260,15 @@ the whole zip with it, before anything on the device changes. The tolerances
 allow for rounding in older builds. `version` goes up only for a change an
 older build would misread; a build that meets a newer version skips this file
 and imports the rest. Unknown keys are ignored.
+
+`nutritionGoalSchedule` is a JSON string containing `{ "version": 1, "plans": [...] }`.
+Each plan stores its effective date (`yyyy-MM-dd`), energy mode (`fixed` or
+`deficit`), energy value in kcal, macro mode (`grams`, `percentage`, or `perKg`),
+carbs/protein/fat values, and reference weight in kg. Energy targets are independent
+of macro energy; `deficit` means TDEE minus the saved value. Plans apply from their
+effective day, while existing past diary targets remain unchanged. Version 1
+backups restore the legacy fields and clear this schedule. Invalid schedules
+reject the archive before any writes.
 
 Only goals that belong to a profile are in the file:
 

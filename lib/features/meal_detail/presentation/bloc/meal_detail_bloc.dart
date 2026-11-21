@@ -59,11 +59,11 @@ class MealDetailBloc extends Bloc<MealDetailEvent, MealDetailState> {
   }) : _favourites = favourites,
        _deleteIntakeUsecase = deleteIntake,
        super(
-          MealDetailInitial(
-            totalQuantityConverted: '100',
-            selectedUnit: UnitDropdownItem.gml.toString(),
-          ),
-        ) {
+         MealDetailInitial(
+           totalQuantityConverted: '100',
+           selectedUnit: UnitDropdownItem.gml.toString(),
+         ),
+       ) {
     on<UpdateKcalEvent>((event, emit) async {
       try {
         final selectedTotalQuantity =
@@ -118,12 +118,7 @@ class MealDetailBloc extends Bloc<MealDetailEvent, MealDetailState> {
           );
         } else {
           final goal = await _getKcalGoalUsecase.getKcalGoal();
-          emit(
-            state.copyWith(
-              dayKcalConsumed: 0,
-              dayKcalGoal: goal,
-            ),
-          );
+          emit(state.copyWith(dayKcalConsumed: 0, dayKcalGoal: goal));
         }
       } catch (e) {
         log.severe('Error loading daily totals: $e');
@@ -308,15 +303,18 @@ class MealDetailBloc extends Bloc<MealDetailEvent, MealDetailState> {
   }) async {
     final hasTrackedDay = await _addTrackedDayUsecase.hasTrackedDay(day);
     if (!hasTrackedDay) {
-      final totalKcalGoal = await _getKcalGoalUsecase.getKcalGoal();
+      final totalKcalGoal = await _getKcalGoalUsecase.getKcalGoal(day: day);
       final totalCarbsGoal = await _getMacroGoalUsecase.getCarbsGoal(
         totalKcalGoal,
+        day: day,
       );
       final totalFatGoal = await _getMacroGoalUsecase.getFatsGoal(
         totalKcalGoal,
+        day: day,
       );
       final totalProteinGoal = await _getMacroGoalUsecase.getProteinsGoal(
         totalKcalGoal,
+        day: day,
       );
 
       await _addTrackedDayUsecase.addNewTrackedDayIfAbsent(

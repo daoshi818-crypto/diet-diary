@@ -705,15 +705,20 @@ void main() {
       await _tapPlus(tester, 'Milk');
       await tester.pumpAndSettle();
 
-      expect(find.text(l10nEn.logTrayTitle(2).toUpperCase()), findsOneWidget);
       expect(find.text(l10nEn.bulkAddSubmitLabel(2)), findsOneWidget);
       expect(find.text('580 kcal'), findsOneWidget);
+      await tester.tap(find.bySemanticsIdentifier('add-meal-review-tray'));
+      await tester.pumpAndSettle();
+      expect(find.text(l10nEn.logTrayTitle(2).toUpperCase()), findsOneWidget);
+      expect(find.bySemanticsIdentifier('add-meal-tray-list'), findsOneWidget);
 
       await tester.tap(find.byTooltip(l10nEn.logTrayRemoveLabel).first);
       await tester.pumpAndSettle();
       expect(find.text(l10nEn.bulkAddSubmitLabel(1)), findsOneWidget);
 
       await tester.tap(find.bySemanticsIdentifier('add-meal-tray-clear'));
+      await tester.pumpAndSettle();
+      await tester.pageBack();
       await tester.pumpAndSettle();
       expect(_logButton(), findsNothing);
       expect(_mealDetailBloc.writes, isEmpty);
@@ -1080,14 +1085,11 @@ void main() {
       await tester.tap(_logButton());
       await tester.pump();
       await tester.tap(
-        find.bySemanticsIdentifier('add-meal-tray-remove').first,
-        warnIfMissed: false,
-      );
-      await tester.tap(
-        find.bySemanticsIdentifier('add-meal-tray-clear'),
+        find.bySemanticsIdentifier('add-meal-review-tray'),
         warnIfMissed: false,
       );
       await tester.pump();
+      expect(find.bySemanticsIdentifier('add-meal-tray-list'), findsNothing);
       expect(find.text(l10nEn.bulkAddSubmitLabel(2)), findsOneWidget);
 
       gate.complete();

@@ -40,7 +40,7 @@ void main() {
     );
   }
 
-  test('breakdown components always sum to the total goal', () {
+  test('budget excludes recorded activity energy', () {
     final user = buildUser(
       weeklyWeightGoalKg: -0.5,
       targetWeightKg: 75.0,
@@ -55,10 +55,10 @@ void main() {
     expect(
       breakdown.tdeeKcal +
           breakdown.effectiveAdjustmentKcal +
-          breakdown.manualKcalAdjustment +
-          breakdown.activityKcal,
+          breakdown.manualKcalAdjustment,
       closeTo(breakdown.totalKcalGoal, 0.0001),
     );
+    expect(breakdown.activityKcal, 320);
   });
 
   test('breakdown total matches the production goal calculation', () {

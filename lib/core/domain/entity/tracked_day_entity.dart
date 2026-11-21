@@ -38,6 +38,7 @@ class TrackedDayEntity extends Equatable {
   final double? vitaminDGoal;
   final double? vitaminB12Goal;
   final double? magnesiumGoal;
+  final bool? activityIncludedInGoal;
 
   const TrackedDayEntity({
     required this.day,
@@ -59,6 +60,7 @@ class TrackedDayEntity extends Equatable {
     this.vitaminDGoal,
     this.vitaminB12Goal,
     this.magnesiumGoal,
+    this.activityIncludedInGoal,
   });
 
   factory TrackedDayEntity.fromTrackedDayDBO(TrackedDayDBO trackedDayDBO) {
@@ -89,6 +91,7 @@ class TrackedDayEntity extends Equatable {
       vitaminDGoal: trackedDayDBO.vitaminDGoal,
       vitaminB12Goal: trackedDayDBO.vitaminB12Goal,
       magnesiumGoal: trackedDayDBO.magnesiumGoal,
+      activityIncludedInGoal: trackedDayDBO.activityIncludedInGoal,
     );
   }
 
@@ -138,24 +141,25 @@ class TrackedDayEntity extends Equatable {
 
   @override
   List<Object?> get props => [
-        day,
-        calorieGoal,
-        caloriesTracked,
-        carbsGoal,
-        carbsTracked,
-        fatGoal,
-        fatTracked,
-        proteinGoal,
-        proteinTracked,
-        fibreGoal,
-        satFatGoal,
-        sugarsGoal,
-        sodiumGoal,
-        calciumGoal,
-        ironGoal,
-        potassiumGoal,
-        vitaminDGoal,
-        vitaminB12Goal,
-        magnesiumGoal,
-      ];
+    day,
+    calorieGoal,
+    caloriesTracked,
+    carbsGoal,
+    carbsTracked,
+    fatGoal,
+    fatTracked,
+    proteinGoal,
+    proteinTracked,
+    fibreGoal,
+    satFatGoal,
+    sugarsGoal,
+    sodiumGoal,
+    calciumGoal,
+    ironGoal,
+    potassiumGoal,
+    vitaminDGoal,
+    vitaminB12Goal,
+    magnesiumGoal,
+    activityIncludedInGoal,
+  ];
 }

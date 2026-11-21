@@ -50,13 +50,14 @@ class LogUserActivityUsecase {
     if (!hasTrackedDay) {
       final kcalGoal = await _getKcalGoalUsecase.getKcalGoal(
         totalKcalActivitiesParam: 0,
+        day: day,
       );
       await _addTrackedDayUsecase.addNewTrackedDayIfAbsent(
         day,
         kcalGoal,
-        await _getMacroGoalUsecase.getCarbsGoal(kcalGoal),
-        await _getMacroGoalUsecase.getFatsGoal(kcalGoal),
-        await _getMacroGoalUsecase.getProteinsGoal(kcalGoal),
+        await _getMacroGoalUsecase.getCarbsGoal(kcalGoal, day: day),
+        await _getMacroGoalUsecase.getFatsGoal(kcalGoal, day: day),
+        await _getMacroGoalUsecase.getProteinsGoal(kcalGoal, day: day),
       );
     }
     await _addTrackedDayUsecase.increaseDayCalorieGoal(day, caloriesBurned);

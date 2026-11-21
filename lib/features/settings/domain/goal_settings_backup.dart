@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/data/dbo/config_dbo.dart';
 import 'package:opennutritracker/core/domain/entity/config_entity.dart';
 
@@ -16,7 +17,7 @@ import 'package:opennutritracker/core/domain/entity/config_entity.dart';
 class GoalSettingsBackup {
   /// Bumped only for a change an older reader would misread. A reader
   /// that meets a newer version skips the file rather than guess.
-  static const formatVersion = 1;
+  static const formatVersion = 2;
 
   // The ranges the Settings dialogs enforce. Kept loose where an older
   // build's rounding could have stored a value just off the mark: the macro
@@ -36,6 +37,7 @@ class GoalSettingsBackup {
     ConfigEntity.mealKeySnack,
   ];
 
+  final String? nutritionGoalScheduleJson;
   final double? kcalAdjustment;
   final double? carbGoalPct;
   final double? proteinGoalPct;
@@ -44,6 +46,7 @@ class GoalSettingsBackup {
   final int? dailyWaterGoalMl;
 
   const GoalSettingsBackup({
+    this.nutritionGoalScheduleJson,
     this.kcalAdjustment,
     this.carbGoalPct,
     this.proteinGoalPct,
@@ -76,6 +79,11 @@ class GoalSettingsBackup {
           ? {for (final k in _mealKeys) k: shares[k]!}
           : null,
       dailyWaterGoalMl: _waterGoalError(water) == null ? water : null,
+      nutritionGoalScheduleJson: config.nutritionGoalScheduleJson == null
+          ? null
+          : NutritionGoalSchedule.tryDecode(
+              config.nutritionGoalScheduleJson,
+            ).encode(),
     );
   }
 
@@ -96,6 +104,14 @@ class GoalSettingsBackup {
     }
     if (version > formatVersion) return null;
 
+    final rawSchedule = version >= 2 ? json['nutritionGoalSchedule'] : null;
+    String? scheduleJson;
+    if (rawSchedule != null) {
+      if (rawSchedule is! String) {
+        throw const FormatException('nutritionGoalSchedule must be a string');
+      }
+      scheduleJson = NutritionGoalSchedule.decode(rawSchedule).encode();
+    }
     final kcal = _optionalDouble(json, 'kcalAdjustment');
     final macros = [
       _optionalDouble(json, 'carbGoalPct'),
@@ -113,6 +129,7 @@ class GoalSettingsBackup {
     if (error != null) throw FormatException(error);
 
     return GoalSettingsBackup(
+      nutritionGoalScheduleJson: scheduleJson,
       kcalAdjustment: kcal,
       carbGoalPct: macros[0],
       proteinGoalPct: macros[1],
@@ -126,6 +143,7 @@ class GoalSettingsBackup {
 
   Map<String, dynamic> toJson() => {
     'version': formatVersion,
+    'nutritionGoalSchedule': nutritionGoalScheduleJson,
     'kcalAdjustment': kcalAdjustment,
     'carbGoalPct': carbGoalPct,
     'proteinGoalPct': proteinGoalPct,

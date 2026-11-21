@@ -76,18 +76,24 @@ class _FakeGetKcalGoalUsecase extends Fake implements GetKcalGoalUsecase {
     Object? userEntity,
     double? totalKcalActivitiesParam,
     double? kcalUserAdjustment,
+    DateTime? day,
   }) async => 1800;
 }
 
 class _FakeGetMacroGoalUsecase extends Fake implements GetMacroGoalUsecase {
   @override
-  Future<double> getCarbsGoal(double totalCalorieGoal) async => 200;
+  Future<double> getCarbsGoal(double totalCalorieGoal, {DateTime? day}) async =>
+      200;
 
   @override
-  Future<double> getFatsGoal(double totalCalorieGoal) async => 60;
+  Future<double> getFatsGoal(double totalCalorieGoal, {DateTime? day}) async =>
+      60;
 
   @override
-  Future<double> getProteinsGoal(double totalCalorieGoal) async => 90;
+  Future<double> getProteinsGoal(
+    double totalCalorieGoal, {
+    DateTime? day,
+  }) async => 90;
 }
 
 class _NoopAddIntakeUsecase extends Fake implements AddIntakeUsecase {
@@ -410,8 +416,8 @@ void main() {
 
       release.complete();
       await imported;
-      // A new day's 1800 kcal goal, raised by both activities.
-      expect((await dataSource.getTrackedDay(_day))!.calorieGoal, 2300);
+      // A new day's budget stays fixed while both activities are written.
+      expect((await dataSource.getTrackedDay(_day))!.calorieGoal, 1800);
     });
   });
 }

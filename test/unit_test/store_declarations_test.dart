@@ -151,7 +151,7 @@ void main() {
           // trimRight() not trim(): a stray leading newline or indent is
           // still charged by Play, so trimming it here would undercount and
           // let an over-cap note through.
-          file.readAsStringSync().trimRight().length,
+          file.readAsStringSync().replaceAll('\r\n', '\n').trimRight().length,
           lessThanOrEqualTo(500),
           reason: '${file.path} exceeds Play\'s 500-character release-note cap',
         );
@@ -248,7 +248,8 @@ void main() {
         expect(
           indexed,
           isNot(contains(word)),
-          reason: '"$word" is already in the name or subtitle; Apple combines '
+          reason:
+              '"$word" is already in the name or subtitle; Apple combines '
               'those fields when indexing, so repeating it wastes a slot',
         );
       }

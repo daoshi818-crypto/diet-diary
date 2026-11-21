@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/core/data/data_source/remote_search_cache_data_source.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
@@ -60,18 +61,27 @@ class _FakeGetKcalGoalUsecase extends Fake implements GetKcalGoalUsecase {
     UserEntity? userEntity,
     double? totalKcalActivitiesParam,
     double? kcalUserAdjustment,
+    DateTime? day,
   }) async => 2000;
 }
 
 class _FakeGetMacroGoalUsecase extends Fake implements GetMacroGoalUsecase {
   @override
-  Future<double> getCarbsGoal(double totalCalorieGoal) async => 250;
+  Future<MacroGoals> getGoals(double calories, {DateTime? day}) async =>
+      const MacroGoals(250, 100, 67);
+  @override
+  Future<double> getCarbsGoal(double totalCalorieGoal, {DateTime? day}) async =>
+      250;
 
   @override
-  Future<double> getFatsGoal(double totalCalorieGoal) async => 67;
+  Future<double> getFatsGoal(double totalCalorieGoal, {DateTime? day}) async =>
+      67;
 
   @override
-  Future<double> getProteinsGoal(double totalCalorieGoal) async => 100;
+  Future<double> getProteinsGoal(
+    double totalCalorieGoal, {
+    DateTime? day,
+  }) async => 100;
 }
 
 class _FakeGetConfigUsecase extends Fake implements GetConfigUsecase {}

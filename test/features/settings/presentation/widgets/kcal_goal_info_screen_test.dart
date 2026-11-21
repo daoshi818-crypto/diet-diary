@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
 import 'package:opennutritracker/core/domain/entity/kcal_goal_breakdown_entity.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_gender_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_pal_entity.dart';
@@ -89,11 +90,39 @@ Future<void> _pump(
 
 void main() {
   group('KcalGoalInfoScreen', () {
+    testWidgets('custom grams retain decimals and replace the legacy offset', (
+      tester,
+    ) async {
+      final breakdown = KcalGoalBreakdownEntity.compute(
+        user: _buildUser(),
+        userKcalAdjustment: 150,
+        totalKcalActivities: 320,
+        plan: NutritionGoalPlan(
+          effectiveFrom: DateTime(2026, 11, 21),
+          energyMode: EnergyGoalMode.fixed,
+          energyValue: 1800,
+          macroMode: MacroGoalMode.perKg,
+          carbs: 3,
+          protein: 1.6,
+          fat: .7,
+          referenceWeightKg: 65,
+        ),
+      );
+      await _pump(tester, breakdown);
+      expect(find.text('1800 kcal'), findsOneWidget);
+      expect(find.text('195 g'), findsOneWidget);
+      expect(find.text('104 g'), findsOneWidget);
+      expect(find.text('45.5 g'), findsOneWidget);
+      expect(find.text(l10nEn.kcalGoalInfoManualSection), findsNothing);
+      expect(find.text('+150 kcal'), findsNothing);
+      expect(find.text('320 kcal'), findsOneWidget);
+    });
+
     // Reference case, hand-computed from IOM 2005 p. 204. PA multiplies the
     // weight *and* height terms — see #987, which is why these numbers moved.
     // TDEE = 864 − 9.72×30 + 1.27×(14.2×80 + 503×1.80)
     //      = 572.4 + 1.27×2041.4 = 3164.98
-    // Goal = 3164.98 − 500 + 150 + 320 = 3134.98
+    // Goal = 3164.98 − 500 + 150 = 2814.98; exercise is already in TDEE.
     KcalGoalBreakdownEntity maleBreakdown() => KcalGoalBreakdownEntity.compute(
       user: _buildUser(),
       userKcalAdjustment: 150,
@@ -143,7 +172,9 @@ void main() {
       // row, and the result-card line.
       expect(find.text('−500 kcal'), findsNWidgets(3));
       expect(find.text('+150 kcal'), findsNWidgets(2));
-      expect(find.text('+320 kcal'), findsNWidgets(2));
+      expect(find.text('320 kcal'), findsOneWidget);
+      expect(find.text('+320 kcal'), findsNothing);
+      expect(find.text(l10nEn.kcalGoalInfoActivityExplanation), findsOneWidget);
       expect(
         find.text(l10nEn.kcalGoalInfoAdjustmentExplanationFlat),
         findsOneWidget,
@@ -155,8 +186,7 @@ void main() {
     ) async {
       await _pump(tester, maleBreakdown());
 
-      // 3134.98 rounds to 3135 — identical to the dashboard (#1469).
-      expect(find.text('3135 kcal'), findsOneWidget);
+      expect(find.text('2815 kcal'), findsOneWidget);
     });
 
     testWidgets('macro card shows the hand-computed gram targets', (
@@ -164,15 +194,14 @@ void main() {
     ) async {
       await _pump(tester, maleBreakdown());
 
-      // The goal shows rounded (3135); grams still truncate, like the
-      // dashboard tiles. Carbs: 3134.98 × 0.60 ÷ 4 = 470.25 → 470 g. Fat: ×0.25 ÷ 9 = 87.08 → 87 g.
-      // Protein: ×0.15 ÷ 4 = 117.56 → 117 g.
-      expect(find.textContaining('3135 × 60 % ÷ 4 = 470 g'), findsOneWidget);
-      expect(find.textContaining('3135 × 25 % ÷ 9 = 87 g'), findsOneWidget);
-      expect(find.textContaining('3135 × 15 % ÷ 4 = 117 g'), findsOneWidget);
-      expect(find.text('470 g'), findsOneWidget);
-      expect(find.text('87 g'), findsOneWidget);
-      expect(find.text('117 g'), findsOneWidget);
+      // 2814.98 × 0.60 / 4 = 422.247; × 0.25 / 9 = 78.194;
+      // × 0.15 / 4 = 105.562. Displayed grams truncate.
+      expect(find.textContaining('2815 × 60 % ÷ 4 = 422 g'), findsOneWidget);
+      expect(find.textContaining('2815 × 25 % ÷ 9 = 78 g'), findsOneWidget);
+      expect(find.textContaining('2815 × 15 % ÷ 4 = 105 g'), findsOneWidget);
+      expect(find.text('422 g'), findsOneWidget);
+      expect(find.text('78 g'), findsOneWidget);
+      expect(find.text('105 g'), findsOneWidget);
     });
 
     testWidgets('kJ mode converts summary rows but keeps the formula in kcal', (
@@ -180,8 +209,8 @@ void main() {
     ) async {
       await _pump(tester, maleBreakdown(), usesKilojoules: true);
 
-      // 3134.98 kcal × 4.184 = 13116.7 → 13117 kJ (rounded).
-      expect(find.text('13117 kJ'), findsOneWidget);
+      // 2814.98 kcal × 4.184 = 11777.9 → 11778 kJ.
+      expect(find.text('11778 kJ'), findsOneWidget);
       // 3164.98 kcal × 4.184 = 13242.3 → 13242 kJ.
       expect(find.text('13242 kJ'), findsNWidgets(2));
       // The IOM equation is defined in kcal, so the box must stay kcal.

@@ -33,7 +33,6 @@ import 'package:opennutritracker/core/domain/usecase/get_physical_activity_useca
 import 'package:opennutritracker/core/domain/usecase/import_workouts_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/log_user_activity_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/set_day_boundary_usecase.dart';
-import 'package:opennutritracker/core/utils/calc/macro_calc.dart';
 import 'package:opennutritracker/core/utils/tracked_day_lock.dart';
 import 'package:opennutritracker/core/utils/tracked_day_reconciler.dart';
 
@@ -240,7 +239,7 @@ void main() {
           (await trackedDayRepository.getTrackedDay(
             DateTime(2026, 5, 22),
           ))!.calorieGoal,
-          closeTo(base + 500, 0.001),
+          closeTo(base, 0.001),
         );
       },
     );
@@ -260,7 +259,7 @@ void main() {
           expect(trackedDayBox.keys, ['2026-05-22']);
           expect(
             trackedDayBox.get('2026-05-22')!.calorieGoal,
-            closeTo(base + 500, 0.001),
+            closeTo(base, 0.001),
           );
         }
         await SetDayBoundaryUsecase(
@@ -270,10 +269,9 @@ void main() {
         expect(trackedDayBox.keys, ['2026-05-22', '2026-05-23']);
         expect(
           trackedDayBox.get('2026-05-23')!.calorieGoal,
-          closeTo(base + 500, 0.001),
+          closeTo(base, 0.001),
         );
-        // The 22nd keeps its row for its goals (#1440), but counts nothing
-        // and no longer carries the workout's credit.
+        // The old day keeps its goals while the workout moves to the 23rd.
         final left = trackedDayBox.get('2026-05-22')!;
         expect(left.calorieGoal, closeTo(base, 0.001));
         expect(left.caloriesTracked, 0);
@@ -282,7 +280,7 @@ void main() {
     );
 
     test(
-      'an imported workout becomes an activity and raises the day goal',
+      'an imported workout records energy without raising daily targets',
       () async {
         healthService.workouts = [_workout(start: DateTime(2026, 5, 23, 7, 0))];
         // Read before importing: the goal excluding activities is the base the
@@ -308,24 +306,17 @@ void main() {
           DateTime(2026, 5, 23),
         );
         expect(trackedDay, isNotNull);
-        expect(trackedDay!.calorieGoal, closeTo(baseKcalGoal + 500, 0.001));
-        expect(
-          trackedDay.carbsGoal,
-          closeTo(baseCarbsGoal + MacroCalc.getTotalCarbsGoal(500), 0.001),
-        );
+        expect(trackedDay!.calorieGoal, closeTo(baseKcalGoal, 0.001));
+        expect(trackedDay.activityIncludedInGoal, isFalse);
+        expect(trackedDay.carbsGoal, closeTo(baseCarbsGoal, 0.001));
         expect(
           trackedDay.fatGoal,
-          closeTo(
-            await getMacroGoalUsecase.getFatsGoal(baseKcalGoal) +
-                MacroCalc.getTotalFatsGoal(500),
-            0.001,
-          ),
+          closeTo(await getMacroGoalUsecase.getFatsGoal(baseKcalGoal), 0.001),
         );
         expect(
           trackedDay.proteinGoal,
           closeTo(
-            await getMacroGoalUsecase.getProteinsGoal(baseKcalGoal) +
-                MacroCalc.getTotalProteinsGoal(500),
+            await getMacroGoalUsecase.getProteinsGoal(baseKcalGoal),
             0.001,
           ),
         );
@@ -335,8 +326,7 @@ void main() {
     test(
       'a workout before the day boundary is filed on the previous day',
       () async {
-        // 00:30 with a 03:00 boundary belongs to the 22nd's diary column, so
-        // that is the day whose goal has to rise (#139).
+        // 00:30 with a 03:00 boundary belongs to the 22nd's diary column.
         await configDataSource.setConfigDayStartOffsetHours(3);
         healthService.workouts = [
           _workout(start: DateTime(2026, 5, 23, 0, 30)),
@@ -355,28 +345,30 @@ void main() {
       },
     );
 
-    test('the multiplier scales the credit, not the record', () async {
-      await configDataSource.setConfigHealthWorkoutKcalMultiplier(0.7);
-      healthService.workouts = [_workout(start: DateTime(2026, 5, 23, 7, 0))];
-      final baseKcalGoal = await getKcalGoalUsecase.getKcalGoal(
-        totalKcalActivitiesParam: 0,
-      );
+    test(
+      'the multiplier scales recorded energy without changing the goal',
+      () async {
+        await configDataSource.setConfigHealthWorkoutKcalMultiplier(0.7);
+        healthService.workouts = [_workout(start: DateTime(2026, 5, 23, 7, 0))];
+        final baseKcalGoal = await getKcalGoalUsecase.getKcalGoal(
+          totalKcalActivitiesParam: 0,
+        );
 
-      await usecase.importNow();
+        await usecase.importNow();
 
-      // 500 kcal reported, 70% credited: 350 toward the goal, 500 kept as
-      // what the device actually said.
-      final activity =
-          (await userActivityRepository.getAllUserActivityDBO()).single;
-      expect(activity.burnedKcal, closeTo(350, 0.001));
-      expect(activity.userKcal, closeTo(350, 0.001));
-      expect(activity.sourceReportedKcal, closeTo(500, 0.001));
+        // Keep both adjusted and source-reported energy for the workout.
+        final activity =
+            (await userActivityRepository.getAllUserActivityDBO()).single;
+        expect(activity.burnedKcal, closeTo(350, 0.001));
+        expect(activity.userKcal, closeTo(350, 0.001));
+        expect(activity.sourceReportedKcal, closeTo(500, 0.001));
 
-      final trackedDay = await trackedDayRepository.getTrackedDay(
-        DateTime(2026, 5, 23),
-      );
-      expect(trackedDay!.calorieGoal, closeTo(baseKcalGoal + 350, 0.001));
-    });
+        final trackedDay = await trackedDayRepository.getTrackedDay(
+          DateTime(2026, 5, 23),
+        );
+        expect(trackedDay!.calorieGoal, closeTo(baseKcalGoal, 0.001));
+      },
+    );
   });
 
   group('ImportWorkoutsUsecase filtering', () {

@@ -1,4 +1,5 @@
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_gender_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_weight_goal_entity.dart';
@@ -21,8 +22,7 @@ class CalorieGoalCalc {
   static double getDailyKcalLeft(
     double totalKcalGoal,
     double totalKcalIntake,
-  ) =>
-      totalKcalGoal - totalKcalIntake;
+  ) => totalKcalGoal - totalKcalIntake;
 
   static double getTdee(UserEntity userEntity) =>
       TDEECalc.getTDEEKcalIOM2005(userEntity);
@@ -35,7 +35,9 @@ class CalorieGoalCalc {
     double totalKcalActivities, {
     double? kcalUserAdjustment,
     bool caloriesTaperEnabled = false,
+    NutritionGoalPlan? plan,
   }) {
+    if (plan != null) return plan.calorieTarget(getTdee(userEntity));
     final baseAdjustment = getKcalGoalAdjustment(
       userEntity.goal,
       weeklyWeightGoalKg: userEntity.weeklyWeightGoalKg,
@@ -47,14 +49,13 @@ class CalorieGoalCalc {
       goal: userEntity.goal,
       taperEnabled: caloriesTaperEnabled,
     );
-    return getTdee(userEntity) +
-        adjustment +
-        (kcalUserAdjustment ?? 0) +
-        totalKcalActivities;
+    return getTdee(userEntity) + adjustment + (kcalUserAdjustment ?? 0);
   }
 
-  static double getKcalGoalAdjustment(UserWeightGoalEntity goal,
-      {double? weeklyWeightGoalKg}) {
+  static double getKcalGoalAdjustment(
+    UserWeightGoalEntity goal, {
+    double? weeklyWeightGoalKg,
+  }) {
     if (weeklyWeightGoalKg != null) {
       return weeklyWeightGoalKg * _kcalPerKgPerWeekDaily;
     }
@@ -145,7 +146,8 @@ class CalorieGoalCalc {
     required UserGenderEntity gender,
     CaloriesProfileEntity? caloriesProfile,
   }) {
-    final usesMaleFloor = gender == UserGenderEntity.male ||
+    final usesMaleFloor =
+        gender == UserGenderEntity.male ||
         caloriesProfile == CaloriesProfileEntity.testosteroneTypical;
     return usesMaleFloor
         ? Ranges.minRecommendedDailyKcalMale

@@ -144,11 +144,15 @@ class ImportMealsJsonUsecase {
   Future<void> _ensureTrackedDay(DateTime day) async {
     final hasTrackedDay = await _addTrackedDayUsecase.hasTrackedDay(day);
     if (hasTrackedDay) return;
-    final totalKcalGoal = await _getKcalGoalUsecase.getKcalGoal();
+    final totalKcalGoal = await _getKcalGoalUsecase.getKcalGoal(day: day);
     final totalCarbsGoal = await _getMacroGoalUsecase.getCarbsGoal(
       totalKcalGoal,
+      day: day,
     );
-    final totalFatGoal = await _getMacroGoalUsecase.getFatsGoal(totalKcalGoal);
+    final totalFatGoal = await _getMacroGoalUsecase.getFatsGoal(
+      totalKcalGoal,
+      day: day,
+    );
     final totalProteinGoal = await _getMacroGoalUsecase.getProteinsGoal(
       totalKcalGoal,
     );

@@ -243,16 +243,15 @@ void main() {
       // scrolls to a computed offset, which a fling never rests at. So this
       // pins the structural property the fix rests on instead, and says so
       // rather than implying wider cover.
-      await tester.pumpWidget(
-        embeddedIn(const SettingsScreen(embedded: true)),
-      );
+      await tester.pumpWidget(embeddedIn(const SettingsScreen(embedded: true)));
       await tester.pumpAndSettle();
 
       final scrollables = tester.widgetList(find.byType(Scrollable));
       expect(
         scrollables,
         hasLength(1),
-        reason: 'only the host scrollable — the embedded settings must add '
+        reason:
+            'only the host scrollable — the embedded settings must add '
             'none of its own',
       );
     });
@@ -499,6 +498,8 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await Scrollable.ensureVisible(tester.element(tile), alignment: .3);
+    await tester.pumpAndSettle();
     await tester.tap(tile);
     await tester.pumpAndSettle();
 

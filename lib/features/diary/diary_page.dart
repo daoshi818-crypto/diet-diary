@@ -140,9 +140,14 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
             alignment: Alignment.centerRight,
             child: Padding(
               padding: const EdgeInsets.only(right: Dimens.spacing8),
-              child: IconButton(
-                icon: const Icon(Icons.today_rounded),
-                onPressed: () => _onDateSelected(_currentDate, trackedDaysMap),
+              child: Semantics(
+                identifier: 'diary-jump-today',
+                child: IconButton(
+                  icon: const Icon(Icons.today_rounded),
+                  tooltip: MaterialLocalizations.of(context).currentDateLabel,
+                  onPressed: () =>
+                      _onDateSelected(_currentDate, trackedDaysMap),
+                ),
               ),
             ),
           ),
@@ -160,36 +165,36 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
                 return _getLoadingContent();
               } else if (state is CalendarDayLoaded) {
                 return DayInfoWidget(
-                trackedDayEntity: state.trackedDayEntity,
-                selectedDay: _selectedDate,
-                currentDay: _currentDate,
-                userActivities: state.userActivityList,
-                breakfastIntake: state.breakfastIntakeList,
-                lunchIntake: state.lunchIntakeList,
-                dinnerIntake: state.dinnerIntakeList,
-                snackIntake: state.snackIntakeList,
-                onDeleteIntake: _onDeleteIntakeItem,
-                onDeleteActivity: _onDeleteActivityItem,
-                onCopyIntake: _onCopyIntakeItem,
-                onCopyActivity: _onCopyActivityItem,
-                onEditIntake: _onEditIntakeItem,
-                onEditActivity: _onEditActivityItem,
-                usesImperialUnits: usesImperialUnits,
-                showMealMacros: showMealMacros,
-                showActivityTracking: showActivityTracking,
-                breakfastKcalTarget: state.breakfastKcalTarget,
-                lunchKcalTarget: state.lunchKcalTarget,
-                dinnerKcalTarget: state.dinnerKcalTarget,
-                snackKcalTarget: state.snackKcalTarget,
-                breakfastSharePct: state.breakfastSharePct,
-                lunchSharePct: state.lunchSharePct,
-                dinnerSharePct: state.dinnerSharePct,
-                snackSharePct: state.snackSharePct,
-                diarySortPreferences: state.diarySortPreferences,
-              );
-            }
-            return const SizedBox();
-          },
+                  trackedDayEntity: state.trackedDayEntity,
+                  selectedDay: _selectedDate,
+                  currentDay: _currentDate,
+                  userActivities: state.userActivityList,
+                  breakfastIntake: state.breakfastIntakeList,
+                  lunchIntake: state.lunchIntakeList,
+                  dinnerIntake: state.dinnerIntakeList,
+                  snackIntake: state.snackIntakeList,
+                  onDeleteIntake: _onDeleteIntakeItem,
+                  onDeleteActivity: _onDeleteActivityItem,
+                  onCopyIntake: _onCopyIntakeItem,
+                  onCopyActivity: _onCopyActivityItem,
+                  onEditIntake: _onEditIntakeItem,
+                  onEditActivity: _onEditActivityItem,
+                  usesImperialUnits: usesImperialUnits,
+                  showMealMacros: showMealMacros,
+                  showActivityTracking: showActivityTracking,
+                  breakfastKcalTarget: state.breakfastKcalTarget,
+                  lunchKcalTarget: state.lunchKcalTarget,
+                  dinnerKcalTarget: state.dinnerKcalTarget,
+                  snackKcalTarget: state.snackKcalTarget,
+                  breakfastSharePct: state.breakfastSharePct,
+                  lunchSharePct: state.lunchSharePct,
+                  dinnerSharePct: state.dinnerSharePct,
+                  snackSharePct: state.snackSharePct,
+                  diarySortPreferences: state.diarySortPreferences,
+                );
+              }
+              return const SizedBox();
+            },
           ),
         ),
       ],
@@ -202,8 +207,11 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
   ) {
     final velocity = details.primaryVelocity ?? 0;
     if (velocity == 0) return;
-    final today =
-        DateTime(_currentDate.year, _currentDate.month, _currentDate.day);
+    final today = DateTime(
+      _currentDate.year,
+      _currentDate.month,
+      _currentDate.day,
+    );
     // Swipe left advances a day, swipe right goes back. Clamp to the calendar's
     // range (no further back than 5 years, no further forward than today).
     final delta = velocity < 0 ? 1 : -1;
@@ -286,8 +294,7 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
       // Custom activities (#70) store the user-entered kcal directly — the
       // MET formula would just return zero for them, so we pass the saved
       // kcal figure through unchanged so a copied entry keeps its calories.
-      final kcal =
-          userActivityEntity.userKcal ?? userActivityEntity.burnedKcal;
+      final kcal = userActivityEntity.userKcal ?? userActivityEntity.burnedKcal;
       await _activityDetailBloc.persistActivity(
         kcal.toString(),
         kcal,
@@ -330,11 +337,10 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
       ),
     );
     if (changeIntakeAmount != null) {
-      await _calendarDayBloc.updateIntakeItem(
-        intakeEntity.id,
-        {'amount': changeIntakeAmount.amount, 'unit': changeIntakeAmount.unit},
-        day,
-      );
+      await _calendarDayBloc.updateIntakeItem(intakeEntity.id, {
+        'amount': changeIntakeAmount.amount,
+        'unit': changeIntakeAmount.unit,
+      }, day);
       _diaryBloc.add(const LoadDiaryYearEvent());
       _calendarDayBloc.add(LoadCalendarDayEvent(_selectedDate));
       _diaryBloc.updateHomePage();
@@ -354,8 +360,7 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
     final day = _selectedDate;
     final newDuration = await showDialog<double>(
       context: context,
-      builder: (context) =>
-          EditActivityDialog(activityEntity: activityEntity),
+      builder: (context) => EditActivityDialog(activityEntity: activityEntity),
     );
     if (newDuration != null) {
       await _calendarDayBloc.updateUserActivityItem(
@@ -379,12 +384,12 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
     Map<String, TrackedDayEntity> trackedDaysMap,
   ) {
     setState(() {
-      _pickedDate =
-          DateUtils.isSameDay(newDate, _currentDate) ? null : newDate;
+      _pickedDate = DateUtils.isSameDay(newDate, _currentDate) ? null : newDate;
       _calendarDayBloc.add(LoadCalendarDayEvent(_selectedDate));
     });
     widget.onDateChanged?.call(_selectedDate);
-    if (newDate.isAfter(_currentDate) && !DateUtils.isSameDay(newDate, _currentDate)) {
+    if (newDate.isAfter(_currentDate) &&
+        !DateUtils.isSameDay(newDate, _currentDate)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(S.of(context).diaryFutureDateWarning)),
       );

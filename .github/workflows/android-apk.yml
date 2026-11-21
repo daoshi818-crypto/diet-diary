@@ -40,7 +40,7 @@ jobs:
           flutter pub get
           flutter gen-l10n
           dart run build_runner build --delete-conflicting-outputs
-      - name: Check Chinese food library and portions
+      - name: Check food library and nutrition goals
         run: |
           python3 tool/test_build_chinese_food_catalog.py
           flutter analyze --no-pub
@@ -53,7 +53,15 @@ jobs:
             test/features/add_meal/presentation/meal_item_card_quantity_test.dart \
             test/features/add_meal/presentation/log_tray_test.dart \
             test/unit_test/config_default_to_raw_food_units_test.dart \
-            test/core/presentation/widgets/logging_dialog_layout_test.dart
+            test/core/presentation/widgets/logging_dialog_layout_test.dart \
+            test/unit_test/nutrition_goal_plan_test.dart \
+            test/unit_test/calorie_goal_calc_test.dart \
+            test/unit_test/import_goal_settings_test.dart \
+            test/unit_test/import_workouts_usecase_test.dart \
+            test/features/home/presentation/widgets/dashboard_widget_test.dart \
+            test/features/settings/presentation/bloc/settings_bloc_update_tracked_day_test.dart \
+            test/features/settings/presentation/widgets/nutrition_goals_screen_test.dart \
+            test/features/settings/presentation/widgets/kcal_goal_info_screen_test.dart
       - name: Prepare release signing
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

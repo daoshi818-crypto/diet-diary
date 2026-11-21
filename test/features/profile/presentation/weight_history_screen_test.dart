@@ -188,7 +188,7 @@ void main() {
       expect(find.byKey(const Key('weightHistoryChart')), findsNothing);
 
       // Tap 60d segment: should now include the 45-day-old point, showing the chart.
-      final button60 = find.text('60d');
+      final button60 = find.text(l10nEn.trendDaysLabel(60));
       expect(button60, findsOneWidget);
       await tester.tap(button60);
       await tester.pumpAndSettle();

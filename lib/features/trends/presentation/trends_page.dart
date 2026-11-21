@@ -111,19 +111,31 @@ class _RangeSelector extends StatelessWidget {
       alignment: Alignment.centerLeft,
       child: Semantics(
         identifier: 'trends-range-selector',
-        child: SegmentedButton<int>(
-          showSelectedIcon: false,
-          segments: [
-            const ButtonSegment(value: 7, label: Text('7d')),
-            const ButtonSegment(value: 30, label: Text('30d')),
-            const ButtonSegment(value: 90, label: Text('90d')),
-            // 0 is the "All" sentinel; the bloc resolves it to the full span.
-            ButtonSegment(value: 0, label: Text(S.of(context).allItemsLabel)),
-          ],
-          selected: {rangeDays},
-          onSelectionChanged: (s) => context
-              .read<TrendsBloc>()
-              .add(LoadTrendsEvent(rangeDays: s.first)),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SegmentedButton<int>(
+            showSelectedIcon: false,
+            segments: [
+              ButtonSegment(
+                value: 7,
+                label: Text(S.of(context).trendDaysLabel(7)),
+              ),
+              ButtonSegment(
+                value: 30,
+                label: Text(S.of(context).trendDaysLabel(30)),
+              ),
+              ButtonSegment(
+                value: 90,
+                label: Text(S.of(context).trendDaysLabel(90)),
+              ),
+              // 0 is the "All" sentinel; the bloc resolves it to the full span.
+              ButtonSegment(value: 0, label: Text(S.of(context).allItemsLabel)),
+            ],
+            selected: {rangeDays},
+            onSelectionChanged: (s) => context.read<TrendsBloc>().add(
+              LoadTrendsEvent(rangeDays: s.first),
+            ),
+          ),
         ),
       ),
     );
