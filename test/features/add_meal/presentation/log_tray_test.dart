@@ -617,14 +617,26 @@ void main() {
       return item;
     }
 
-    testWidgets('a food with a serving goes on as one serving', (tester) async {
+    testWidgets('packaged food can default to one serving', (tester) async {
       final item = await resolve(
         tester,
-        _meal('Bread', servingQuantity: 38, servingSize: '1 slice (38 g)'),
+        _meal('Bread', servingQuantity: 38, servingSize: '1包（38 g）'),
       );
       expect(item!.unit, 'serving');
       expect(item.amount, 38);
     });
+
+    testWidgets(
+      'household food defaults to grams with an old serving preference',
+      (tester) async {
+        final item = await resolve(
+          tester,
+          _meal('米饭', servingQuantity: 150, servingSize: '一碗'),
+        );
+        expect(item!.unit, 'g');
+        expect(item.amount, 100);
+      },
+    );
 
     testWidgets('raw units win over the serving when the user prefers them', (
       tester,

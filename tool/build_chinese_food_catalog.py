@@ -20,6 +20,11 @@ import unicodedata
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from food_weight_basis import (
+    name_with_basis, portion_basis_error, preparation_basis,
+    preparation_nutrition_error,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 CORE = ('energy_kcal', 'protein_g', 'carbohydrate_g', 'fat_g')
 BRANDS = {'麦当劳', '肯德基', '星巴克', '瑞幸咖啡', '瑞幸', '蜜雪冰城',
@@ -139,7 +144,7 @@ def read_csv(path, manifest):
 
 def build(source_root, output=ROOT):
     manifest, rejected, candidates = [], [], []
-    name_corrections = []
+    name_corrections, preparation_audit = [], []
     portions = defaultdict(list)
     report = source_root / 'report'
     for row in read_csv(next(report.glob('08_*.csv')), manifest):
@@ -151,6 +156,7 @@ def build(source_root, output=ROOT):
             aliases=(), provenance=None, unit='g'):
         original_name = name
         reason = None
+        basis = None
         try:
             name = clean_food_name(name)
         except ValueError as error:
@@ -171,6 +177,27 @@ def build(source_root, output=ROOT):
                              'name': original_name, 'reason': reason,
                              'original': provenance or nutrients})
             return
+        try:
+            basis = preparation_basis(name, source, source_id, category,
+                                      nutrients, provenance or {})
+            error = preparation_nutrition_error(name, basis, nutrients)
+            if error:
+                raise ValueError(error)
+        except ValueError as error:
+            rejected.append({'source': source, 'source_id': str(source_id),
+                             'name': original_name, 'reason': str(error),
+                             'original': provenance or nutrients})
+            return
+        safe_portions = []
+        for portion in serving or []:
+            error = portion_basis_error(name, basis, portion.get('label', ''))
+            if error:
+                preparation_audit.append({'source': source, 'source_id': str(source_id),
+                    'name': original_name, 'weight_basis': basis,
+                    'portion': portion, 'reason': error})
+            else:
+                safe_portions.append(portion)
+        name = name_with_basis(name, basis)
         # Crawled exports may repeat an id with a revised name or recipe.
         # Include its actual identity/values so retained conflicts stay unique.
         key = json.dumps([source, str(source_id), normalized(original_name), normalized(brand),
@@ -185,7 +212,7 @@ def build(source_root, output=ROOT):
                            'name': name.strip(), 'brand': brand.strip(), 'unit': unit,
                            'category': category, 'aliases': sorted(aliases - {name}),
                            'nutrients': {k: round(v, 6) for k, v in nutrients.items() if v is not None},
-                           'portions': serving or [],
+                           'portions': safe_portions, 'weight_basis': basis,
                            'sources': [{'source': source, 'id': str(source_id)}],
                            '_representative': bool(re.search(r'代表值|平均值|均值', original_name))})
 
@@ -246,7 +273,7 @@ def build(source_root, output=ROOT):
         brand = normalized(item['brand'])
         if brand and n.startswith(brand):
             n = n[len(brand):]
-        key = (n, brand, item['unit'])
+        key = (n, brand, item['unit'], item['weight_basis'])
         groups[key].append(item)
 
     def selection_rank(food):
@@ -283,14 +310,16 @@ def build(source_root, output=ROOT):
     summary = {'schema_version': 1, 'inputs': manifest,
                'candidate_rows': len(candidates), 'food_count': len(foods),
                'merged_duplicates': merged_count, 'rejected_rows': len(rejected),
-               'cleaning_version': 3,
+               'cleaning_version': 4,
+               'preparation_portions_removed': len(preparation_audit),
+               'weight_basis_coverage': dict(Counter(f['weight_basis'] or 'unspecified' for f in foods)),
                'conflict_groups_resolved': len(conflicts),
                'conflict_rows_archived': sum(len(c['alternatives']) for c in conflicts),
                'name_corrections': len(name_corrections),
                'source_coverage': dict(Counter(s['source'] for f in foods for s in f['sources'])),
                'serving_count': sum(len(f['portions']) for f in foods),
                'normalization': '每100克可食部；kcal/g/mg/µg；不推测份量克重或饮品密度',
-               'deduplication': '清洗后名称+品牌+单位唯一；中国食物成分表>吃有数>FatSecret；同源优先代表值及完整营养，数值不平均，冲突进审计不重复展示',
+               'deduplication': '清洗后名称+品牌+单位+生熟干湿状态唯一；中国食物成分表>吃有数>FatSecret；同源优先代表值及完整营养，数值不平均，冲突进审计不重复展示',
                'distribution': '私人本地数据；来源许可未授权公开再分发，不得上传公共仓库'}
     asset = output / 'assets' / 'foods'
     data = output / 'data' / 'private_food_catalog'
@@ -301,6 +330,7 @@ def build(source_root, output=ROOT):
     (data / 'catalog_manifest.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding='utf-8')
     (data / 'food_rejected.json').write_text(json.dumps(rejected, ensure_ascii=False, indent=2), encoding='utf-8')
     (data / 'food_conflicts.json').write_text(json.dumps(conflicts, ensure_ascii=False, indent=2), encoding='utf-8')
+    (data / 'food_preparation_audit.json').write_text(json.dumps(preparation_audit, ensure_ascii=False, indent=2), encoding='utf-8')
     (data / 'food_name_corrections.json').write_text(json.dumps(name_corrections, ensure_ascii=False, indent=2), encoding='utf-8')
     csv_fields = ['id', 'name', 'brand', 'unit', *CORE, 'sources']
     with (data / 'food_library.csv').open('w', encoding='utf-8-sig', newline='') as fp:

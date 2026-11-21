@@ -14,6 +14,80 @@ from build_chinese_food_catalog import (
 
 
 class FoodCatalogueTest(unittest.TestCase):
+    def test_dry_and_hydrated_profiles_remain_separate_with_safe_portions(self):
+        with tempfile.TemporaryDirectory(prefix='preparation_catalogue_') as temp:
+            root = Path(temp)
+            (root / 'report').mkdir()
+            (root / 'fatsecret').mkdir()
+
+            def write(path, template, entries):
+                with path.open('w', encoding='utf-8-sig', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=list(template))
+                    writer.writeheader()
+                    writer.writerows(dict(template, **entry) for entry in entries)
+
+            write(root / 'report/13_reference.csv', {
+                '食物编码': '', '食物名称': '', '原名称': '', '一级分类': '谷类及制品',
+                '水分(g)': '15', '能量(kcal)': '338', '蛋白质(g)': '.8',
+                '碳水化合物(g)': '83.7', '脂肪(g)': '.2',
+            }, [{'食物编码': '22201', '食物名称': '粉丝', '原名称': '粉丝'}])
+            write(root / 'report/07_foods.csv', {
+                'id': '', '名称': '', '英文名': '', '分类': '主食',
+                '卡路里(kcal/100g)': '125', '蛋白质(g/100g)': '2.8',
+                '碳水(g/100g)': '28', '脂肪(g/100g)': '.2',
+                '膳食纤维(g/100g)': '', '糖(g/100g)': '', '钠(mg/100g)': '',
+                '常用份量克重(g)': '50', '常用份量描述': '一把干粉丝',
+            }, [{'id': '551', '名称': '粉丝'}])
+            write(root / 'report/08_portions.csv', {
+                'food_id': '551', '份量描述': '', '份量克重': '',
+            }, [
+                {'份量描述': '一把干粉丝', '份量克重': '50'},
+                {'份量描述': '一碗粉丝', '份量克重': '150'},
+                {'份量描述': '一份凉拌粉丝', '份量克重': '200'},
+            ])
+            write(root / 'fatsecret/有效数据.csv', {
+                'key': '', '名称': '', '品牌': '', '类型': '',
+                '每100g_热量': '', '每100g_蛋白': '', '每100g_碳水': '', '每100g_脂肪': '',
+                '基准克重': '', '计量基准': '', '其他份量': '',
+            }, [])
+            with contextlib.redirect_stdout(io.StringIO()):
+                summary = build(root, root / 'out')
+            foods = json.loads((root / 'out/assets/foods/catalog.json').read_text(encoding='utf-8'))['foods']
+            self.assertEqual(len(foods), 2)
+            dry = next(f for f in foods if f['name'] == '粉丝（干）')
+            wet = next(f for f in foods if f['name'] == '粉丝（湿）')
+            self.assertEqual(dry['nutrients']['energy_kcal'], 338)
+            self.assertEqual(wet['nutrients']['energy_kcal'], 125)
+            self.assertEqual(wet['portions'], [{'label': '一碗粉丝', 'grams': 150}])
+            self.assertEqual(summary['preparation_portions_removed'], 2)
+            self.assertNotEqual(dry['id'], wet['id'])
+
+    def test_portions_do_not_cross_raw_cooked_or_dry_wet_bases(self):
+        from food_weight_basis import portion_basis_error, explicit_basis
+        for basis, label in [
+            ('raw', '一碗熟米饭'), ('dry', '一碗煮好的荞麦面'),
+            ('cooked', '一小把干荞麦面'), ('rehydrated', '一朵干木耳'),
+            ('fresh', '一把干海带'), ('fresh', '一盘清炒芸豆'),
+            ('wet', '一碗汤河粉'), ('fresh', '一把带荚青豆'),
+        ]:
+            self.assertIsNotNone(portion_basis_error('食物', basis, label))
+        self.assertIsNone(portion_basis_error('米饭', 'cooked', '一小碗'))
+        self.assertIsNone(portion_basis_error('木耳', 'rehydrated', '一碗泡发木耳'))
+        self.assertEqual(explicit_basis('海带（浸）'), 'rehydrated')
+        self.assertIsNone(explicit_basis('豆腐干'))
+        self.assertIsNone(explicit_basis('一份干炒河粉'))
+
+    def test_bean_categories_do_not_override_reviewed_fresh_records(self):
+        from food_weight_basis import preparation_basis, preparation_nutrition_error
+        for source_id, name, kcal in [('833', '蚕豆', 104), ('834', '青豆', 81), ('835', '豌豆', 81)]:
+            self.assertEqual(preparation_basis(name, 'calshot', source_id, '豆制品',
+                                             {'energy_kcal': kcal}, {}), 'fresh')
+        self.assertEqual(preparation_basis('蚕豆（炸）[开花豆]', 'cn_fct', '35202',
+                         '干豆类及制品', {'energy_kcal': 447}, {}), 'cooked')
+        self.assertIsNotNone(preparation_nutrition_error('青豆', 'dry', {'energy_kcal': 81}))
+        self.assertIsNotNone(preparation_nutrition_error('方便米饭', 'cooked',
+                             {'energy_kcal': 354, 'carbohydrate_g': 76}))
+
     def test_numeric_inputs_do_not_turn_unknown_or_invalid_into_zero(self):
         for raw in ['', '-', 'Tr', 'NaN', 'inf', '-1', None]:
             self.assertIsNone(number(raw))

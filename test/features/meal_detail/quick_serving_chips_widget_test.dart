@@ -107,7 +107,81 @@ Future<void> _pumpSheet(
   await tester.pumpAndSettle();
 }
 
+MealEntity _riceWithPortions() => MealEntity(
+  code: 'rice',
+  name: '米饭',
+  url: null,
+  mealQuantity: '100',
+  mealUnit: 'g',
+  servingQuantity: 150,
+  servingUnit: 'g',
+  servingSize: '小碗',
+  nutriments: _nutriments,
+  source: MealSourceEntity.fdc,
+  backendSource: 'local_calshot',
+  portions: const [
+    MealPortionEntity(label: '小碗', gramWeight: 150, localized: true),
+    MealPortionEntity(label: '中碗', gramWeight: 200, localized: true),
+    MealPortionEntity(label: '大碗', gramWeight: 300, localized: true),
+    MealPortionEntity(label: '半碗', gramWeight: 100, localized: true),
+    MealPortionEntity(label: '外卖盒', gramWeight: 250, localized: true),
+  ],
+);
+
 void main() {
+  testWidgets('a household portion fills grams and confirms that weight', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: '100');
+    final changes = <(String?, String?)>[];
+    LogTrayItem? selected;
+    await _pumpSheet(
+      tester,
+      product: _riceWithPortions(),
+      quantityController: controller,
+      initialUnit: 'g',
+      onChanged: (q, u) => changes.add((q, u)),
+      onConfirm: (item) async => selected = item,
+    );
+    final menu = tester.widget<DropdownButton<String>>(
+      find.byType(DropdownButton<String>),
+    );
+    expect(menu.items!.map((i) => i.value), ['g', 'oz']);
+    await tester.tap(find.bySemanticsIdentifier('meal-detail-chip-portion-0'));
+    await tester.pumpAndSettle();
+    expect(controller.text, '150');
+    expect(changes, [('150', 'g')]);
+    await tester.tap(find.text('Confirm amount'));
+    await tester.pumpAndSettle();
+    expect(selected!.amount, 150);
+    expect(selected!.unit, 'g');
+  });
+
+  testWidgets('the portion picker reaches presets beyond the first four', (
+    tester,
+  ) async {
+    final controller = TextEditingController(text: '100');
+    final changes = <(String?, String?)>[];
+    await _pumpSheet(
+      tester,
+      product: _riceWithPortions(),
+      quantityController: controller,
+      initialUnit: 'g',
+      onChanged: (q, u) => changes.add((q, u)),
+    );
+    await tester.tap(find.bySemanticsIdentifier('meal-detail-more-portions'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('外卖盒 · 250 g'));
+    await tester.pumpAndSettle();
+    expect(controller.text, '250');
+    expect(changes, [('250', 'g')]);
+    expect(
+      find.bySemanticsIdentifier('meal-detail-portion-options'),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('renders one chip per option with a stable ASCII identifier', (
     tester,
   ) async {

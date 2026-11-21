@@ -1462,5 +1462,13 @@
     }
   },
   "localFoodLoadError": "食物库加载失败，请重新打开。",
-  "localFoodNoBarcode": "自定义食物可添加条码，方便下次扫码查找。"
+  "localFoodNoBarcode": "自定义食物可添加条码，方便下次扫码查找。",
+  "foodWeightLabel": "重量",
+  "foodChoosePortion": "选择份量",
+  "foodWeightBasisRaw": "生重",
+  "foodWeightBasisCooked": "熟重",
+  "foodWeightBasisDry": "干重",
+  "foodWeightBasisWet": "湿重",
+  "foodWeightBasisFresh": "鲜重",
+  "foodWeightBasisRehydrated": "泡发后重量"
 }

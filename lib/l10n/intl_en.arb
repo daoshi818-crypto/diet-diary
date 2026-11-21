@@ -1605,5 +1605,13 @@
     }
   },
   "localFoodLoadError": "Could not load the food library. Please reopen this page.",
-  "localFoodNoBarcode": "Add barcodes to custom foods to find them on your next scan."
+  "localFoodNoBarcode": "Add barcodes to custom foods to find them on your next scan.",
+  "foodWeightLabel": "Weight",
+  "foodChoosePortion": "Choose a portion",
+  "foodWeightBasisRaw": "Raw weight",
+  "foodWeightBasisCooked": "Cooked weight",
+  "foodWeightBasisDry": "Dry weight",
+  "foodWeightBasisWet": "Moist weight",
+  "foodWeightBasisFresh": "Fresh weight",
+  "foodWeightBasisRehydrated": "Rehydrated weight"
 }

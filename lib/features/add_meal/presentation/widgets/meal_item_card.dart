@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/meal_detail/util/food_weight_basis.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -152,6 +153,13 @@ class MealItemCard extends StatelessWidget {
                           color: palette.textMuted,
                         ),
                       ),
+                      if (foodWeightBasisLabel(s, mealEntity.name)
+                          case final basis?)
+                        Text(
+                          basis,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: palette.textMuted),
+                        ),
                       if (mealEntity.source == MealSourceEntity.recipe)
                         Text(
                           s.additionalInfoLabelRecipe,

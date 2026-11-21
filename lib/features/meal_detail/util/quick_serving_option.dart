@@ -1,7 +1,9 @@
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/util/portion_display.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_policy.dart';
 
 /// One preset a user can tap in the meal-detail sheet to jump the
 /// quantity + unit inputs to a common portion without typing.
@@ -36,44 +38,65 @@ List<QuickServingOption> quickServingOptionsFor(
   final servingUnit = UnitDropdownItem.serving.toString();
   final gramUnit = UnitDropdownItem.g.toString();
   final options = <QuickServingOption>[];
+  final counted = offersCountedServings(product);
 
   if (product.portions.isNotEmpty) {
     for (final i in visiblePortionIndices(product)) {
       final portion = product.portions[i];
+      if (product.isLiquid && !counted) continue;
       options.add(
         QuickServingOption(
           id: 'portion-$i',
-          quantity: 1,
-          unit: portionUnit(i),
+          quantity: counted ? 1 : portion.gramWeight,
+          unit: counted ? portionUnit(i) : gramUnit,
           label: portionDisplayLabel(portion, gramUnitLabel),
         ),
       );
     }
-  } else if (product.scalableServingQuantity != null) {
-    options.addAll([
-      QuickServingOption(
-        id: 'half-serving',
-        quantity: 0.5,
-        unit: servingUnit,
-        label: '½×',
-      ),
-      QuickServingOption(
-        id: 'one-serving',
-        quantity: 1,
-        unit: servingUnit,
-        label: '1×',
-      ),
-      QuickServingOption(
-        id: 'double-serving',
-        quantity: 2,
-        unit: servingUnit,
-        label: '2×',
-      ),
-    ]);
+  } else if (product.scalableServingQuantity case final weight?
+      when weight.isFinite && weight > 0) {
+    if (!counted) {
+      options.add(
+        QuickServingOption(
+          id: 'one-serving',
+          quantity: weight,
+          unit: product.isLiquid ? UnitDropdownItem.ml.toString() : gramUnit,
+          label: portionDisplayLabel(
+            MealPortionEntity(
+              label: product.servingSize?.trim().isNotEmpty == true
+                  ? product.servingSize!
+                  : '$weight $gramUnitLabel',
+              gramWeight: weight,
+              localized: product.servingSizeIsLocalized,
+            ),
+            product.isLiquid ? 'ml' : gramUnitLabel,
+          ),
+        ),
+      );
+    } else {
+      options.addAll([
+        QuickServingOption(
+          id: 'half-serving',
+          quantity: 0.5,
+          unit: servingUnit,
+          label: '½×',
+        ),
+        QuickServingOption(
+          id: 'one-serving',
+          quantity: 1,
+          unit: servingUnit,
+          label: '1×',
+        ),
+        QuickServingOption(
+          id: 'double-serving',
+          quantity: 2,
+          unit: servingUnit,
+          label: '2×',
+        ),
+      ]);
+    }
   }
-  // Mirror the unit dropdown's gate at meal_detail_bottom_sheet.dart:167-170,
-  // so quick-add custom meals (mealUnit == 'g/ml') and liquids with no
-  // serving still get the 100 g shortcut.
+  // Keep weight presets available without serving metadata.
   if (product.isSolid || (!product.isLiquid && !product.isSolid)) {
     if (includeWeightPresets) {
       for (final grams in [50, 100, 150, 200]) {

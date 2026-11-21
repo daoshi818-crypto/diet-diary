@@ -57,7 +57,7 @@ MealEntity _solidThirtyGramServing() => MealEntity(
   mealUnit: 'g',
   servingQuantity: 30,
   servingUnit: 'g',
-  servingSize: '30 g',
+  servingSize: '1包（30 g）',
   nutriments: _nutriments,
   source: MealSourceEntity.custom,
 );

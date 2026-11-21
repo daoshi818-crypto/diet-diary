@@ -17,6 +17,8 @@ import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart'
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/util/quick_serving_option.dart';
 import 'package:opennutritracker/features/meal_detail/util/portion_display.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_policy.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_weight_basis.dart';
 import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
@@ -163,6 +165,51 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     widget.onQuantityOrUnitChanged(widget.quantityTextController.text, unit);
   }
 
+  Future<void> _choosePortion(List<QuickServingOption> options) async {
+    _quantityFocusNode.unfocus();
+    final selection = await showModalBottomSheet<QuickServingOption>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        top: false,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .7,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Text(
+                  S.of(context).foodChoosePortion,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              Flexible(
+                child: Semantics(
+                  identifier: 'meal-detail-portion-options',
+                  container: true,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    itemBuilder: (context, index) => ListTile(
+                      title: Text(options[index].label),
+                      onTap: () => Navigator.of(context).pop(options[index]),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (mounted && selection != null) _onQuickServingSelected(selection);
+  }
+
   String _formatQuantity(double value) {
     if (value == value.roundToDouble()) {
       return value.toInt().toString();
@@ -174,6 +221,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final missing = _hasRequiredProductInfoMissing();
+    final counted = offersCountedServings(widget.product);
     final quantity = double.tryParse(
       widget.quantityTextController.text.replaceAll(',', '.'),
     );
@@ -219,7 +267,8 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                   border: const OutlineInputBorder(
                     borderRadius: Dimens.borderRadiusM,
                   ),
-                  labelText: s.quantityLabel,
+                  labelText: counted ? s.quantityLabel : s.foodWeightLabel,
+                  helperText: foodWeightBasisLabel(s, widget.product.name),
                   labelStyle: TextStyle(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
@@ -254,27 +303,31 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                     ..._getSolidUnitDropdownItems(context),
                   if (widget.product.isLiquid || !widget.product.isSolid)
                     ..._getLiquidUnitDropdownItems(context),
-                  if (widget.product.portions.isNotEmpty)
+                  if (widget.product.portions.isNotEmpty) ...[
                     for (final i in visiblePortionIndices(
                       widget.product,
                       selectedUnit: widget.selectedUnit,
                     ))
-                      DropdownMenuItem<String>(
-                        value: portionUnit(i),
-                        child: Text(
-                          portionDisplayLabel(
-                            widget.product.portions[i],
-                            s.gramUnit,
-                            localizedLabel: localizeServingLabel(
-                              s,
-                              widget.product.portions[i].label,
+                      if (counted || portionUnit(i) == widget.selectedUnit)
+                        DropdownMenuItem<String>(
+                          value: portionUnit(i),
+                          child: Text(
+                            portionDisplayLabel(
+                              widget.product.portions[i],
+                              s.gramUnit,
+                              localizedLabel: localizeServingLabel(
+                                s,
+                                widget.product.portions[i].label,
+                              ),
                             ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      )
-                  else if (widget.product.scalableServingQuantity != null)
+                  ] else if (widget.product.scalableServingQuantity != null &&
+                      (counted ||
+                          widget.selectedUnit ==
+                              UnitDropdownItem.serving.toString()))
                     _getServingDropdownItem(context),
                   if (widget.selectedUnit == UnitDropdownItem.gml.toString())
                     ..._getOtherDropdownItems(context),
@@ -313,12 +366,33 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                 for (final option in options.take(4))
                   Semantics(
                     identifier: 'meal-detail-chip-${option.id}',
-                    child: ActionChip(
+                    child: ChoiceChip(
                       label: Text(option.label),
-                      onPressed: () => _onQuickServingSelected(option),
+                      selected:
+                          widget.selectedUnit == option.unit &&
+                          quantity != null &&
+                          (quantity - option.quantity).abs() < .000001,
+                      showCheckmark: false,
+                      materialTapTargetSize: MaterialTapTargetSize.padded,
+                      onSelected: (_) => _onQuickServingSelected(option),
                     ),
                   ),
               ],
+            ),
+          ),
+        if (options.length > 4)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Semantics(
+              identifier: 'meal-detail-more-portions',
+              child: OutlinedButton.icon(
+                onPressed: () => _choosePortion(options),
+                icon: const Icon(Icons.straighten_rounded),
+                label: Text(s.foodChoosePortion),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
             ),
           ),
         if (missing)

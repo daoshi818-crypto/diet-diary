@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/meal_detail/util/food_entry_policy.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -127,6 +128,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
     final preferServing =
         meal.scalableServingQuantity != null &&
         !_defaultToRawFoodUnits &&
+        offersCountedServings(meal) &&
         !(meal.backendSource?.startsWith('local_') ?? false);
 
     _applyingInitialSelection = true;

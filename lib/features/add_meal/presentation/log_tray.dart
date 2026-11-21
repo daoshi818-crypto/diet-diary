@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/meal_detail/util/food_entry_policy.dart';
 import 'package:flutter/widgets.dart';
 import 'package:opennutritracker/core/utils/energy_display.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
@@ -132,6 +133,7 @@ LogTrayItem? defaultLogTrayItem(
   final double quantity;
   if (meal.scalableServingQuantity != null &&
       !defaultToRawFoodUnits &&
+      offersCountedServings(meal) &&
       !(meal.backendSource?.startsWith('local_') ?? false)) {
     unit = UnitDropdownItem.serving.toString();
     quantity = 1;

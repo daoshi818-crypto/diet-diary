@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
+import 'package:opennutritracker/features/meal_detail/util/quick_serving_option.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.dart';
@@ -295,6 +297,43 @@ void main() {
     );
     expect(cache.writes, 0);
   });
+
+  test(
+    'actual raw and hydrated foods scale against their own nutrient basis',
+    () async {
+      final actual = ChineseFoodDataSource();
+      for (final entry in [
+        ('calshot', '962545', '大米（生）', 346.0),
+        ('cn_fct', '012401x', '蒸米饭', 116.0),
+        ('cn_fct', '22201', '粉丝（干）', 338.0),
+        ('calshot', '551', '粉丝（湿）', 125.0),
+        ('cn_fct', '019010', '荞麦面（干）', 340.0),
+        ('calshot', '545', '荞麦面（熟）', 132.0),
+      ]) {
+        final meal = await actual.bySourceId(entry.$1, entry.$2);
+        expect(meal.name, entry.$3);
+        final weight = convertQuantityToBaseUnit(150, 'g', meal);
+        expect(
+          weight * meal.nutriments.energyPerUnit!,
+          closeTo(entry.$4 * 1.5, .001),
+        );
+        for (final option in quickServingOptionsFor(meal, '克')) {
+          expect(option.unit, 'g');
+          expect(
+            convertQuantityToBaseUnit(option.quantity, option.unit, meal),
+            option.quantity,
+          );
+        }
+      }
+      final wet = await actual.bySourceId('calshot', '550');
+      expect(
+        wet.portions.any((p) => RegExp('干炒|汤河粉').hasMatch(p.label)),
+        false,
+      );
+      final hydrated = await actual.bySourceId('calshot', '178');
+      expect(hydrated.portions.any((p) => p.label.contains('干木耳')), false);
+    },
+  );
 
   test(
     'private snapshot has Chinese names, unique ids and three sources',
