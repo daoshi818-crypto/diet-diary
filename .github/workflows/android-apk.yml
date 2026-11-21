@@ -2,7 +2,7 @@ name: Android APK
 
 on:
   push:
-    branches: [codex/chinese-food-catalog]
+    branches: [main, codex/chinese-food-catalog]
   workflow_dispatch:
 
 permissions:
