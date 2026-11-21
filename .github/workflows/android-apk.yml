@@ -84,7 +84,7 @@ jobs:
           EOF
       - name: Build signed APK
         run: |
-          flutter build apk --release --flavor full --build-number="$((1000 + GITHUB_RUN_NUMBER))"
+          flutter build apk --release --flavor full --target-platform android-arm64 --build-number="$((1000 + GITHUB_RUN_NUMBER))"
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-full-release.apk dist/diet-diary.apk
           sha256sum dist/diet-diary.apk > dist/SHA256SUMS.txt
@@ -95,6 +95,11 @@ jobs:
           path: dist/
           if-no-files-found: error
           retention-days: 30
+      - name: Free workspace space before saving caches
+        if: always()
+        run: |
+          rm -rf -- build .dart_tool/flutter_build
+          df -h .
       - name: Remove signing files
         if: always()
         run: rm -f android/key.properties android/app/upload-keystore.p12
