@@ -272,6 +272,47 @@ void main() {
     }
   }
 
+  testWidgets('large text keeps Chinese meal titles readable beside actions', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      _wrapWithMaterial(
+        MediaQuery(
+          data: const MediaQueryData(
+            size: Size(320, 640),
+            textScaler: TextScaler.linear(2),
+          ),
+          child: IntakeVerticalList(
+            day: DateTime(2026, 1, 1),
+            title: '午餐',
+            listIcon: Icons.lunch_dining_outlined,
+            addMealType: AddMealType.lunchType,
+            intakeList: intakes,
+            usesImperialUnits: false,
+            mealKcalTarget: 641,
+            onSortTypeChanged: (_) {},
+            onDeleteIntakeCallback: (_, _) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final title = tester.renderObject<RenderParagraph>(find.text('午餐'));
+    expect(title.didExceedMaxLines, isFalse);
+    final summaryFinder = find.textContaining('641').first;
+    expect(
+      tester.getTopLeft(summaryFinder).dy,
+      greaterThan(tester.getBottomLeft(find.text('午餐')).dy),
+    );
+    final summary = tester.renderObject<RenderParagraph>(summaryFinder);
+    expect(summary.didExceedMaxLines, isFalse);
+    expect(tester.getSize(summaryFinder).height, greaterThan(20));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('meal calorie target stays on one line on a narrow phone', (
     tester,
   ) async {

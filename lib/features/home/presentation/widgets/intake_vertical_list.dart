@@ -174,6 +174,37 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
     final palette = isDark ? AppPalette.dark : AppPalette.light;
     final accent = Theme.of(context).colorScheme.primary;
     final textTheme = Theme.of(context).textTheme;
+    final Widget headerSummary = widget.intakeList.isEmpty
+        ? Text(
+            S.of(context).loggingMealEmpty,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.end,
+            style: textTheme.bodySmall?.copyWith(color: palette.textMuted),
+          )
+        : _shouldShowHeaderSummary
+        ? Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (final line in _buildHeaderSummary(context).split('\n'))
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    line,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelMedium?.copyWith(
+                      color: palette.textMuted,
+                      fontWeight: FontWeight.w700,
+                      height: 1.3,
+                    ),
+                    textAlign: TextAlign.end,
+                  ),
+                ),
+            ],
+          )
+        : const SizedBox.shrink();
     return Column(
       children: [
         Container(
@@ -184,215 +215,218 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
             Dimens.spacing8,
           ),
           alignment: Alignment.centerLeft,
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(Dimens.spacing8),
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: Dimens.borderRadiusS,
-                ),
-                child: Icon(widget.listIcon, size: 20, color: accent),
-              ),
-              const SizedBox(width: Dimens.spacing12),
-              Expanded(
-                flex: 2,
-                child: AutoSizeText(
-                  widget.title,
-                  maxLines: 1,
-                  minFontSize: 14,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleLarge?.copyWith(
-                    color: palette.textStrong,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              const SizedBox(width: Dimens.spacing8),
-              if (widget.intakeList.isEmpty)
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    S.of(context).loggingMealEmpty,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: palette.textMuted,
-                    ),
-                  ),
-                ),
-              if (_shouldShowHeaderSummary && widget.intakeList.isNotEmpty)
-                Expanded(
-                  flex: 3,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final stackHeader =
+                  constraints.maxWidth < 300 ||
+                  MediaQuery.textScalerOf(context).scale(14) > 17.5;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
                     children: [
-                      for (final line in _buildHeaderSummary(
-                        context,
-                      ).split('\n'))
-                        FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerRight,
-                          child: Text(
-                            line,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: textTheme.labelMedium?.copyWith(
-                              color: palette.textMuted,
-                              fontWeight: FontWeight.w700,
-                              height: 1.3,
-                            ),
-                            textAlign: TextAlign.end,
+                      Container(
+                        padding: const EdgeInsets.all(Dimens.spacing8),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: Dimens.borderRadiusS,
+                        ),
+                        child: Icon(widget.listIcon, size: 20, color: accent),
+                      ),
+                      const SizedBox(width: Dimens.spacing12),
+                      Expanded(
+                        flex: 2,
+                        child: AutoSizeText(
+                          widget.title,
+                          maxLines: 1,
+                          minFontSize: 14,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.titleLarge?.copyWith(
+                            color: palette.textStrong,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
+                      ),
+                      const SizedBox(width: Dimens.spacing8),
+                      if (!stackHeader) Expanded(flex: 3, child: headerSummary),
+                      if (widget.onSortTypeChanged != null)
+                        SizedBox(
+                          width: 48,
+                          child: totalKcal > 0 ? _buildSortMenu(context) : null,
+                        ),
+                      Semantics(
+                        identifier: 'intake-section-add',
+                        child: IconButton(
+                          tooltip: S.of(context).addLabel,
+                          onPressed: () => Navigator.of(context).pushNamed(
+                            NavigationOptions.addMealRoute,
+                            arguments: AddMealScreenArguments(
+                              widget.addMealType,
+                              widget.day,
+                            ),
+                          ),
+                          icon: Icon(
+                            Icons.add_circle_outline_rounded,
+                            color: accent,
+                          ),
+                        ),
+                      ),
+                      Semantics(
+                        identifier: 'intake-section-menu',
+                        // Tight bounds: without this the node inherits the flex
+                        // Row's full-width box and coordinate taps miss the button.
+                        container: true,
+                        child: PopupMenuButton<VerticalListPopupMenuSelections>(
+                          icon: Icon(
+                            Icons.more_vert_rounded,
+                            color: palette.textMuted,
+                          ),
+                          shape: Dimens.shapeM,
+                          onSelected: (VerticalListPopupMenuSelections selection) async {
+                            // The section as it was when the menu was used: the
+                            // Diary can move on to another day while a dialog is
+                            // open (#1360), rebuilding this list for that day.
+                            final intakes = widget.intakeList;
+                            final onDeleteIntake =
+                                widget.onDeleteIntakeCallback;
+                            final trackedDay = widget.trackedDayEntity;
+                            switch (selection) {
+                              case VerticalListPopupMenuSelections.onCopy:
+                                final copyDialog = CopyDialog(
+                                  initialValue: widget.addMealType,
+                                );
+                                final selectedMealType =
+                                    await showDialog<AddMealType>(
+                                      context: context,
+                                      builder: (context) => copyDialog,
+                                    );
+                                if (selectedMealType != null) {
+                                  for (IntakeEntity intake in intakes) {
+                                    widget.onCopyIntakeCallback!(
+                                      intake,
+                                      null,
+                                      selectedMealType,
+                                    );
+                                  }
+                                }
+                                break;
+                              case VerticalListPopupMenuSelections.onDelete:
+                                final shouldDeleteIntakes =
+                                    await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) =>
+                                          const DeleteAllDialog(),
+                                    );
+                                if (shouldDeleteIntakes == true) {
+                                  for (IntakeEntity intake in intakes) {
+                                    onDeleteIntake(intake, trackedDay);
+                                  }
+                                  break;
+                                }
+                              case VerticalListPopupMenuSelections.onShare:
+                                if (context.mounted) {
+                                  await _shareIntakes(
+                                    intakes,
+                                    title: S.of(context).shareMealLabel,
+                                    fileBaseName: 'meal_qr',
+                                  );
+                                }
+                              case VerticalListPopupMenuSelections.onImport:
+                                if (context.mounted) {
+                                  Navigator.of(context).pushNamed(
+                                    NavigationOptions.importMealScannerRoute,
+                                    arguments: ImportMealScannerArguments(
+                                      widget.addMealType.getIntakeType(),
+                                      widget.addMealType,
+                                      widget.day,
+                                    ),
+                                  );
+                                }
+                              case VerticalListPopupMenuSelections.onImportCode:
+                                final payload =
+                                    await showDialog<SharedMealPayload>(
+                                      context: context,
+                                      builder: (_) =>
+                                          const SharedMealCodeDialog(),
+                                    );
+                                if (payload != null && context.mounted) {
+                                  final imported = await SharedMealImporter(
+                                    context,
+                                    widget.addMealType.getIntakeType(),
+                                    widget.addMealType,
+                                    widget.day,
+                                  ).importPayload(payload);
+                                  if (imported && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          S.of(context).importMealSuccessLabel,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+                            }
+                          },
+                          itemBuilder: (BuildContext context) =>
+                              <PopupMenuEntry<VerticalListPopupMenuSelections>>[
+                                if (widget.onCopyIntakeCallback != null &&
+                                    totalKcal > 0)
+                                  PopupMenuItem<
+                                    VerticalListPopupMenuSelections
+                                  >(
+                                    value:
+                                        VerticalListPopupMenuSelections.onCopy,
+                                    child: Text(S.of(context).dialogCopyLabel),
+                                  ),
+                                if (totalKcal > 0)
+                                  PopupMenuItem<
+                                    VerticalListPopupMenuSelections
+                                  >(
+                                    value: VerticalListPopupMenuSelections
+                                        .onDelete,
+                                    child: Text(S.of(context).deleteAllLabel),
+                                  ),
+                                if (totalKcal > 0)
+                                  PopupMenuItem<
+                                    VerticalListPopupMenuSelections
+                                  >(
+                                    value:
+                                        VerticalListPopupMenuSelections.onShare,
+                                    child: Text(S.of(context).shareMealLabel),
+                                  ),
+                                PopupMenuItem<VerticalListPopupMenuSelections>(
+                                  value:
+                                      VerticalListPopupMenuSelections.onImport,
+                                  child: Text(S.of(context).importMealLabel),
+                                ),
+                                PopupMenuItem<VerticalListPopupMenuSelections>(
+                                  value: VerticalListPopupMenuSelections
+                                      .onImportCode,
+                                  child: Semantics(
+                                    identifier: 'intake-import-meal-code',
+                                    child: Text(S.of(context).pasteCodeLabel),
+                                  ),
+                                ),
+                              ],
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              if (widget.intakeList.isNotEmpty && !_shouldShowHeaderSummary)
-                const Expanded(flex: 3, child: SizedBox.shrink()),
-              if (widget.onSortTypeChanged != null)
-                SizedBox(
-                  width: 48,
-                  child: totalKcal > 0 ? _buildSortMenu(context) : null,
-                ),
-              Semantics(
-                identifier: 'intake-section-add',
-                child: IconButton(
-                  tooltip: S.of(context).addLabel,
-                  onPressed: () => Navigator.of(context).pushNamed(
-                    NavigationOptions.addMealRoute,
-                    arguments: AddMealScreenArguments(
-                      widget.addMealType,
-                      widget.day,
+                  if (stackHeader)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: 48,
+                        top: Dimens.spacing4,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: headerSummary,
+                      ),
                     ),
-                  ),
-                  icon: Icon(Icons.add_circle_outline_rounded, color: accent),
-                ),
-              ),
-              Semantics(
-                identifier: 'intake-section-menu',
-                // Tight bounds: without this the node inherits the flex
-                // Row's full-width box and coordinate taps miss the button.
-                container: true,
-                child: PopupMenuButton<VerticalListPopupMenuSelections>(
-                  icon: Icon(Icons.more_vert_rounded, color: palette.textMuted),
-                  shape: Dimens.shapeM,
-                  onSelected:
-                      (VerticalListPopupMenuSelections selection) async {
-                        // The section as it was when the menu was used: the
-                        // Diary can move on to another day while a dialog is
-                        // open (#1360), rebuilding this list for that day.
-                        final intakes = widget.intakeList;
-                        final onDeleteIntake = widget.onDeleteIntakeCallback;
-                        final trackedDay = widget.trackedDayEntity;
-                        switch (selection) {
-                          case VerticalListPopupMenuSelections.onCopy:
-                            final copyDialog = CopyDialog(
-                              initialValue: widget.addMealType,
-                            );
-                            final selectedMealType =
-                                await showDialog<AddMealType>(
-                                  context: context,
-                                  builder: (context) => copyDialog,
-                                );
-                            if (selectedMealType != null) {
-                              for (IntakeEntity intake in intakes) {
-                                widget.onCopyIntakeCallback!(
-                                  intake,
-                                  null,
-                                  selectedMealType,
-                                );
-                              }
-                            }
-                            break;
-                          case VerticalListPopupMenuSelections.onDelete:
-                            final shouldDeleteIntakes = await showDialog<bool>(
-                              context: context,
-                              builder: (context) => const DeleteAllDialog(),
-                            );
-                            if (shouldDeleteIntakes == true) {
-                              for (IntakeEntity intake in intakes) {
-                                onDeleteIntake(intake, trackedDay);
-                              }
-                              break;
-                            }
-                          case VerticalListPopupMenuSelections.onShare:
-                            if (context.mounted) {
-                              await _shareIntakes(
-                                intakes,
-                                title: S.of(context).shareMealLabel,
-                                fileBaseName: 'meal_qr',
-                              );
-                            }
-                          case VerticalListPopupMenuSelections.onImport:
-                            if (context.mounted) {
-                              Navigator.of(context).pushNamed(
-                                NavigationOptions.importMealScannerRoute,
-                                arguments: ImportMealScannerArguments(
-                                  widget.addMealType.getIntakeType(),
-                                  widget.addMealType,
-                                  widget.day,
-                                ),
-                              );
-                            }
-                          case VerticalListPopupMenuSelections.onImportCode:
-                            final payload = await showDialog<SharedMealPayload>(
-                              context: context,
-                              builder: (_) => const SharedMealCodeDialog(),
-                            );
-                            if (payload != null && context.mounted) {
-                              final imported = await SharedMealImporter(
-                                context,
-                                widget.addMealType.getIntakeType(),
-                                widget.addMealType,
-                                widget.day,
-                              ).importPayload(payload);
-                              if (imported && context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      S.of(context).importMealSuccessLabel,
-                                    ),
-                                  ),
-                                );
-                              }
-                            }
-                        }
-                      },
-                  itemBuilder: (BuildContext context) =>
-                      <PopupMenuEntry<VerticalListPopupMenuSelections>>[
-                        if (widget.onCopyIntakeCallback != null &&
-                            totalKcal > 0)
-                          PopupMenuItem<VerticalListPopupMenuSelections>(
-                            value: VerticalListPopupMenuSelections.onCopy,
-                            child: Text(S.of(context).dialogCopyLabel),
-                          ),
-                        if (totalKcal > 0)
-                          PopupMenuItem<VerticalListPopupMenuSelections>(
-                            value: VerticalListPopupMenuSelections.onDelete,
-                            child: Text(S.of(context).deleteAllLabel),
-                          ),
-                        if (totalKcal > 0)
-                          PopupMenuItem<VerticalListPopupMenuSelections>(
-                            value: VerticalListPopupMenuSelections.onShare,
-                            child: Text(S.of(context).shareMealLabel),
-                          ),
-                        PopupMenuItem<VerticalListPopupMenuSelections>(
-                          value: VerticalListPopupMenuSelections.onImport,
-                          child: Text(S.of(context).importMealLabel),
-                        ),
-                        PopupMenuItem<VerticalListPopupMenuSelections>(
-                          value: VerticalListPopupMenuSelections.onImportCode,
-                          child: Semantics(
-                            identifier: 'intake-import-meal-code',
-                            child: Text(S.of(context).pasteCodeLabel),
-                          ),
-                        ),
-                      ],
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ),
         DragTarget<IntakeEntity>(
