@@ -400,8 +400,9 @@ void main() {
     expect(find.bySemanticsIdentifier('add-meal-bulk-add'), findsNothing);
   });
 
-  testWidgets('with the AI features hidden, Snap meal goes and Describe '
-      'loses its AI badge (#1518)', (tester) async {
+  testWidgets('hiding AI keeps the local batch entry available', (
+    tester,
+  ) async {
     await _register(aiHidden: true);
     await tester.pumpWidget(_app([]));
     await tester.pumpAndSettle();
@@ -414,6 +415,14 @@ void main() {
     );
     expect(
       find.bySemanticsIdentifier('add-meal-method-describe'),
+      findsNothing,
+    );
+    expect(
+      find.bySemanticsIdentifier('add-meal-nutrition-label'),
+      findsNothing,
+    );
+    expect(
+      find.bySemanticsIdentifier('add-meal-method-local-batch'),
       findsOneWidget,
     );
     expect(find.text('AI'), findsNothing);

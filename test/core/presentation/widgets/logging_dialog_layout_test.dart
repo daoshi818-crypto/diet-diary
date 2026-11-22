@@ -143,10 +143,10 @@ void main() {
     await tester.pumpAndSettle();
     final field = find.byType(TextFormField);
     expect(tester.widget<TextFormField>(field).controller!.text, '100');
-    final dropdown = tester.widget<DropdownButtonFormField<String>>(
-      find.byType(DropdownButtonFormField<String>),
+    final units = tester.widget<SegmentedButton<String>>(
+      find.byType(SegmentedButton<String>),
     );
-    expect(dropdown.initialValue, 'g');
+    expect(units.selected, {'g'});
     await tester.enterText(field, '50');
     await tester.pumpAndSettle();
     final confirm = find.byWidgetPredicate(
@@ -254,7 +254,9 @@ void main() {
             final keyboard = size.height > 400 ? 260.0 : 140.0;
             tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
             await tester.pumpAndSettle();
-            await tester.ensureVisible(find.bySemanticsIdentifier('meal-detail-add'));
+            await tester.ensureVisible(
+              find.bySemanticsIdentifier('meal-detail-add'),
+            );
             await tester.pumpAndSettle();
             expect(
               tester

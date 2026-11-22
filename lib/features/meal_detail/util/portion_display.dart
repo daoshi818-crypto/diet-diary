@@ -7,15 +7,27 @@ List<int> visiblePortionIndices(MealEntity meal, {String? selectedUnit}) {
   final selected = selectedUnit != null && isPortionUnit(selectedUnit)
       ? effectivePortionIndex(selectedUnit)
       : null;
+  final onlyWeight = RegExp(
+    meal.isLiquid
+        ? r'^\s*\d+(?:\.\d+)?\s*(?:毫升|ml)\s*$'
+        : r'^\s*\d+(?:\.\d+)?\s*(?:克|g|grams?)\s*$',
+    caseSensitive: false,
+  );
+  final selectedWeight =
+      selected != null &&
+          selected >= 0 &&
+          selected < meal.portions.length &&
+          onlyWeight.hasMatch(meal.portions[selected].label)
+      ? meal.portions[selected].gramWeight
+      : null;
   for (var i = 0; i < meal.portions.length; i++) {
     final portion = meal.portions[i];
-    final onlyWeight = RegExp(
-      meal.isLiquid
-          ? r'^\s*\d+(?:\.\d+)?\s*(?:毫升|ml)\s*$'
-          : r'^\s*\d+(?:\.\d+)?\s*(?:克|g|grams?)\s*$',
-      caseSensitive: false,
-    ).hasMatch(portion.label);
-    if (onlyWeight && i != selected) continue;
+    if (i != selected &&
+        (onlyWeight.hasMatch(portion.label) ||
+            (selectedWeight != null &&
+                (portion.gramWeight - selectedWeight).abs() < 0.000001))) {
+      continue;
+    }
     final grams = portion.gramWeight;
     if (!grams.isFinite || grams <= 0) continue;
     final key = (portion.label.trim().toLowerCase(), (grams * 1000000).round());

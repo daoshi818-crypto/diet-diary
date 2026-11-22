@@ -16,9 +16,6 @@ class AddFoodMethodTiles extends StatelessWidget {
   final bool singleRow;
   final VoidCallback? onNutritionLabelPressed;
 
-  /// False once the user has hidden the AI features (#1518): the Snap meal
-  /// tile goes, since only a model can read a photo, and Describe stays
-  /// without its badge, since the offline parser reads it then.
   final bool showAi;
 
   const AddFoodMethodTiles({
@@ -133,7 +130,7 @@ class AddFoodMethodTiles extends StatelessWidget {
           1,
           tiles.length,
         );
-        final columns = singleRow && maxColumns == tiles.length
+        final columns = singleRow
             ? tiles.length
             : maxColumns < tiles.length && maxColumns >= 2
             ? (maxColumns >= 3 && tiles.length == 5 ? 3 : 2)
