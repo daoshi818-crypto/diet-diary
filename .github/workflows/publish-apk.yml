@@ -53,6 +53,7 @@ jobs:
             --name "diet-diary-apk-${run_number}" --dir dist
           test -s dist/diet-diary.apk
           test -s dist/BUILD_INFO.json
+          test -s dist/UPDATE.json
           sha256sum --check dist/SHA256SUMS.txt
           echo "number=$run_number" >> "$GITHUB_OUTPUT"
           echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
@@ -65,15 +66,16 @@ jobs:
         run: |
           set -euo pipefail
           tag="apk-${RUN_NUMBER}"
+          version=$(jq -er ' .version ' dist/UPDATE.json)
           printf '下载 diet-diary.apk 安装。\n\n构建记录：https://github.com/%s/actions/runs/%s\n源码提交：%s\n' \
             "$GH_REPO" "$RUN_ID" "$HEAD_SHA" > release-notes.md
           if gh release view "$tag" --repo "$GH_REPO" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/diet-diary.apk dist/SHA256SUMS.txt dist/BUILD_INFO.json \
+            gh release upload "$tag" dist/diet-diary.apk dist/SHA256SUMS.txt dist/BUILD_INFO.json dist/UPDATE.json \
               --repo "$GH_REPO" --clobber
           else
-            gh release create "$tag" dist/diet-diary.apk dist/SHA256SUMS.txt dist/BUILD_INFO.json \
+            gh release create "$tag" dist/diet-diary.apk dist/SHA256SUMS.txt dist/BUILD_INFO.json dist/UPDATE.json \
               --repo "$GH_REPO" --target "$HEAD_SHA" --draft \
-              --title "吃有数 Android APK #${RUN_NUMBER}" --notes-file release-notes.md
+              --title "饮食日记 ${version} · Android #${RUN_NUMBER}" --notes-file release-notes.md
           fi
           gh release edit "$tag" --repo "$GH_REPO" --draft=false --latest
           gh release view "$tag" --repo "$GH_REPO" --json url --jq '.url' \

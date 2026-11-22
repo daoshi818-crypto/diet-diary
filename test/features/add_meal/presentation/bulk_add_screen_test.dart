@@ -52,8 +52,9 @@ class _Write {
   final String unit;
   final String amount;
   final String? mealName;
+  final IntakeTypeEntity type;
 
-  const _Write(this.unit, this.amount, this.mealName);
+  const _Write(this.unit, this.amount, this.mealName, this.type);
 
   @override
   String toString() => '$mealName $amount $unit';
@@ -77,7 +78,7 @@ class _FakeMealDetailBloc extends Fake implements MealDetailBloc {
     if (failOnSecondWrite && writes.length == 1) {
       throw StateError('write failed');
     }
-    writes.add(_Write(unit, amountText, meal.name));
+    writes.add(_Write(unit, amountText, meal.name, intakeTypeEntity));
   }
 }
 
@@ -600,6 +601,36 @@ Future<void> _parse(WidgetTester tester, String text) async {
 Finder _submitButton() => find.widgetWithIcon(FilledButton, Icons.add_rounded);
 
 void main() {
+  testWidgets('description review writes the selected meal instead of its initial meal', (tester) async {
+    await _register({'玉米': [_meal('玉米')]});
+    await tester.pumpWidget(_app());
+    await _parse(tester, '玉米100g');
+    await tester.tap(find.bySemanticsIdentifier('bulk-add-meal-type'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10nEn.dinnerLabel).last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(_submitButton());
+    await tester.tap(_submitButton());
+    await tester.pumpAndSettle();
+    expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.dinner);
+  });
+
+  testWidgets('mixed description retains all foods and asks for unspecified quantity', (tester) async {
+    await _register({'无糖可乐': [_meal('无糖可乐')],
+      '玉米': [_meal('玉米')], '土豆': [_meal('土豆')]});
+    await tester.pumpWidget(_app());
+    await _parse(tester, '无糖可乐 玉米100g 土豆50g');
+    expect(find.textContaining('无糖可乐'), findsWidgets);
+    expect(find.textContaining('玉米'), findsWidgets);
+    expect(find.textContaining('土豆'), findsWidgets);
+    final amounts = tester.widgetList<TextField>(find.byType(TextField)).where(
+      (field) => field.keyboardType == const TextInputType.numberWithOptions(decimal: true)).toList();
+    expect(amounts.map((field) => field.controller!.text), ['', '100', '50']);
+    await tester.ensureVisible(_submitButton());
+    await tester.tap(_submitButton());
+    await tester.pumpAndSettle();
+    expect(_mealDetailBloc.writes, isEmpty);
+  });
   testWidgets('changing Americano from 40 to 400 keeps the amount row stable', (
     tester,
   ) async {

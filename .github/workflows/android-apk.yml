@@ -46,6 +46,7 @@ jobs:
         run: |
           python3 tool/test_build_chinese_food_catalog.py
           python3 tool/test_verify_android_apk.py
+          python3 tool/test_write_app_update_manifest.py
           flutter analyze --no-pub
           flutter test --no-pub --concurrency=2
       - name: Prepare release signing
@@ -77,6 +78,8 @@ jobs:
       - name: Verify APK architecture and packaged food catalog
         run: |
           python3 tool/verify_android_apk.py dist/diet-diary.apk --report dist/BUILD_INFO.json
+          aapt=$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -n 1)
+          python3 tool/write_app_update_manifest.py dist/diet-diary.apk --aapt "$aapt" --build "$((1000 + GITHUB_RUN_NUMBER))"
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:

@@ -289,7 +289,7 @@ void main() {
         expect(initialSearch.bottom, lessThanOrEqualTo(initialRecent.top));
         expect(tester.getRect(log).bottom, lessThanOrEqualTo(size.height));
         await _captureScreen(tester, size, scale);
-        await tester.drag(find.byType(NestedScrollView), const Offset(0, -400));
+        await tester.drag(find.byType(Scrollable).first, const Offset(0, -400));
         await tester.pumpAndSettle();
         expect(tester.getRect(search), initialSearch);
         expect(tester.getRect(recent), initialRecent);

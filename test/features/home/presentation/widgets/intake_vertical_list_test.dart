@@ -193,6 +193,85 @@ void main() {
 
   String headerKcalOnly() => '200 ${l10nEn.kcalLabel}';
 
+  for (final width in [320.0, 360.0, 412.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final sortable in [false, true]) {
+        testWidgets(
+          'meal columns align width=$width scale=$scale sort=$sortable',
+          (tester) async {
+            tester.view.physicalSize = Size(width, 1000);
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.reset);
+            await tester.pumpWidget(
+              _wrapWithMaterial(
+                Builder(
+                  builder: (context) {
+                    return MediaQuery(
+                      data: MediaQuery.of(
+                        context,
+                      ).copyWith(textScaler: TextScaler.linear(scale)),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          children: [
+                            for (final entry in [
+                              ('午餐', intakes),
+                              ('晚餐', <IntakeEntity>[]),
+                              ('加餐', <IntakeEntity>[]),
+                            ])
+                              IntakeVerticalList(
+                                day: DateTime(2026, 1, 1),
+                                title: entry.$1,
+                                listIcon: Icons.restaurant,
+                                addMealType: AddMealType.lunchType,
+                                intakeList: entry.$2,
+                                usesImperialUnits: false,
+                                mealKcalTarget: 819,
+                                onSortTypeChanged: sortable ? (_) {} : null,
+                                onDeleteIntakeCallback: (_, _) {},
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            Finder identified(String id) => find.byWidgetPredicate(
+              (w) => w is Semantics && w.properties.identifier == id,
+            );
+            for (final id in ['intake-section-add', 'intake-section-menu']) {
+              final buttons = identified(id);
+              expect(buttons, findsNWidgets(3));
+              final x = tester.getCenter(buttons.at(0)).dx;
+              for (var i = 1; i < 3; i++) {
+                expect(
+                  tester.getCenter(buttons.at(i)).dx,
+                  closeTo(x, 0.1),
+                  reason: id,
+                );
+              }
+            }
+            final foodMenu = identified('intake-item-menu');
+            expect(foodMenu, findsOneWidget);
+            expect(
+              tester.getCenter(identified('intake-section-menu').first).dx,
+              closeTo(tester.getCenter(foodMenu).dx, 0.1),
+            );
+            for (final title in ['午餐', '晚餐', '加餐']) {
+              expect(
+                tester.getTopLeft(find.text(title)).dx,
+                closeTo(tester.getTopLeft(find.text('午餐')).dx, 0.1),
+              );
+            }
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
   testWidgets('meal calorie target stays on one line on a narrow phone', (
     tester,
   ) async {
@@ -585,8 +664,8 @@ void main() {
     );
     await tester.pump();
 
-      // No RenderFlex overflow from the header competing for width.
-      expect(tester.takeException(), isNull);
+    // No RenderFlex overflow from the header competing for width.
+    expect(tester.takeException(), isNull);
 
     final titleFinder = find.text('Breakfast');
     expect(titleFinder, findsOneWidget);

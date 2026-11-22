@@ -90,7 +90,43 @@ class ResolveParsedMealsUseCase {
   /// batch — it just narrows the candidate list.
   Future<List<ResolvedMealItem>> resolve(List<ParsedMealItem> items) async {
     if (items.isEmpty) return const [];
-    return Future.wait(items.map(_resolveOne));
+    final groups = await Future.wait(items.map(_resolveDescriptionItem));
+    return groups.expand((group) => group).toList();
+  }
+
+  Future<List<ResolvedMealItem>> _resolveDescriptionItem(
+    ParsedMealItem item,
+  ) async {
+    final whole = await _resolveOne(item);
+    final parts = item.query.trim().split(RegExp(r'\s+'));
+    if (parts.length < 2 ||
+        parts.length > 6 ||
+        !parts.every((part) => RegExp(r'^[\u3400-\u9fff]+$').hasMatch(part))) {
+      return [whole];
+    }
+    final food = whole.selected;
+    final label = '${food?.name ?? ''} ${food?.brands ?? ''}';
+    if (food != null &&
+        !whole.isLowConfidence &&
+        parts.every((part) => label.contains(part))) {
+      return [whole];
+    }
+    final split = await Future.wait([
+      for (var i = 0; i < parts.length; i++)
+        _resolveOne(
+          ParsedMealItem(
+            query: parts[i],
+            quantity: i == parts.length - 1 ? item.quantity : null,
+            unit: i == parts.length - 1 ? item.unit : null,
+            portion: i == parts.length - 1 ? item.portion : null,
+            requiresAmountConfirmation:
+                i < parts.length - 1 || item.requiresAmountConfirmation,
+          ),
+        ),
+    ]);
+    return split.every((part) => part.isResolved && part.confidence >= .65)
+        ? split
+        : [whole];
   }
 
   /// A source that fails contributes nothing instead of failing the item.

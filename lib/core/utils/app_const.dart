@@ -7,8 +7,7 @@ class AppConst {
   static const platformNameAndroid = "Android";
   static const platformNameIOS = "iOS";
   static const reportErrorEmail = "opennutritracker-dev@pm.me";
-  static const sourceCodeUrl =
-      "https://github.com/simonoppowa/OpenNutriTracker";
+  static const sourceCodeUrl = "https://github.com/daoshi818-crypto/diet-diary";
 
   // Support page links (#1536). Every one opens outside the app.
   static const appStoreUrl = "https://apps.apple.com/app/id6451490901";

@@ -132,6 +132,54 @@ ParsedMealItem item(String query, {double? quantity, String? unit}) =>
     ParsedMealItem(query: query, quantity: quantity, unit: unit);
 
 void main() {
+  test(
+    'mixed Chinese description preserves unquantified drink and both weights',
+    () async {
+      final search = _FakeSearch(
+        off: {
+          '无糖可乐': [meal('无糖可乐')],
+          '玉米': [meal('玉米')],
+          '土豆': [meal('土豆')],
+        },
+      );
+      final result = await ResolveParsedMealsUseCase(
+        search,
+      ).resolve(parseMealText('无糖可乐 玉米100g 土豆50g').items);
+      expect(result.map((r) => r.parsed.query), ['无糖可乐', '玉米', '土豆']);
+      expect(result.map((r) => r.parsed.quantity), [null, 100, 50]);
+      expect(result.first.parsed.requiresAmountConfirmation, isTrue);
+      expect(result.every((r) => r.isResolved), isTrue);
+    },
+  );
+
+  test('brand and product keywords remain one matching food', () async {
+    final search = _FakeSearch(
+      off: {
+        '西麦 麦片': [meal('西麦燕麦片')],
+      },
+    );
+    final result = await ResolveParsedMealsUseCase(
+      search,
+    ).resolve(parseMealText('西麦 麦片50g').items);
+    expect(result, hasLength(1));
+    expect(result.single.parsed.quantity, 50);
+    expect(result.single.selected!.name, '西麦燕麦片');
+  });
+
+  test(
+    'uncertain Chinese split retains original row without dropping words',
+    () async {
+      final search = _FakeSearch(
+        off: {
+          '玉米': [meal('玉米')],
+        },
+      );
+      final result = await ResolveParsedMealsUseCase(
+        search,
+      ).resolve([item('未知食品 玉米', quantity: 100, unit: 'g')]);
+      expect(result.single.parsed.query, '未知食品 玉米');
+    },
+  );
   test('each parsed item gets its own candidate list', () async {
     final search = _FakeSearch(
       off: {

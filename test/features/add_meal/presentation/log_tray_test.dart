@@ -396,6 +396,74 @@ Future<void> _confirmAmount(WidgetTester tester) async {
 Finder _logButton() => find.bySemanticsIdentifier('add-meal-tray-log');
 
 void main() {
+  testWidgets('quantity picker can change the meal independently of the library default', (tester) async {
+    await _register([_meal('Oats')]);
+    await _openAddMeal(tester, []);
+    await _tapPlus(tester, 'Oats', confirm: false);
+    await tester.tap(find.bySemanticsIdentifier('food-detail-meal-type'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10nEn.lunchLabel).last);
+    await tester.pumpAndSettle();
+    await _confirmAmount(tester);
+    await tester.tap(_logButton());
+    await tester.pumpAndSettle();
+    expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.lunch);
+  });
+  testWidgets(
+    'one pending list records independently selected lunch and dinner',
+    (tester) async {
+      await _register([_meal('Oats'), _meal('Milk')]);
+      await _openAddMeal(tester, [], library: true);
+      Future<void> selectMeal(String id, String label) async {
+        await tester.tap(find.bySemanticsIdentifier(id));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+      }
+
+      await selectMeal('add-meal-type', l10nEn.lunchLabel);
+      await _tapPlus(tester, 'Oats');
+      await selectMeal('add-meal-type', l10nEn.dinnerLabel);
+      await _tapPlus(tester, 'Milk');
+      final list = tester.widget<LogTrayLogButton>(find.byType(LogTrayLogButton));
+      expect(list.tray.items.map((item) => item.intakeType), [
+        IntakeTypeEntity.lunch,
+        IntakeTypeEntity.dinner,
+      ]);
+      await tester.tap(_logButton());
+      await tester.pumpAndSettle();
+      expect(_mealDetailBloc.writes.map((item) => item.type), [
+        IntakeTypeEntity.lunch,
+        IntakeTypeEntity.dinner,
+      ]);
+    },
+  );
+
+  test(
+    'changing a row meal does not alter other entries or retry identity',
+    () {
+      final tray = LogTray(defaultIntakeType: IntakeTypeEntity.lunch);
+      LogTrayItem entry(String name) => LogTrayItem(
+        meal: _meal(name),
+        unit: 'g',
+        amount: 100,
+        amountLabel: '100 g',
+      );
+      tray.add(entry('Oats'));
+      tray.defaultIntakeType = IntakeTypeEntity.dinner;
+      tray.add(entry('Milk'));
+      final first = tray.items.first;
+      tray.changeIntakeType(1, IntakeTypeEntity.snack);
+      expect(tray.items.first, same(first));
+      expect(tray.items.map((item) => item.intakeType), [
+        IntakeTypeEntity.lunch,
+        IntakeTypeEntity.snack,
+      ]);
+      tray.removeAll([first]);
+      expect(tray.items.single.meal.name, 'Milk');
+      tray.dispose();
+    },
+  );
   testWidgets(
     'custom foods filters the saved library, keeps its tab and follows edits',
     (tester) async {
@@ -459,13 +527,13 @@ void main() {
       final pushed = <RouteSettings>[];
       await _openAddMeal(tester, pushed, library: true);
       await tester.ensureVisible(
-        find.bySemanticsIdentifier('food-library-meal-selector'),
+        find.bySemanticsIdentifier('add-meal-type'),
       );
       await tester.tap(
-        find.bySemanticsIdentifier('food-library-meal-selector'),
+        find.bySemanticsIdentifier('add-meal-type'),
       );
       await tester.pumpAndSettle();
-      final snack = find.bySemanticsIdentifier('food-library-meal-snackType');
+      final snack = find.text(l10nEn.snackLabel).last;
       await tester.ensureVisible(snack);
       await tester.tap(snack);
       await tester.pumpAndSettle();
@@ -847,6 +915,10 @@ void main() {
       await _openAddMeal(tester, []);
 
       await fillQuickAdd(tester);
+      await tester.tap(find.bySemanticsIdentifier('quick-add-meal-type'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10nEn.dinnerLabel).last);
+      await tester.pumpAndSettle();
       // With nothing on the list yet, Add itself logs at once (#1520), so
       // starting a list is the second button.
       await tester.tap(find.bySemanticsIdentifier('quick-add-add-to-list'));
@@ -860,6 +932,7 @@ void main() {
       await tester.tap(_logButton());
       await tester.pumpAndSettle();
       expect(_mealDetailBloc.writes.single.name, 'Cake');
+      expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.dinner);
     });
 
     testWidgets('with nothing on the list, Quick add\'s Add logs at once', (

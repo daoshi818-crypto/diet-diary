@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
 import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
@@ -64,10 +65,12 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
   final _proteinController = TextEditingController();
 
   bool _saving = false;
+  late IntakeTypeEntity _intakeType;
 
   @override
   void initState() {
     super.initState();
+    _intakeType = widget.intakeType;
     _titleController.addListener(_onRequiredFieldChanged);
     _energyController.addListener(_onRequiredFieldChanged);
     // The button reads "Add" or "Add to list" from the list's state, which
@@ -139,6 +142,7 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
         logTray.add(
           LogTrayItem(
             meal: intake.meal,
+            intakeType: _intakeType,
             unit: intake.unit,
             amount: intake.amount,
             amountLabel: S.of(context).quickAddCardLabel,
@@ -164,7 +168,7 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
       locator<CalendarDayBloc>().add(RefreshCalendarDayEvent());
 
       if (!mounted) return;
-      final mealTypeLabel = _intakeTypeLabel(context, widget.intakeType);
+      final mealTypeLabel = _intakeTypeLabel(context, _intakeType);
       final scaffoldMessenger = ScaffoldMessenger.of(context);
       // Resolve the localized message before navigating: the push below
       // removes every route (including this sheet's), so reading from
@@ -217,7 +221,7 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
       id: IdGenerator.getUniqueID(),
       unit: 'g',
       amount: 100,
-      type: widget.intakeType,
+      type: _intakeType,
       meal: meal,
       dateTime: widget.day,
     );
@@ -280,6 +284,14 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
               textAlign: TextAlign.center,
             ),
           ),
+          MealTypeSelector(
+            identifier: 'quick-add-meal-type',
+            value: _intakeType,
+            onChanged: _saving
+                ? null
+                : (type) => setState(() => _intakeType = type),
+          ),
+          const SizedBox(height: 12),
           _field(
             controller: _titleController,
             identifier: 'quick-add-title',

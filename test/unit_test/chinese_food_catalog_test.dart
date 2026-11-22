@@ -1,3 +1,5 @@
+import 'package:opennutritracker/features/add_meal/domain/usecase/resolve_parsed_meals_usecase.dart';
+import 'package:opennutritracker/features/add_meal/util/meal_text_parser.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
@@ -121,6 +123,16 @@ class _Favourites extends Fake implements ToggleFavouriteMealUsecase {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('real bundled catalogue resolves the mixed cola corn potato description', () async {
+    final source = ChineseFoodDataSource(read: () => File('assets/foods/catalog.json').readAsString());
+    final search = SearchProductsUseCase(ProductsRepository.local(source),
+      _Intakes(), _Custom(), _Cache(), _Recipes(), _Config());
+    final resolved = await ResolveParsedMealsUseCase(search).resolve(
+      parseMealText('无糖可乐 玉米100g 土豆50g').items);
+    expect(resolved.map((row) => row.parsed.query), ['无糖可乐', '玉米', '土豆']);
+    expect(resolved.every((row) => row.isResolved), isTrue);
+    expect(resolved.map((row) => row.parsed.quantity), [null, 100, 50]);
+  });
   late ChineseFoodDataSource source;
   late ProductsRepository repository;
   late _Cache cache;

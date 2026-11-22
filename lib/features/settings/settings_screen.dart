@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/settings/presentation/widgets/app_update_screen.dart';
 import 'dart:async';
 
 import 'package:opennutritracker/features/settings/presentation/widgets/nutrition_goals_screen.dart';
@@ -628,6 +629,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SettingsGroup(
                 palette: palette,
                 tiles: [
+                  SettingsTile(
+                    identifier: 'settings-app-update',
+                    palette: palette,
+                    icon: Icons.system_update_rounded,
+                    title: S.of(context).appUpdateCheck,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const AppUpdateScreen(),
+                      ),
+                    ),
+                  ),
                   SettingsTile(
                     identifier: 'settings-support',
                     palette: palette,

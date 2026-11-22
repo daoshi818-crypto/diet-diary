@@ -598,6 +598,7 @@ class BulkAddBloc extends Bloc<BulkAddEvent, BulkAddState> {
     MealEntity? meal,
     bool usesImperialUnits,
   ) {
+    if (parsed.requiresAmountConfirmation && parsed.quantity == null) return '';
     final parsedQuantity = parsed.quantity;
     if (parsedQuantity != null) return _amountText(parsedQuantity);
 

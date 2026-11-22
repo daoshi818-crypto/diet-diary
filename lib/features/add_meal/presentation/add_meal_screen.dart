@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
@@ -126,6 +127,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
       final args =
           ModalRoute.of(context)?.settings.arguments as AddMealScreenArguments;
       _mealType = args.mealType;
+      _logTray.defaultIntakeType = _mealType.getIntakeType();
       _day = args.day;
       _isFoodLibrary = args.isFoodLibrary;
       _argumentsLoaded = true;
@@ -188,10 +190,15 @@ class _AddMealScreenState extends State<AddMealScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: Text(
-          _isFoodLibrary
-              ? S.of(context).loggingFoodLibrary
-              : _mealType.getTypeName(context),
+        title: MealTypeSelector(
+          identifier: 'add-meal-type',
+          value: _mealType.getIntakeType(),
+          onChanged: (type) => setState(() {
+            _mealType = AddMealType.values.firstWhere(
+              (meal) => meal.getIntakeType() == type,
+            );
+            _logTray.defaultIntakeType = type;
+          }),
         ),
         actions: [
           Semantics(
@@ -275,25 +282,8 @@ class _AddMealScreenState extends State<AddMealScreen> {
                       Expanded(
                         child: ValueListenableBuilder<String>(
                           valueListenable: _searchStringListener,
-                          builder: (context, query, _) => NestedScrollView(
-                            key: const PageStorageKey('add-meal-results'),
-                            headerSliverBuilder:
-                                (context, innerBoxIsScrolled) => [
-                                  SliverToBoxAdapter(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.stretch,
-                                      children: [
-                                        if (_isFoodLibrary) ...[
-                                          const SizedBox(height: 8),
-                                          _buildLibraryMealSelector(context),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                            body: _buildResults(context, palette, query),
-                          ),
+                          builder: (context, query, _) =>
+                              _buildResults(context, palette, query),
                         ),
                       ),
                       if (!_logTray.isEmpty && keyboardVisible)
@@ -547,31 +537,6 @@ class _AddMealScreenState extends State<AddMealScreen> {
   // #576: "Search all" CTA on an empty filtered-Recent result — switches to
   // the All chip without the user having to find and tap it themselves.
   void _onSearchAllPressed() => _selectSource(_SearchSource.all);
-
-  Widget _buildLibraryMealSelector(BuildContext context) => Semantics(
-    identifier: 'food-library-meal-selector',
-    child: DropdownButtonFormField<AddMealType>(
-      initialValue: _mealType,
-      decoration: InputDecoration(
-        labelText: S.of(context).loggingRecordTo,
-        border: const OutlineInputBorder(),
-      ),
-      isExpanded: true,
-      items: [
-        for (final type in AddMealType.values)
-          DropdownMenuItem(
-            value: type,
-            child: Semantics(
-              identifier: 'food-library-meal-${type.name}',
-              child: Text(type.getTypeName(context)),
-            ),
-          ),
-      ],
-      onChanged: (type) {
-        if (type != null) setState(() => _mealType = type);
-      },
-    ),
-  );
 
   Widget _buildSourceChips(
     BuildContext context,
@@ -1209,7 +1174,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
           context,
           item.unit,
           item.amount.toString(),
-          type,
+          item.intakeType ?? type,
           item.meal,
           _day,
         );

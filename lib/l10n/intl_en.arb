@@ -1853,5 +1853,17 @@
   "exerciseKnownCalories": "Enter calories per session (optional)",
   "exerciseAddCardio": "Add cardio schedule",
   "exerciseAddStrength": "Add strength schedule",
-  "exerciseNoSchedule": "Not set; no extra expenditure counted"
+  "exerciseNoSchedule": "Not set; no extra expenditure counted",
+  "appUpdateTitle": "App updates",
+  "appUpdateCurrentVersion": "Installed version",
+  "appUpdateChecking": "Checking for updates…",
+  "appUpdateDownloading": "Downloading and verifying APK…",
+  "appUpdateFailed": "Update failed. Check your connection and try again.",
+  "appUpdateLatest": "You have the latest version.",
+  "appUpdateAvailable": "New version available",
+  "appUpdateInstallPermission": "Allow this app to install updates, then return and tap Install.",
+  "appUpdateInstallerOpened": "Continue in the Android installer. If cancelled, you can tap Install again.",
+  "appUpdateDownload": "Download update",
+  "appUpdateInstall": "Install update",
+  "appUpdateCheck": "Check for updates"
 }

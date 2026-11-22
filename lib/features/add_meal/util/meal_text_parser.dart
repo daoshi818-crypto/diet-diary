@@ -33,12 +33,14 @@ class ParsedMealItem {
   /// matches nothing is ignored, which is a far weaker failure than a wrong
   /// number. #864.
   final String? portion;
+  final bool requiresAmountConfirmation;
 
   const ParsedMealItem({
     required this.query,
     this.quantity,
     this.unit,
     this.portion,
+    this.requiresAmountConfirmation = false,
   });
 
   @override

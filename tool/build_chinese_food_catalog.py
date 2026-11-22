@@ -462,7 +462,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', required=True, type=Path)
     parser.add_argument('--output', type=Path, default=ROOT)
-    parser.add_argument('--fatsecret-update', action='append', type=Path, default=[],
+    parser.add_argument('--catalog-update', '--fatsecret-update', dest='fatsecret_update', action='append', type=Path, default=[],
                         help='Additional snapshot folder containing 全量原始.csv and 有效数据.csv; newest last')
     args = parser.parse_args()
     build(args.source_root, args.output, args.fatsecret_update)

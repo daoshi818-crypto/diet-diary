@@ -96,6 +96,7 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
       product: widget.meal,
       day: widget.day,
       intakeTypeEntity: widget.type,
+      allowMealTypeChange: widget.editingIntake == null,
       quantityTextController: _quantity,
       selectedUnit: _unit,
       usesImperialUnits: widget.usesImperialUnits,

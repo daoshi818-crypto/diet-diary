@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
 import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -46,6 +47,7 @@ class MealDetailBottomSheet extends StatefulWidget {
   final LogTray? logTray;
   final Future<void> Function(LogTrayItem)? onSelectionConfirmed;
   final String? confirmLabel;
+  final bool allowMealTypeChange;
   final Widget Function(BuildContext, Widget editor, Widget actions)?
   layoutBuilder;
 
@@ -62,6 +64,7 @@ class MealDetailBottomSheet extends StatefulWidget {
     this.logTray,
     this.onSelectionConfirmed,
     this.confirmLabel,
+    this.allowMealTypeChange = true,
     this.layoutBuilder,
   });
 
@@ -77,10 +80,12 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
   /// a second tap would pass the duplicate check again and log the meal
   /// twice.
   bool _submitting = false;
+  late IntakeTypeEntity _intakeType;
 
   @override
   void initState() {
     super.initState();
+    _intakeType = widget.intakeTypeEntity;
     widget.quantityTextController.addListener(_onQuantityChanged);
     _quantityFocusNode.addListener(_onQuantityFocusChanged);
     // "Add" or "Add to list" follows the list, which a food arriving from
@@ -242,6 +247,16 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (widget.allowMealTypeChange) ...[
+          MealTypeSelector(
+            identifier: 'food-detail-meal-type',
+            value: _intakeType,
+            onChanged: _submitting
+                ? null
+                : (type) => setState(() => _intakeType = type),
+          ),
+          const SizedBox(height: 12),
+        ],
         LayoutBuilder(
           builder: (context, constraints) {
             final quantityField = Semantics(
@@ -514,6 +529,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
       await widget.onSelectionConfirmed!(
         LogTrayItem(
           meal: widget.product,
+          intakeType: _intakeType,
           unit: storedUnit(unit),
           amount: amount,
           amountLabel: logTrayAmountLabel(
@@ -546,6 +562,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
       logTray.add(
         LogTrayItem(
           meal: widget.product,
+          intakeType: _intakeType,
           unit: storedUnit(state.selectedUnit),
           amount: double.parse(
             state.totalQuantityConverted.replaceAll(',', '.'),
@@ -575,7 +592,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
       context,
       widget.mealDetailBloc!.state.selectedUnit,
       widget.mealDetailBloc!.state.totalQuantityConverted,
-      widget.intakeTypeEntity,
+      _intakeType,
       widget.product,
       widget.day,
     );
@@ -602,7 +619,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     final getIntakeUsecase = locator<GetIntakeUsecase>();
     final List<IntakeEntity> todayIntakes;
 
-    switch (widget.intakeTypeEntity) {
+    switch (_intakeType) {
       case IntakeTypeEntity.breakfast:
         todayIntakes = await getIntakeUsecase.getBreakfastIntakeByDay(
           widget.day,

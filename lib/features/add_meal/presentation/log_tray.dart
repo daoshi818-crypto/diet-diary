@@ -1,5 +1,6 @@
 import 'package:opennutritracker/features/meal_detail/util/food_entry_policy.dart';
 import 'package:flutter/widgets.dart';
+import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
 import 'package:opennutritracker/core/utils/energy_display.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/util/portion_label.dart';
@@ -19,6 +20,7 @@ class LogTrayItem {
   final MealEntity meal;
   final String unit;
   final double amount;
+  final IntakeTypeEntity? intakeType;
 
   /// How the amount reads on screen — "1 slice", "200 g" — fixed when the
   /// item is added, because it is the user's own wording of the amount and
@@ -30,7 +32,16 @@ class LogTrayItem {
     required this.unit,
     required this.amount,
     required this.amountLabel,
+    this.intakeType,
   });
+
+  LogTrayItem withIntakeType(IntakeTypeEntity type) => LogTrayItem(
+    meal: meal,
+    unit: unit,
+    amount: amount,
+    amountLabel: amountLabel,
+    intakeType: type,
+  );
 
   /// Energy for this amount, or 0 when the food carries none.
   double get kcal => amount * (meal.nutriments.energyPerUnit ?? 0);
@@ -44,6 +55,19 @@ class LogTrayItem {
 /// button is pressed, and then all of it at once.
 class LogTray extends ChangeNotifier {
   final List<LogTrayItem> _items = [];
+  IntakeTypeEntity? defaultIntakeType;
+
+  LogTray({this.defaultIntakeType});
+
+  LogTrayItem _snapshot(LogTrayItem item) =>
+      item.intakeType == null && defaultIntakeType != null
+      ? item.withIntakeType(defaultIntakeType!)
+      : item;
+
+  void changeIntakeType(int index, IntakeTypeEntity type) {
+    _items[index] = _items[index].withIntakeType(type);
+    notifyListeners();
+  }
 
   List<LogTrayItem> get items => List.unmodifiable(_items);
 
@@ -77,12 +101,12 @@ class LogTray extends ChangeNotifier {
   double get totalKcal => _items.fold(0, (sum, item) => sum + item.kcal);
 
   void add(LogTrayItem item) {
-    _items.add(item);
+    _items.add(_snapshot(item));
     notifyListeners();
   }
 
   void addAll(Iterable<LogTrayItem> items) {
-    _items.addAll(items);
+    _items.addAll(items.map(_snapshot));
     notifyListeners();
   }
 

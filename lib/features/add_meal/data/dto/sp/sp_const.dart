@@ -102,8 +102,8 @@ class SPConst {
   /// food_source.code. Proper nouns — shown as-is in every app language.
   static const foodSourceDisplayNames = <String, String>{
     'local_cn_fct': '本地·中国食物成分表',
-    'local_calshot': '本地·吃有数食物库',
-    'local_fatsecret': '本地·FatSecret 中文快照',
+    'local_calshot': '中文营养食物库',
+    'local_fatsecret': '中文营养食物库',
     'fdc_foundation': 'FoodData Central (Foundation Foods)',
     'fdc_sr_legacy': 'FoodData Central (SR Legacy)',
     'fdc_survey': 'FoodData Central (FNDDS Survey)',

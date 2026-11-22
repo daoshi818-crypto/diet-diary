@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
 import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'dart:async';
 import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
@@ -243,6 +244,7 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
   }
 
   late BulkAddScreenArguments _args;
+  late IntakeTypeEntity _intakeType;
   bool _submitting = false;
 
   /// Whether the entry point in [_args] has been acted on. Dependencies can
@@ -320,6 +322,7 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
         ModalRoute.of(context)!.settings.arguments as BulkAddScreenArguments;
     if (!_startHandled) {
       _startHandled = true;
+      _intakeType = _args.intakeTypeEntity;
       final initialText = _args.initialText;
       if (initialText != null && initialText.trim().isNotEmpty) {
         _textController.text = initialText;
@@ -423,6 +426,19 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
           bloc: _bloc,
           builder: (context, state) => Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: MealTypeSelector(
+                  identifier: 'bulk-add-meal-type',
+                  value: _intakeType,
+                  onChanged: _submitting
+                      ? null
+                      : (type) => setState(() => _intakeType = type),
+                ),
+              ),
               Expanded(
                 child: SingleChildScrollView(
                   keyboardDismissBehavior:
@@ -1744,7 +1760,7 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (_) => QuickAddBottomSheet(
-        intakeType: _args.intakeTypeEntity,
+        intakeType: _intakeType,
         day: _args.day,
         logTray: _args.logTray,
         // The reviewed rows join the list only when the batch is confirmed,
@@ -1842,6 +1858,7 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
         for (final write in writes)
           LogTrayItem(
             meal: write.row.meal!,
+            intakeType: _intakeType,
             unit: storedUnit(write.row.effectiveUnit),
             amount: write.amount,
             amountLabel:
@@ -1877,7 +1894,7 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
           // against. #864 decision 3.
           storedUnit(write.row.effectiveUnit),
           write.amount.toString(),
-          _args.intakeTypeEntity,
+          _intakeType,
           write.row.meal!,
           _args.day,
         );

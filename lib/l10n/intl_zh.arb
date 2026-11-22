@@ -1655,5 +1655,17 @@
   "exerciseKnownCalories": "填写单次运动消耗（可选）",
   "exerciseAddCardio": "添加有氧安排",
   "exerciseAddStrength": "添加力量安排",
-  "exerciseNoSchedule": "未设置，不额外计入消耗"
+  "exerciseNoSchedule": "未设置，不额外计入消耗",
+  "appUpdateTitle": "应用更新",
+  "appUpdateCurrentVersion": "当前版本",
+  "appUpdateChecking": "正在检查更新…",
+  "appUpdateDownloading": "正在下载并校验安装包…",
+  "appUpdateFailed": "更新未完成，请检查网络后重试。",
+  "appUpdateLatest": "当前已是最新版本",
+  "appUpdateAvailable": "发现新版本",
+  "appUpdateInstallPermission": "请允许此应用安装更新，返回后点击“安装更新”。",
+  "appUpdateInstallerOpened": "请在系统安装界面继续。取消后可再次点击“安装更新”。",
+  "appUpdateDownload": "下载更新",
+  "appUpdateInstall": "安装更新",
+  "appUpdateCheck": "检查更新"
 }

@@ -47,6 +47,23 @@ class MainActivity : FlutterFragmentActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "diet-diary/app-update")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "install") {
+                    result.notImplemented()
+                } else {
+                    healthConnectScope.launch {
+                        try {
+                            result.success(AppUpdateInstaller.install(this@MainActivity, call))
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            result.error("update_install_failed", e.message, null)
+                        }
+                    }
+                }
+            }
+
         // A cold start: the launching intent is the one held by the activity.
         // Or-ing rather than assigning so an intent that arrived through
         // onNewIntent while the engine was being rebuilt is not dropped.

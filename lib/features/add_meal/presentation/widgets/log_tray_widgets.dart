@@ -1,5 +1,7 @@
+import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/energy_display.dart';
@@ -72,6 +74,7 @@ class LogTrayList extends StatelessWidget {
                   child: _LogTrayRow(
                     item: items[i],
                     onRemove: () => tray.removeAt(i),
+                    onMealChanged: (type) => tray.changeIntakeType(i, type),
                   ),
                 ),
             ],
@@ -85,8 +88,13 @@ class LogTrayList extends StatelessWidget {
 class _LogTrayRow extends StatelessWidget {
   final LogTrayItem item;
   final VoidCallback onRemove;
+  final ValueChanged<IntakeTypeEntity> onMealChanged;
 
-  const _LogTrayRow({required this.item, required this.onRemove});
+  const _LogTrayRow({
+    required this.item,
+    required this.onRemove,
+    required this.onMealChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +129,14 @@ class _LogTrayRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (item.intakeType != null) ...[
+                  MealTypeSelector(
+                    identifier: 'tray-item-meal-type',
+                    value: item.intakeType!,
+                    onChanged: onMealChanged,
+                  ),
+                  const SizedBox(height: 4),
+                ],
                 AutoSizeText(
                   item.meal.name ?? '?',
                   maxLines: 1,

@@ -94,15 +94,8 @@ class _FoodSourcesScreenState extends State<FoodSourcesScreen> {
           const Divider(height: 32),
           const ListTile(
             leading: Icon(Icons.storage_outlined),
-            title: Text('中国食物成分表'),
-          ),
-          const ListTile(
-            leading: Icon(Icons.storage_outlined),
-            title: Text('吃有数食物库'),
-          ),
-          const ListTile(
-            leading: Icon(Icons.storage_outlined),
-            title: Text('FatSecret 中文数据'),
+            title: Text('中文营养食物库'),
+            subtitle: Text('已合并同名食物并整理分量，保留品牌、生熟及烹调方式的区别。'),
           ),
           const Divider(),
           Text(s.localFoodNoBarcode),

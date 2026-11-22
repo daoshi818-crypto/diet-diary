@@ -180,7 +180,7 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
           padding: const EdgeInsets.fromLTRB(
             Dimens.spacing16,
             Dimens.spacing8,
-            Dimens.spacing12,
+            Dimens.spacing16 + Dimens.spacing12 + Dimens.hairline,
             Dimens.spacing8,
           ),
           alignment: Alignment.centerLeft,
@@ -195,7 +195,7 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
                 child: Icon(widget.listIcon, size: 20, color: accent),
               ),
               const SizedBox(width: Dimens.spacing12),
-              Flexible(
+              Expanded(
                 flex: 2,
                 child: AutoSizeText(
                   widget.title,
@@ -210,10 +210,16 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
               ),
               const SizedBox(width: Dimens.spacing8),
               if (widget.intakeList.isEmpty)
-                Text(
-                  S.of(context).loggingMealEmpty,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: palette.textMuted,
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    S.of(context).loggingMealEmpty,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
                   ),
                 ),
               if (_shouldShowHeaderSummary && widget.intakeList.isNotEmpty)
@@ -243,8 +249,13 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
                     ],
                   ),
                 ),
-              if (widget.onSortTypeChanged != null && totalKcal > 0)
-                _buildSortMenu(context),
+              if (widget.intakeList.isNotEmpty && !_shouldShowHeaderSummary)
+                const Expanded(flex: 3, child: SizedBox.shrink()),
+              if (widget.onSortTypeChanged != null)
+                SizedBox(
+                  width: 48,
+                  child: totalKcal > 0 ? _buildSortMenu(context) : null,
+                ),
               Semantics(
                 identifier: 'intake-section-add',
                 child: IconButton(
