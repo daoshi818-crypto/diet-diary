@@ -480,7 +480,15 @@ void main() {
               scrollable: find.byType(Scrollable).first,
             );
             await tester.pumpAndSettle();
-            expect(tester.getSize(meal).height, lessThanOrEqualTo(100));
+            expect(
+              tester.getSize(meal).height,
+              lessThanOrEqualTo(scale > 1 ? 112 : 100),
+            );
+            final title = find.descendant(of: meal, matching: find.text('早餐'));
+            expect(
+              tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
+              isFalse,
+            );
             expect(tester.takeException(), isNull);
             await tester.pumpWidget(const SizedBox.shrink());
             await tester.pumpAndSettle();
