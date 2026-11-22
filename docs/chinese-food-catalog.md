@@ -7,7 +7,8 @@
 在项目根目录运行 Python 3.10 或更新版本（只使用标准库）：
 
 ```powershell
-py -X utf8 tool/build_chinese_food_catalog.py --source-root 'D:\吃有数'
+py -X utf8 tool/build_chinese_food_catalog.py --source-root 'D:\吃有数' `
+  --fatsecret-update 'D:\吃有数\抓取_20261122_0214'
 ```
 
 读取以下真实输入，原文件不作修改：
@@ -16,6 +17,7 @@ py -X utf8 tool/build_chinese_food_catalog.py --source-root 'D:\吃有数'
 - `report/07_食物库_卡路里与三大营养素.csv`
 - `report/08_食物库_常用份量明细.csv`
 - `fatsecret/有效数据.csv`
+- `抓取_20261122_0214/全量原始.csv`、`有效数据.csv`：同一抓取快照；新快照覆盖旧同 key，有效表未收录的原始行隔离，不回退旧值。`--fatsecret-update` 可重复传入，较新的快照放最后。
 
 生成的文件：
 
@@ -25,6 +27,7 @@ py -X utf8 tool/build_chinese_food_catalog.py --source-root 'D:\吃有数'
 - `data/private_food_catalog/food_rejected.json`：异常/缺少关键字段的隔离记录及原因。
 - `data/private_food_catalog/food_conflicts.json`：同名营养冲突的选定来源与其他原始版本，仅用于审计，不重复显示在搜索中。
 - `data/private_food_catalog/food_name_corrections.json`：原名称、清洗后的名称与来源ID。
+- `data/private_food_catalog/food_energy_corrections.json`：源表 kcal/kJ 列反置的修正依据。
 
 清洗后的 `assets/foods/catalog.json` 随代码提交到当前私有仓库，便于自动构建；原始CSV及审计产物保留本地，不上传。程序不会在读取失败时回退远程库。
 
@@ -38,7 +41,7 @@ py -X utf8 tool/build_chinese_food_catalog.py --source-root 'D:\吃有数'
 
 份量按实际克重去重，同重量优先保留“小个/一碗”等具名份量；界面不再重复追加相同重量的克重快捷项，也不重复标注标签已有的克重。手动输入克重仍可使用。“一份”对应不同重量时显式写出克重。稳定 ID 包含来源、原始 ID、原名称、品牌与营养指纹；被合并记录的原始来源 ID 仍可解析到选定食物。
 
-每 100 克为营养基准；宏量营养用 g，钠及大多数矿物质用 mg，维生素 A 用 µg RAE。未知微量营养保留为空，不补成 0；不溶性纤维不冒充总膳食纤维。饮品源数据明确为每 100 克时不擅自换成每 100 毫升，也不猜测一碗、一杯的重量。
+每 100 克或每 100 毫升为营养基准；宏量营养用 g，钠及大多数矿物质用 mg，维生素 A 用 µg RAE。未知微量营养保留为空，不补成 0；不溶性纤维不冒充总膳食纤维。饮品源数据明确为每 100 克时不擅自换成每 100 毫升，也不猜测一碗、一杯的重量。明确每毫升的饮品保留 ml，不用克字段或假定密度换算；克重仅由热量反推的记录隔离。成分表同时提供 kcal/kJ 且两列反置时，按明确的 4.184 换算关系改用原 kcal 数值，保留修正审计，不以宏量供能估算覆盖热量。
 
 ## 旧数据与条码
 
@@ -67,7 +70,7 @@ node tool/serve_web_preview.mjs 4183
 
 ## 自动构建APK
 
-推送 `main` 或 `codex/chinese-food-catalog` 分支会运行 `Android APK` 工作流，验证目录和份量后构建签名的 release APK。工作流使用仓库加密的 Android 签名 secrets，签名文件不进入Git。构建产物 `diet-diary-apk-<运行编号>` 包含 `diet-diary.apk` 和 SHA-256 校验文件，在Actions页面下载，保留30天。
+推送 `main` 或 `codex/chinese-food-catalog` 分支会运行 `Android APK` 工作流，验证目录和份量后构建签名的 release APK。工作流使用仓库加密的 Android 签名 secrets，签名文件不进入Git。构建产物 `diet-diary-apk-<运行编号>` 包含 `diet-diary.apk`、SHA-256 校验文件和 `BUILD_INFO.json`，在Actions页面下载，保留30天；main成功构建后同步到GitHub Release。
 
 首个成功构建：Actions运行 `44857934349`，产物 `diet-diary-apk-1`。APK的SHA-256为 `f00ea808c8140fbc35c286cb41edd8a0ca38f3fa09020836acabed0e2bf416b3`；下载后已核对包内目录与仓库资产相同，签名证书与release密钥一致。
 
@@ -86,3 +89,11 @@ flutter test --no-pub --dart-define=GENERATE_FOOD_PREVIEW=true test/widget_test/
 2026-11-21 清洗修正验证：Python 5 项通过；相关 Flutter 94 项通过，真实页面截图另行启用通过；补充生成后的真实目录与演示引用回归 10 项通过（与前述部分重叠）。静态分析无问题，Web profile 构建成功。全库归一名称/品牌/单位重复为0，普通无品牌鸡蛋恰好1条；坏名称不进入目录；原始四份CSV的SHA-256不变。
 
 2026-11-21 份量整理：13,730条食物、17,868条份量，比上一版减少1,139条同重量份量；导入及界面快捷项均按重量去重，保留具名份量与手动输入。Python5项、Flutter97项相关测试通过，静态分析无问题。
+
+## 2026-11-22 更新
+
+本次抓取原始13,771条、有效表13,686条；与历史三源数据合并后为19,546条食物、23,638条分量，候选重复合并1,332条，隔离729条。包含18,067条克重食物、1,479条毫升食物；普通无品牌鸡蛋仅1条。源成分表90行kcal/kJ反列已修正。数量均以本次manifest为准。
+
+本机完整Flutter回归3,755项通过、6项跳过、0失败；静态分析无问题。Python导入与APK校验回归14+1项通过；再次生成目录逐字节一致，归一食物身份与同重量分量重复均为0。构建及发布工作流的YAML和Shell语法检查通过。
+
+构建流程采用 `gradle/actions/setup-gradle@v5` 去重保存Gradle依赖和构建状态，保留单ARM64、构建前腾出runner空间及缓存前清理中间产物。关闭公开Build Scan上传。`tool/verify_android_apk.py` 在上传前核对ARM64运行库和APK内食物目录的逐字节一致性，`BUILD_INFO.json` 随Actions产物保存。首次仍需建立Gradle缓存，不把首次构建时长当作热缓存结果。

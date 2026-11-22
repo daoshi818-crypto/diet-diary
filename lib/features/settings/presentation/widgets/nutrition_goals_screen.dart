@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:opennutritracker/core/domain/entity/user_entity.dart';
+import 'package:opennutritracker/core/utils/calc/tdee_calc.dart';
 import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/domain/usecase/get_config_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/get_user_usecase.dart';
@@ -30,8 +32,9 @@ Future<void> openNutritionGoals(BuildContext context) async {
 class NutritionGoalsData {
   final double tdee;
   final NutritionGoalPlan plan;
+  final UserEntity? user;
 
-  const NutritionGoalsData({required this.tdee, required this.plan});
+  const NutritionGoalsData({required this.tdee, required this.plan, this.user});
 }
 
 class NutritionGoalsScreen extends StatefulWidget {
@@ -47,6 +50,8 @@ class NutritionGoalsScreen extends StatefulWidget {
 class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
   final _form = GlobalKey<FormState>();
   final _energy = TextEditingController();
+  final _activityFactor = TextEditingController();
+  TdeeMethod _tdeeMethod = TdeeMethod.iom2005;
   final _weight = TextEditingController();
   final _carbs = TextEditingController();
   final _protein = TextEditingController();
@@ -84,7 +89,8 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
       );
       final plan = config.nutritionGoalSchedule.onDay(day);
       final data = NutritionGoalsData(
-        tdee: CalorieGoalCalc.getTdee(user),
+        tdee: CalorieGoalCalc.getTdee(user, plan: plan),
+        user: user,
         plan: NutritionGoalPlan(
           effectiveFrom: day,
           energyMode: plan?.energyMode ?? EnergyGoalMode.fixed,
@@ -104,6 +110,8 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
               (config.userFatGoalPct ?? MacroCalc.defaultFatsPercentageGoal) *
                   100,
           referenceWeightKg: plan?.referenceWeightKg ?? user.weightKG,
+          tdeeMethod: plan?.tdeeMethod ?? TdeeMethod.mifflinStJeor,
+          activityMultiplier: plan?.activityMultiplier ?? 1.5,
         ),
       );
       if (mounted) setState(() => _applyData(data));
@@ -120,6 +128,8 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
 
   void _applyData(NutritionGoalsData data) {
     _data = data;
+    _tdeeMethod = data.plan.tdeeMethod;
+    _activityFactor.text = _number(data.plan.activityMultiplier);
     _energyMode = data.plan.energyMode;
     _macroMode = data.plan.macroMode;
     _energy.text = _number(data.plan.energyValue);
@@ -147,11 +157,25 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
     protein: _value(_protein),
     fat: _value(_fat),
     referenceWeightKg: _value(_weight),
+    tdeeMethod: _tdeeMethod,
+    activityMultiplier: _value(_activityFactor),
   );
+
+  double get _tdee {
+    final user = _data?.user;
+    if (user == null) return _data!.tdee;
+    final plan = _plan;
+    if (!plan.activityMultiplier.isFinite ||
+        plan.activityMultiplier < 1.1 ||
+        plan.activityMultiplier > 2.5) {
+      return double.nan;
+    }
+    return CalorieGoalCalc.getTdee(user, plan: plan);
+  }
 
   void _changeMacroMode(MacroGoalMode mode) {
     final plan = _plan;
-    final calories = plan.calorieTarget(_data!.tdee);
+    final calories = plan.calorieTarget(_tdee);
     final grams = plan.macroGoals(calories);
     if (![
           grams.carbs,
@@ -191,7 +215,7 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
     setState(() => _validate = true);
     if (!_form.currentState!.validate()) return;
     var plan = _plan;
-    final calories = plan.calorieTarget(_data!.tdee);
+    final calories = plan.calorieTarget(_tdee);
     if (!plan.isValid ||
         !calories.isFinite ||
         calories <= 0 ||
@@ -317,7 +341,14 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
 
   @override
   void dispose() {
-    for (final controller in [_energy, _weight, _carbs, _protein, _fat]) {
+    for (final controller in [
+      _energy,
+      _weight,
+      _carbs,
+      _protein,
+      _fat,
+      _activityFactor,
+    ]) {
       controller.dispose();
     }
     super.dispose();
@@ -346,10 +377,10 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
       );
     }
     final plan = _plan;
-    final target = plan.calorieTarget(_data!.tdee);
+    final target = plan.calorieTarget(_tdee);
     final grams = plan.macroGoals(target);
     final validPreview = plan.isValid && target.isFinite && target > 0;
-    final difference = _data!.tdee - target;
+    final difference = _tdee - target;
     final unit = switch (_macroMode) {
       MacroGoalMode.grams => 'g',
       MacroGoalMode.percentage => '%',
@@ -357,21 +388,27 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
     };
     return Scaffold(
       appBar: AppBar(title: Text(s.nutritionGoalsTitle)),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Semantics(
-            identifier: 'goals-save',
-            child: FilledButton(
-              onPressed: _saving ? null : _save,
-              child: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text(s.goalSave),
+      bottomNavigationBar: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Semantics(
+              identifier: 'goals-save',
+              child: FilledButton(
+                onPressed: _saving ? null : _save,
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(s.goalSave),
+              ),
             ),
           ),
         ),
@@ -394,7 +431,10 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      _summary(s.goalTdeeLabel, '${_data!.tdee.round()} kcal'),
+                      _summary(
+                        s.goalTdeeLabel,
+                        _tdee.isFinite ? '${_tdee.round()} kcal' : '—',
+                      ),
                       _summary(
                         s.goalIntakeLabel,
                         validPreview ? '${target.round()} kcal' : '—',
@@ -430,6 +470,10 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+                if (_data!.user != null) ...[
+                  _buildTdeeEditor(s),
+                  const SizedBox(height: 20),
+                ],
                 _section(s.goalEnergyMode, [
                   Wrap(
                     spacing: 8,
@@ -446,14 +490,12 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
                             ),
                             selected: _energyMode == mode,
                             onSelected: (_) => setState(() {
-                              final oldTarget = _plan.calorieTarget(
-                                _data!.tdee,
-                              );
+                              final oldTarget = _plan.calorieTarget(_tdee);
                               _energyMode = mode;
                               _energy.text = _number(
                                 mode == EnergyGoalMode.fixed
                                     ? oldTarget
-                                    : _data!.tdee - oldTarget,
+                                    : _tdee - oldTarget,
                               );
                             }),
                           ),
@@ -476,7 +518,7 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
                       }
                       final result = _energyMode == EnergyGoalMode.fixed
                           ? n
-                          : _data!.tdee - n;
+                          : _tdee - n;
                       return result <= 0 || result > 20000
                           ? s.goalEnergyError
                           : null;
@@ -603,6 +645,78 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
       ),
     );
   }
+
+  Widget _buildTdeeEditor(S s) => _section(s.goalTdeeMethodTitle, [
+    Text(
+      '${_data!.user!.heightCM.round()} cm · ${_data!.user!.weightKG} kg · ${s.yearsLabel(_data!.user!.age)}',
+      style: Theme.of(context).textTheme.bodySmall,
+    ),
+    const SizedBox(height: 12),
+    Semantics(
+      identifier: 'goals-tdee-method',
+      child: DropdownButtonFormField<TdeeMethod>(
+        initialValue: _tdeeMethod,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: s.goalTdeeMethodTitle,
+          border: const OutlineInputBorder(),
+        ),
+        items: [
+          DropdownMenuItem(
+            value: TdeeMethod.mifflinStJeor,
+            child: Text(s.goalTdeeMifflin),
+          ),
+          DropdownMenuItem(
+            value: TdeeMethod.iom2005,
+            child: Text(s.goalTdeeIom),
+          ),
+        ],
+        onChanged: (method) {
+          if (method != null) setState(() => _tdeeMethod = method);
+        },
+      ),
+    ),
+    const SizedBox(height: 12),
+    if (_tdeeMethod == TdeeMethod.mifflinStJeor) ...[
+      Text(s.goalActivityFactorGuide),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final factor in [1.2, 1.35, 1.5, 1.7, 1.9])
+            Semantics(
+              identifier:
+                  'goals-factor-${factor.toString().replaceAll('.', '-')}',
+              child: ChoiceChip(
+                label: Text(factor.toString()),
+                selected: _value(_activityFactor) == factor,
+                onSelected: (_) =>
+                    setState(() => _activityFactor.text = _number(factor)),
+              ),
+            ),
+        ],
+      ),
+      const SizedBox(height: 12),
+      _field(
+        'goals-activity-factor',
+        _activityFactor,
+        s.goalActivityFactor,
+        '×',
+        (n) => !n.isFinite || n < 1.1 || n > 2.5
+            ? s.goalActivityFactorError
+            : null,
+      ),
+      const SizedBox(height: 8),
+      Text(
+        '${s.goalRestingEnergy} ${TDEECalc.restingMifflinKcal(_data!.user!).round()} kcal × ${_activityFactor.text}',
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+    ] else
+      Text(s.goalIomActivityGuide(_data!.user!.pal.getName(context))),
+    const SizedBox(height: 8),
+    Text(s.goalTdeeEstimateHint, style: Theme.of(context).textTheme.bodySmall),
+  ]);
 
   Widget _section(String title, List<Widget> children) => AppCard(
     padding: const EdgeInsets.all(16),

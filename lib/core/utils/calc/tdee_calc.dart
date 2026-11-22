@@ -4,6 +4,28 @@ import 'package:opennutritracker/core/domain/entity/user_gender_entity.dart';
 import 'package:opennutritracker/core/utils/calc/pal_calc.dart';
 
 class TDEECalc {
+  /// Mifflin et al., AJCN 1990, doi:10.1093/ajcn/51.2.241.
+  static double restingMifflinKcal(UserEntity user) {
+    final base = 10 * user.weightKG + 6.25 * user.heightCM - 5 * user.age;
+    return switch (user.gender) {
+      UserGenderEntity.male => base + 5,
+      UserGenderEntity.female => base - 161,
+      UserGenderEntity.nonBinary => switch (user.caloriesProfile ??
+          CaloriesProfileEntity.averaged) {
+        CaloriesProfileEntity.testosteroneTypical => base + 5,
+        CaloriesProfileEntity.estrogenTypical => base - 161,
+        CaloriesProfileEntity.averaged => base - 78,
+      },
+    };
+  }
+
+  static double getTDEEKcalMifflin(UserEntity user, double multiplier) {
+    if (!multiplier.isFinite || multiplier < 1.1 || multiplier > 2.5) {
+      throw ArgumentError.value(multiplier, 'multiplier');
+    }
+    return restingMifflinKcal(user) * multiplier;
+  }
+
   /// Returns the total daily energy expenditure (TDEE) of given userEntity
   /// based on 2005 IOM equation
   ///
@@ -62,7 +84,9 @@ class TDEECalc {
   /// whole content of this expression, so keep them. See
   /// `docs/tdee-iom-2005-verification.md`.
   static double iom2005MaleReferenceKcal(
-      UserEntity userEntity, double palValue) {
+    UserEntity userEntity,
+    double palValue,
+  ) {
     final paValue = PalCalc.getPAValueForFormula(
       palValue: palValue,
       isMaleFormula: true,
@@ -81,7 +105,9 @@ class TDEECalc {
   ///   TEE = 387 - (7.31 x age [y]) + PA x (10.9 x weight [kg]
   ///         + 660.7 x height [m])
   static double iom2005FemaleReferenceKcal(
-      UserEntity userEntity, double palValue) {
+    UserEntity userEntity,
+    double palValue,
+  ) {
     final paValue = PalCalc.getPAValueForFormula(
       palValue: palValue,
       isMaleFormula: false,

@@ -17,6 +17,7 @@ import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dar
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/add_meal_bloc.dart';
 import 'package:opennutritracker/features/add_meal/presentation/screens/bulk_add_screen.dart';
+import 'package:opennutritracker/features/add_meal/presentation/screens/nutrition_label_screen.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/favourite_meal_bloc.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/food_bloc.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/recent_meal_bloc.dart';
@@ -128,6 +129,24 @@ class _AddMealScreenState extends State<AddMealScreen> {
       _day = args.day;
       _isFoodLibrary = args.isFoodLibrary;
       _argumentsLoaded = true;
+      if (args.initialMeal case final meal?) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _addInitialMeal(meal),
+        );
+      }
+    }
+  }
+
+  Future<void> _addInitialMeal(MealEntity meal) async {
+    final current = _addMealBloc.state;
+    final loaded = current is AddMealLoadedState
+        ? current
+        : await _addMealBloc.stream.firstWhere(
+            (state) => state is AddMealLoadedState,
+            orElse: () => AddMealInitialState(),
+          );
+    if (mounted && loaded is AddMealLoadedState) {
+      await _onQuickAddToTray(meal, loaded.usesImperialUnits);
     }
   }
 
@@ -249,6 +268,19 @@ class _AddMealScreenState extends State<AddMealScreen> {
                                       describeOpen: _describeOpen,
                                       showAi: !_aiHidden,
                                     ),
+                                    if (!_aiHidden)
+                                      Semantics(
+                                        identifier: 'add-meal-nutrition-label',
+                                        child: TextButton.icon(
+                                          onPressed: _openNutritionLabel,
+                                          icon: const Icon(
+                                            Icons.document_scanner_outlined,
+                                          ),
+                                          label: Text(
+                                            S.of(context).labelScanTitle,
+                                          ),
+                                        ),
+                                      ),
                                   ],
                                   if (_describeOpen &&
                                       query.trim().isEmpty &&
@@ -1052,6 +1084,21 @@ class _AddMealScreenState extends State<AddMealScreen> {
     );
   }
 
+  Future<void> _openNutritionLabel() async {
+    final meal = await Navigator.of(context).push<MealEntity>(
+      MaterialPageRoute(builder: (_) => const NutritionLabelScreen()),
+    );
+    if (!mounted || meal == null) return;
+    if (_isFoodLibrary) {
+      setState(() => _source = _SearchSource.custom);
+      return;
+    }
+    final state = _addMealBloc.state;
+    if (state is AddMealLoadedState) {
+      await _onQuickAddToTray(meal, state.usesImperialUnits);
+    }
+  }
+
   /// A search result, wired to this screen's list: opening it adds there,
   /// and its + asks for an explicit amount before adding to the list.
   Widget _mealCard(MealEntity meal, bool usesImperialUnits) => MealItemCard(
@@ -1086,14 +1133,12 @@ class _AddMealScreenState extends State<AddMealScreen> {
       }
     }
     if (!mounted) return;
-    final item = await showDialog<LogTrayItem>(
+    final item = await showFoodQuantitySheet(
       context: context,
-      builder: (_) => FoodQuantityDialog(
-        meal: meal,
-        day: _day,
-        type: _mealType.getIntakeType(),
-        usesImperialUnits: usesImperialUnits,
-      ),
+      meal: meal,
+      day: _day,
+      type: _mealType.getIntakeType(),
+      usesImperialUnits: usesImperialUnits,
     );
     if (!mounted || item == null) return;
     // No snackbar: the count on the log button is the confirmation, and a
@@ -1281,8 +1326,14 @@ class AddMealScreenArguments {
   final DateTime day;
 
   final bool isFoodLibrary;
+  final MealEntity? initialMeal;
 
-  AddMealScreenArguments(this.mealType, this.day, {this.isFoodLibrary = false});
+  AddMealScreenArguments(
+    this.mealType,
+    this.day, {
+    this.isFoodLibrary = false,
+    this.initialMeal,
+  });
 }
 
 enum _SearchSource { recent, favourites, custom, all, products, food }

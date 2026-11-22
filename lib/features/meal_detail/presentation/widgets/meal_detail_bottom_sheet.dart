@@ -196,6 +196,8 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                     shrinkWrap: true,
                     itemCount: options.length,
                     itemBuilder: (context, index) => ListTile(
+                      key: ValueKey('portion-option-${options[index].id}'),
+                      leading: const Icon(Icons.straighten_rounded),
                       title: Text(options[index].label),
                       onTap: () => Navigator.of(context).pop(options[index]),
                     ),
@@ -237,7 +239,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
         : quickServingOptionsFor(
             widget.product,
             s.gramUnit,
-            includeWeightPresets: widget.onSelectionConfirmed != null,
+            includeWeightPresets: true,
           );
     final editor = Column(
       mainAxisSize: MainAxisSize.min,
@@ -308,13 +310,13 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                       widget.product,
                       selectedUnit: widget.selectedUnit,
                     ))
-                      if (counted || portionUnit(i) == widget.selectedUnit)
+                      if (portionUnit(i) == widget.selectedUnit)
                         DropdownMenuItem<String>(
                           value: portionUnit(i),
                           child: Text(
                             portionDisplayLabel(
                               widget.product.portions[i],
-                              s.gramUnit,
+                              widget.product.isLiquid ? 'ml' : s.gramUnit,
                               localizedLabel: localizeServingLabel(
                                 s,
                                 widget.product.portions[i].label,
@@ -359,30 +361,6 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
         if (options.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: [
-                for (final option in options.take(4))
-                  Semantics(
-                    identifier: 'meal-detail-chip-${option.id}',
-                    child: ChoiceChip(
-                      label: Text(option.label),
-                      selected:
-                          widget.selectedUnit == option.unit &&
-                          quantity != null &&
-                          (quantity - option.quantity).abs() < .000001,
-                      showCheckmark: false,
-                      materialTapTargetSize: MaterialTapTargetSize.padded,
-                      onSelected: (_) => _onQuickServingSelected(option),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        if (options.length > 4)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
             child: Semantics(
               identifier: 'meal-detail-more-portions',
               child: OutlinedButton.icon(

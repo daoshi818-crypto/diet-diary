@@ -42,13 +42,21 @@ void main() {
   tearDown(() async => locator.reset());
 
   group('water chip (#1306)', () {
-    testWidgets('shows progress without a separate add action', (tester) async {
+    testWidgets('shows progress and opens water logging when tapped', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         _app(const QuickWaterWidget(waterMlToday: 1500, waterGoalMl: 2000)),
       );
       expect(find.byIcon(Icons.add_rounded), findsNothing);
-      expect(find.byType(InkWell), findsNothing);
+      expect(find.byType(InkWell), findsOneWidget);
       expect(find.text(l10nEn.waterChipLabel(1500, 2000)), findsOneWidget);
+      await tester.tap(find.bySemanticsIdentifier('home-water-chip'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LogWaterDialog), findsOneWidget);
+      await tester.tap(find.bySemanticsIdentifier('log-water-save'));
+      await tester.pumpAndSettle();
+      expect(homeBloc.addedMl, [250]);
     });
 
     testWidgets('shows fl oz with imperial food units', (tester) async {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/intake_entity.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
+import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/core/utils/calc/unit_calc.dart';
 import 'package:opennutritracker/core/utils/energy_display.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
@@ -18,6 +19,7 @@ class FoodQuantityDialog extends StatefulWidget {
   final IntakeTypeEntity type;
   final bool usesImperialUnits;
   final IntakeEntity? editingIntake;
+  final bool asBottomSheet;
 
   const FoodQuantityDialog({
     super.key,
@@ -26,6 +28,7 @@ class FoodQuantityDialog extends StatefulWidget {
     required this.type,
     required this.usesImperialUnits,
     this.editingIntake,
+    this.asBottomSheet = false,
   });
 
   @override
@@ -89,6 +92,75 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
     final base = amount != null && amount.isFinite && amount > 0
         ? convertQuantityToBaseUnit(amount, _unit, widget.meal)
         : 0.0;
+    final content = MealDetailBottomSheet(
+      product: widget.meal,
+      day: widget.day,
+      intakeTypeEntity: widget.type,
+      quantityTextController: _quantity,
+      selectedUnit: _unit,
+      usesImperialUnits: widget.usesImperialUnits,
+      onQuantityOrUnitChanged: _update,
+      confirmLabel: widget.editingIntake == null
+          ? s.loggingConfirmAmount
+          : s.loggingSaveAmount,
+      onSelectionConfirmed: (item) async => Navigator.of(context).pop(item),
+      layoutBuilder: (context, editor, actions) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 8, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.meal.name ?? '?',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+                Semantics(
+                  identifier: 'food-quantity-close',
+                  child: IconButton(
+                    tooltip: s.dialogCloseLabel,
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Flexible(
+            fit: widget.asBottomSheet ? FlexFit.tight : FlexFit.loose,
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    widget.meal.nutriments.energyPerUnit == null
+                        ? '—'
+                        : EnergyDisplay.formatWithUnit(
+                            context,
+                            base * widget.meal.nutriments.energyPerUnit!,
+                          ),
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  editor,
+                ],
+              ),
+            ),
+          ),
+          actions,
+        ],
+      ),
+    );
+    if (widget.asBottomSheet) return content;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       shape: Dimens.shapeXL,
@@ -96,76 +168,44 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 480,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+          maxHeight: MediaQuery.sizeOf(context).height * .65,
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.editingIntake == null
-                          ? s.loggingChooseAmount
-                          : s.loggingEditAmount,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      widget.meal.name ?? '?',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      EnergyDisplay.formatWithUnit(
-                        context,
-                        base * (widget.meal.nutriments.energyPerUnit ?? 0),
-                      ),
-                      style: Theme.of(context).textTheme.headlineMedium
-                          ?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              MealDetailBottomSheet(
-                product: widget.meal,
-                day: widget.day,
-                intakeTypeEntity: widget.type,
-                quantityTextController: _quantity,
-                selectedUnit: _unit,
-                usesImperialUnits: widget.usesImperialUnits,
-                onQuantityOrUnitChanged: _update,
-                confirmLabel: widget.editingIntake == null
-                    ? s.loggingConfirmAmount
-                    : s.loggingSaveAmount,
-                onSelectionConfirmed: (item) async {
-                  Navigator.of(context).pop(item);
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Semantics(
-                  identifier: 'food-quantity-close',
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                    ),
-                    child: Text(s.dialogCloseLabel),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        child: content,
       ),
     );
   }
 }
+
+Future<LogTrayItem?> showFoodQuantitySheet({
+  required BuildContext context,
+  required MealEntity meal,
+  required DateTime day,
+  required IntakeTypeEntity type,
+  required bool usesImperialUnits,
+  IntakeEntity? editingIntake,
+}) => showModalBottomSheet<LogTrayItem>(
+  context: context,
+  useSafeArea: true,
+  isScrollControlled: true,
+  showDragHandle: true,
+  builder: (context) => AnimatedPadding(
+    duration: const Duration(milliseconds: 180),
+    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+    child: LayoutBuilder(
+      builder: (context, constraints) => SizedBox(
+        height: (MediaQuery.sizeOf(context).height * .56).clamp(
+          0,
+          constraints.maxHeight,
+        ),
+        child: FoodQuantityDialog(
+          meal: meal,
+          day: day,
+          type: type,
+          usesImperialUnits: usesImperialUnits,
+          editingIntake: editingIntake,
+          asBottomSheet: true,
+        ),
+      ),
+    ),
+  ),
+);

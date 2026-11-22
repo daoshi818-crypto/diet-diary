@@ -10,10 +10,90 @@ from pathlib import Path
 
 from build_chinese_food_catalog import (
     build, clean_food_name, clean_portions, close_nutrition, number,
+    fatsecret_values, metric_quantity, reference_energy,
 )
 
 
 class FoodCatalogueTest(unittest.TestCase):
+    def test_reference_energy_only_repairs_explicit_reversed_kcal_kj_columns(self):
+        self.assertEqual(reference_energy({'能量(kcal)': '221', '能量(kJ)': '53'}), (53, True))
+        self.assertEqual(reference_energy({'能量(kcal)': '116', '能量(kJ)': '486'}), (116, False))
+        self.assertEqual(reference_energy({'能量(kcal)': '200'}), (200, False))
+        self.assertEqual(reference_energy({'能量(kcal)': '500', '能量(kJ)': '50'}), (500, False))
+
+    def test_explicit_millilitres_never_use_or_infer_gram_density(self):
+        row = {'计量基准': '每1盒 (250毫升)', '基准来源': 'derived',
+               '基准克重': '275', '热量kcal': '120', '蛋白g': '5',
+               '碳水g': '16', '脂肪g': '4', '每100g_热量': '999',
+               '其他份量': '[{"name":"1瓶 (500毫升)","grams":550},{"name":"100克","grams":100}]'}
+        nutrients, unit, portions = fatsecret_values(row)
+        self.assertEqual(unit, 'ml')
+        self.assertEqual(nutrients['energy_kcal'], 48)
+        self.assertEqual(nutrients['protein_g'], 2)
+        self.assertEqual(portions, [{'label': '1瓶 (500毫升)', 'grams': 500}])
+        row['基准来源'] = 'stated'
+        self.assertEqual(fatsecret_values(row)[2][0]['grams'], 250)
+
+    def test_unknown_serving_weights_are_not_inferred_from_energy(self):
+        with self.assertRaisesRegex(ValueError, '反推'):
+            fatsecret_values({'计量基准': '每1杯', '基准克重': '244',
+                              '基准来源': 'derived', '每100g_热量': '50'})
+        self.assertEqual(metric_quantity('每1份 (15毫升)'), (15, 'ml'))
+        self.assertEqual(metric_quantity('每100 ml'), (100, 'ml'))
+        self.assertEqual(metric_quantity('每1份 (60克)'), (60, 'g'))
+        self.assertIsNone(metric_quantity('1块 (30厘米直径)'))
+        self.assertIsNone(metric_quantity('100克 / 200毫升'))
+
+    def test_volume_portions_deduplicate_without_gram_labels(self):
+        self.assertEqual(clean_portions([
+            {'label': '250 ml', 'grams': 250},
+            {'label': '一盒', 'grams': 250},
+            {'label': '250毫升', 'grams': 250},
+        ], 'ml'), [{'label': '一盒', 'grams': 250}])
+
+    def test_new_snapshot_supersedes_old_keys_and_never_restores_excluded_rows(self):
+        with tempfile.TemporaryDirectory(prefix='refresh_catalogue_') as temp:
+            root = Path(temp)
+            for name in ['report', 'fatsecret', 'new']:
+                (root / name).mkdir()
+
+            def write(path, template, rows):
+                with path.open('w', encoding='utf-8-sig', newline='') as stream:
+                    writer = csv.DictWriter(stream, fieldnames=list(template))
+                    writer.writeheader()
+                    writer.writerows(dict(template, **row) for row in rows)
+
+            write(root / 'report/13_reference.csv', {'食物编码': ''}, [])
+            write(root / 'report/07_foods.csv', {'id': ''}, [])
+            write(root / 'report/08_portions.csv', {'food_id': ''}, [])
+            template = {'key': '', '名称': '', '品牌': '', '类型': 'brand',
+                        '每100g_热量': '100', '每100g_蛋白': '2', '每100g_碳水': '14',
+                        '每100g_脂肪': '4', '基准克重': '100', '计量基准': '每100克',
+                        '其他份量': '[]'}
+            write(root / 'fatsecret/有效数据.csv', template, [
+                {'key': 'updated', '名称': '旧奶片'},
+                {'key': 'retained', '名称': '保留奶片'},
+                {'key': 'excluded', '名称': '异常奶片'},
+            ])
+            incoming = [{'key': 'updated', '名称': '新奶片', '每100g_热量': '110'},
+                        {'key': 'excluded', '名称': '异常奶片'}]
+            write(root / 'new/全量原始.csv', template, incoming)
+            write(root / 'new/有效数据.csv', template, incoming[:1])
+            originals = {p: p.read_bytes() for p in root.rglob('*.csv')}
+            with contextlib.redirect_stdout(io.StringIO()):
+                summary = build(root, root / 'out', [root / 'new'])
+            foods = json.loads((root / 'out/assets/foods/catalog.json').read_text(encoding='utf-8'))['foods']
+            self.assertEqual({food['name'] for food in foods}, {'新奶片', '保留奶片'})
+            self.assertEqual(summary['refresh_snapshots'][0]['superseded_rows'], 2)
+            self.assertEqual(summary['refresh_snapshots'][0]['excluded_rows'], 1)
+            self.assertEqual(summary['rejected_rows'], 1)
+            before = (root / 'out/assets/foods/catalog.json').read_bytes()
+            with contextlib.redirect_stdout(io.StringIO()):
+                build(root, root / 'out', [root / 'new'])
+            self.assertEqual((root / 'out/assets/foods/catalog.json').read_bytes(), before)
+            for path, content in originals.items():
+                self.assertEqual(path.read_bytes(), content)
+
     def test_dry_and_hydrated_profiles_remain_separate_with_safe_portions(self):
         with tempfile.TemporaryDirectory(prefix='preparation_catalogue_') as temp:
             root = Path(temp)

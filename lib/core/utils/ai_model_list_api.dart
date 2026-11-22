@@ -150,11 +150,12 @@ class AiModelListApi {
     try {
       final data = (jsonDecode(body) as Map<String, dynamic>)['data'];
       if (data is! List) return null;
-      return [
+      return <String>{
         for (final entry in data)
           if (entry is Map<String, dynamic>)
-            if (entry['id'] case final String id when id.isNotEmpty) id,
-      ];
+            if (entry['id'] case final String id when id.trim().isNotEmpty)
+              id.trim(),
+      }.toList();
     } catch (_) {
       return null;
     }

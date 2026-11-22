@@ -7,6 +7,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
+import 'package:opennutritracker/core/domain/entity/user_entity.dart';
+import 'package:opennutritracker/core/domain/entity/user_gender_entity.dart';
+import 'package:opennutritracker/core/domain/entity/user_pal_entity.dart';
+import 'package:opennutritracker/core/domain/entity/user_weight_goal_entity.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/app_theme.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/nutrition_goals_screen.dart';
@@ -30,6 +34,7 @@ NutritionGoalPlan _plan({MacroGoalMode mode = MacroGoalMode.perKg}) =>
 
 Widget _wrap({
   NutritionGoalPlan? plan,
+  UserEntity? user,
   double scale = 1,
   bool dark = false,
   Future<bool> Function(NutritionGoalPlan)? onSave,
@@ -48,7 +53,11 @@ Widget _wrap({
     child: RepaintBoundary(key: _capture, child: child!),
   ),
   home: NutritionGoalsScreen(
-    initialData: NutritionGoalsData(tdee: 2400, plan: plan ?? _plan()),
+    initialData: NutritionGoalsData(
+      tdee: 2400,
+      plan: plan ?? _plan(),
+      user: user,
+    ),
     onSave: onSave ?? (_) async => false,
   ),
 );
@@ -150,6 +159,53 @@ void main() {
     expect(saved!.calorieTarget(2400), 1800);
     expect(saved!.macroGoals(1800), const MacroGoals(195, 104, 45.5));
   });
+
+  testWidgets(
+    'TDEE activity factor and custom deficit update the same saved plan',
+    (tester) async {
+      final day = DateTime.now().subtract(const Duration(days: 1));
+      NutritionGoalPlan? saved;
+      await tester.pumpWidget(
+        _wrap(
+          user: UserEntity(
+            birthday: DateTime(day.year - 24, day.month, day.day),
+            heightCM: 175,
+            weightKG: 68,
+            gender: UserGenderEntity.male,
+            pal: UserPALEntity.active,
+            goal: UserWeightGoalEntity.maintainWeight,
+          ),
+          plan: NutritionGoalPlan(
+            effectiveFrom: _day,
+            energyMode: EnergyGoalMode.deficit,
+            energyValue: 400,
+            macroMode: MacroGoalMode.percentage,
+            carbs: 50,
+            protein: 25,
+            fat: 25,
+            referenceWeightKg: 68,
+            tdeeMethod: TdeeMethod.mifflinStJeor,
+            activityMultiplier: 1.5,
+          ),
+          onSave: (plan) async {
+            saved = plan;
+            return false;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('2488 kcal'), findsOneWidget);
+      expect(find.text('2088 kcal'), findsOneWidget);
+      expect(find.textContaining('记录运动不会再次增加'), findsOneWidget);
+      await _show(tester, _id('goals-activity-factor'));
+      await _screenshot(tester, 'goals-activity-factor');
+      await _edit(tester, 'goals-activity-factor', '1.35');
+      await _save(tester);
+      expect(saved!.activityMultiplier, 1.35);
+      expect(saved!.tdeeMethod, TdeeMethod.mifflinStJeor);
+      expect(saved!.energyValue, 400);
+    },
+  );
 
   testWidgets('carb correction previews grams and preserves protein and fat', (
     tester,
@@ -333,6 +389,10 @@ void main() {
         await tester.pumpAndSettle();
         await tester.ensureVisible(_id('goals-fat'));
         await tester.pumpAndSettle();
+        expect(
+          tester.getRect(_id('goals-save')).bottom,
+          lessThanOrEqualTo(640 - 280),
+        );
         expect(tester.takeException(), isNull);
         tester.view.viewInsets = FakeViewPadding.zero;
         await tester.pumpAndSettle();

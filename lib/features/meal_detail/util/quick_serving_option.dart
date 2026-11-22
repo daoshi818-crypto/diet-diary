@@ -37,19 +37,20 @@ List<QuickServingOption> quickServingOptionsFor(
 }) {
   final servingUnit = UnitDropdownItem.serving.toString();
   final gramUnit = UnitDropdownItem.g.toString();
+  final baseUnit = product.isLiquid ? UnitDropdownItem.ml.toString() : gramUnit;
+  final baseUnitLabel = product.isLiquid ? 'ml' : gramUnitLabel;
   final options = <QuickServingOption>[];
   final counted = offersCountedServings(product);
 
   if (product.portions.isNotEmpty) {
     for (final i in visiblePortionIndices(product)) {
       final portion = product.portions[i];
-      if (product.isLiquid && !counted) continue;
       options.add(
         QuickServingOption(
           id: 'portion-$i',
           quantity: counted ? 1 : portion.gramWeight,
-          unit: counted ? portionUnit(i) : gramUnit,
-          label: portionDisplayLabel(portion, gramUnitLabel),
+          unit: counted ? portionUnit(i) : baseUnit,
+          label: portionDisplayLabel(portion, baseUnitLabel),
         ),
       );
     }
@@ -123,7 +124,8 @@ List<QuickServingOption> quickServingOptionsFor(
   final weights = <int>{};
   return options.where((option) {
     double? grams;
-    if (option.unit == gramUnit) {
+    if (option.unit == gramUnit ||
+        option.unit == UnitDropdownItem.ml.toString()) {
       grams = option.quantity;
     } else if (isPortionUnit(option.unit)) {
       final index = effectivePortionIndex(option.unit);

@@ -177,7 +177,7 @@ void main() {
       }
     });
 
-    test('other hosts keep the own-server paragraph', () {
+    test('other hosts identify the custom provider or relay', () {
       final s = lookupS(const Locale('en'));
       for (final typed in [
         'https://box.local:11434/v1',
@@ -189,7 +189,12 @@ void main() {
           provider: AiProvider.ownServer,
           typedEndpoint: typed,
         );
-        expect(rendered, contains('a server you run'), reason: typed);
+        expect(
+          rendered,
+          contains('third-party provider or relay'),
+          reason: typed,
+        );
+        expect(rendered, isNot(contains('No third party')), reason: typed);
         expect(rendered, isNot(contains('Gemini')), reason: typed);
       }
     });

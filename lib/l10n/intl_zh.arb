@@ -354,7 +354,7 @@
   "gramUnit": "g",
   "heightLabel": "身高",
   "homeLabel": "主页",
-  "homeFirstMealHint": "点按 + 记录你的第一餐或运动",
+  "homeFirstMealHint": "点击右下角记录饮食",
   "homeDemoBannerLabel": "您正在查看示例数据",
   "homeDemoBannerAction": "设置您的个人资料",
   "homeDemoBannerConfirmTitle": "设置自己的个人资料？",
@@ -803,10 +803,10 @@
   "paWateraerobicsCalisthenicsDesc": "水中有氧运动，水中健美操",
   "paWrestling": "摔跤",
   "paWrestlingDesc": "一般",
-  "palActiveDescriptionLabel": "工作中大部分时间站立或行走，空闲时间活动活跃",
-  "palActiveLabel": "活跃",
-  "palLowActiveDescriptionLabel": "例如：工作中坐着或站立，空闲时间活动轻微",
-  "palLowLActiveLabel": "低活跃",
+  "palActiveDescriptionLabel": "全天有较多站立、行走或体力活动，并经常训练。办公室久坐、每周训练约3次通常不应仅凭训练次数选择此档。",
+  "palActiveLabel": "高活动",
+  "palLowActiveDescriptionLabel": "工作以坐姿为主，日常有步行或每周规律进行数次训练。请按整周的总活动量判断。",
+  "palLowLActiveLabel": "轻度活动",
   "palSedentaryDescriptionLabel": "例如：办公室工作，空闲时间大部分坐着",
   "palSedentaryLabel": "久坐",
   "palVeryActiveDescriptionLabel": "工作中大部分时间行走、跑步或负重，空闲时间活动活跃",
@@ -1228,16 +1228,16 @@
   "bulkAddModelHintLabel": "模型可以为你读取这些内容",
   "bulkAddModelHintKeyLabel": "使用你自己的 API 密钥",
   "aiConsentChangeProviderNote": "你之后可以更换服务商。每个服务商的条款都在设置中，在你使用该功能之前，你输入或拍摄的任何内容都不会被发送。",
-  "aiConsentOwnServerCheckNote": "保存你的服务器地址时，还会询问该服务器提供哪些模型，并进行一次配置检查——只发送一行固定的示例文字和一张本应用自带的示例照片，绝不会发送你自己的任何内容。",
+  "aiConsentOwnServerCheckNote": "点击“获取模型列表”时会向当前接口请求模型。保存配置后，还会用固定示例文字和本应用自带的示例照片检查能力，不会使用你的内容。",
   "aiConsentAgreeLabel": "我已了解",
-  "aiAssistDisclosureCommon": "您的日记和您的个人资料永远不会被发送。营养数值始终来自食物数据库，而非模型。密钥仅存储在本设备上：饮食日记 永远看不到它，也不会为其使用付费。",
+  "aiAssistDisclosureCommon": "日记和个人资料不会自动上传。食物匹配使用数据库营养值；营养表识别转录图片数值，需校对后保存。API Key 只存储在本机，接口费用由供应商收取。",
   "aiAssistDisclosureAnthropic": "保存密钥后，您在多项添加界面输入的文本——以及您选择在那里识别的任何照片——会发送给 Anthropic。照片仅为该次请求发送，绝不保存。",
   "aiAssistDisclosureOpenRouter": "保存密钥后，您在多项添加界面输入的文本——以及您选择在那里识别的任何照片——会发送给 OpenRouter，再由其转发给提供所选模型的服务商。OpenRouter 还会在每次请求时向该服务商转发一个账户级标识，且无法关闭。除滥用检测、安全、计费或法律合规所需外，OpenRouter 不会在转发请求之外保留您的内容。 提供所选模型的服务商会依据其自身政策保留所收到的内容。",
   "aiAssistDisclosureOpenAI": "保存密钥后，您在多项添加界面输入的文本——以及您选择在那里识别的任何照片——会发送给 OpenAI。OpenAI 会将您发送的内容保留最多 30 天以进行滥用检测；若法律要求，或为保护其服务或第三方免受损害而属合理必要，则保留更久。",
-  "aiAssistProviderOwnServerLabel": "您自己的服务器",
-  "aiAssistEndpointFieldLabel": "服务器地址",
-  "aiAssistModelFieldLabel": "模型名称",
-  "aiAssistDisclosureOwnServerSecure": "保存地址后，您在多项添加界面输入的文本，以及您选择在那里读取的任何照片，会发送到 {host}——由您自己运行的服务器。没有第三方会收到它，本项目与该机器没有任何关系，也无法就其保留内容做出任何承诺。连接是加密的。",
+  "aiAssistProviderOwnServerLabel": "自定义供应商（OpenAI 兼容）",
+  "aiAssistEndpointFieldLabel": "API 地址",
+  "aiAssistModelFieldLabel": "模型 ID（高级）",
+  "aiAssistDisclosureOwnServerSecure": "你选择通过 AI 分析的饮食文本或照片、营养表图片会发送至 {host}。如果使用第三方供应商或中转站，内容也可能转交其模型服务商，并按相应服务商的政策处理。连接已加密。",
   "@aiAssistDisclosureOwnServerSecure": {
     "placeholders": {
       "host": {
@@ -1245,7 +1245,7 @@
       }
     }
   },
-  "aiAssistDisclosureOwnServerPlaintext": "保存地址后，您在多项添加界面输入的文本，以及您选择在那里读取的任何照片，会发送到 {host}——由您自己运行的服务器。没有第三方会收到它，本项目与该机器没有任何关系，也无法就其保留内容做出任何承诺。该地址为明文 HTTP，因此连接未加密：本手机与该服务器之间网络上的任何设备都能读取所发送的内容。",
+  "aiAssistDisclosureOwnServerPlaintext": "你选择通过 AI 分析的饮食文本或照片、营养表图片会发送至 {host}。如果使用第三方供应商或中转站，内容也可能转交其模型服务商，并按相应服务商的政策处理。此 HTTP 连接未加密，传输路径上的设备可读取发送内容。",
   "@aiAssistDisclosureOwnServerPlaintext": {
     "placeholders": {
       "host": {
@@ -1254,7 +1254,7 @@
     }
   },
   "aiAssistEndpointInvalidLabel": "请输入以 http:// 或 https:// 开头的地址",
-  "aiAssistModelRequiredLabel": "请填写该服务器要使用的模型名称。",
+  "aiAssistModelRequiredLabel": "请先获取模型列表并选择一个模型",
   "aiAssistEndpointPublicPlaintextLabel": "该地址是公网地址且未加密，因此发往它的请求会被拒绝。请使用 https 或私有地址。",
   "aiAssistProbeSectionLabel": "配置检查",
   "aiAssistProbeRunningLabel": "正在检查该服务器。两项检查依次进行，最多可能需要 {minutes, plural, other{{minutes} 分钟}}——您可以关闭此窗口，回来时结果就在这里。",
@@ -1266,12 +1266,12 @@
   "aiAssistProbeNoAnswerLabel": "已检查——没有收到任何回应，因此未能了解该服务器的情况。等它启动并可访问后再试一次。",
   "aiAssistProbeTextFailedLabel": "已检查——该模型没有返回任何条目。您输入的餐食仍由离线解析器读取，您也仍可以试用。",
   "aiAssistProbePhotoFailedLabel": "已检查——该模型对照片没有返回任何条目，因此该服务器不提供照片识别。",
-  "aiAssistLoadModelsLabel": "加载模型",
-  "aiAssistPickModelLabel": "请选择模型",
-  "aiAssistModelsUnreachableLabel": "无法连接 {host}。它可能已休眠、位于其他网络，或处于未开启的 VPN 之后——请改为手动输入模型名称。",
-  "aiAssistModelsEmptyLabel": "{host} 已响应，但未列出任何模型。请手动输入模型名称。",
-  "aiAssistModelsRejectedLabel": "{host} 已响应，但返回的不是模型列表。请检查地址，或手动输入模型名称。",
-  "aiAssistModelsInsecureLabel": "未发送任何内容：该地址是公网地址且未加密。请使用 https，或手动输入模型名称。",
+  "aiAssistLoadModelsLabel": "获取模型列表",
+  "aiAssistPickModelLabel": "从获取的列表选择模型",
+  "aiAssistModelsUnreachableLabel": "无法连接 {host}，请检查地址和网络后重试。",
+  "aiAssistModelsEmptyLabel": "{host} 未返回可用模型，请确认账户权限或更换接口。",
+  "aiAssistModelsRejectedLabel": "未能获取 {host} 的模型，请检查接口地址、API Key 和模型权限后重试。",
+  "aiAssistModelsInsecureLabel": "未发送请求：公网接口需要使用 HTTPS。",
   "aiAssistProviderLabel": "服务商",
   "aiAssistModelLabel": "模型",
   "aiAssistServedByLabel": "由 {provider} 提供",
@@ -1448,7 +1448,7 @@
   "loggingMoveMeal": "修改餐次",
   "loggingMoveMealHint": "移动这条记录，保留原有用量",
   "loggingAmountInvalid": "请输入大于 0 且不超过 10000 的用量",
-  "loggingMealEmpty": "点击底部中央 + 记录餐食",
+  "loggingMealEmpty": "未记录",
   "loggingCustomFoods": "自定义食物",
   "loggingRecordTo": "餐次",
   "localFoodSourcesTitle": "本地中文食物库",
@@ -1516,8 +1516,70 @@
   "profileSettingsEntry": "应用设置",
   "goalActivityGuide": "按平常一周的活动与常规训练选择。",
   "trendDaysLabel": "{days} 天",
-  "@trendDaysLabel": {"placeholders": {"days": {"type": "int"}}},
+  "@trendDaysLabel": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
   "diaryMonthView": "月视图",
   "diaryWeekView": "周视图",
-  "goalValuesError": "请检查热量、营养素和参考体重；营养素不能全部为 0。"
+  "goalValuesError": "请检查热量、营养素和参考体重；营养素不能全部为 0。",
+  "goalTdeeMethodTitle": "TDEE 计算方式",
+  "goalTdeeMifflin": "Mifflin 公式 × 活动系数",
+  "goalTdeeIom": "IOM 2005（原有公式）",
+  "goalActivityFactor": "全天活动系数",
+  "goalActivityFactorError": "请输入 1.1–2.5 之间的活动系数",
+  "goalRestingEnergy": "基础消耗估算",
+  "goalActivityFactorGuide": "综合工作、步行和训练选择：1.2 久坐少动；1.35 少量活动；1.5 办公室工作并规律训练；1.7 全天较活跃；1.9 高强度活动。档位是起始估算，不是精确测量。",
+  "goalIomActivityGuide": "当前 IOM 档位：{category}。每周训练几次不等于全天活跃；办公室工作应同时考虑久坐时长。",
+  "goalTdeeEstimateHint": "不同公式和活动假设会产生差异。TDEE 是估算值，可结合数周体重与摄入记录调整活动系数。保存后从今天生效，历史记录保留。",
+  "@goalIomActivityGuide": {
+    "placeholders": {
+      "category": {
+        "type": "String"
+      }
+    }
+  },
+  "aiAssistCustomEndpointHint": "填写供应商的 Base URL（如 https://api.deepseek.com/v1）或完整 /chat/completions 地址；填写 API Key 后获取模型。",
+  "aiAssistManualModelAdvanced": "高级：手动输入模型 ID",
+  "aiAssistPhotoCapabilityHint": "列表包含文字模型和视觉模型。营养表识别需要图片能力，请选择支持图片输入的模型并检查。",
+  "labelScanTitle": "AI 识别营养成分表",
+  "labelScanShortTitle": "营养表识别",
+  "labelScanIntro": "拍摄清晰完整的营养表，识别后校对并保存到自定义食物。",
+  "labelScanConfigureFirst": "请先设置 AI 接口，获取模型列表并选择支持图片的模型。",
+  "labelScanDisclosure": "图片将发送至 {destination} 进行识别，请避免包含个人信息。识别结果需校对，本应用不保存原图。",
+  "labelScanGallery": "从相册选择营养表",
+  "labelScanAuthError": "接口认证失败，请检查 API Key 和权限。",
+  "labelScanBillingError": "接口余额或额度不足，请检查供应商账户。",
+  "labelScanVisionError": "此模型或接口无法识别图片，请在 AI 设置中选择视觉模型。",
+  "labelScanReadError": "无法读取营养表，请重试或换一张清晰图片。",
+  "labelScanValuesError": "请核对计量基准、能量和营养素数值，确认它们来自同一列。",
+  "labelScanSaveError": "保存失败，校对内容已保留，请重试。",
+  "labelScanSave": "保存到自定义食物",
+  "labelScanSaved": "已保存到自定义食物",
+  "labelScanSaving": "正在保存…",
+  "labelScanAgain": "重新识别",
+  "labelScanPick": "拍照 / 选择图片",
+  "labelScanAiSettings": "AI 接口设置",
+  "labelScanReading": "正在识别营养表，请稍候…",
+  "labelScanReview": "校对识别结果",
+  "labelScanFoodName": "食物名称",
+  "labelScanBrand": "品牌（选填）",
+  "labelScanBasisHint": "下列数值必须对应同一列。例如标签为“每份 30 克”，这里填 30，不要填整袋净含量。",
+  "labelScanBasis": "标签计量基准",
+  "labelScanOptional": "更多营养素（选填）",
+  "labelScanFiber": "膳食纤维",
+  "labelScanSodium": "钠",
+  "labelScanNormalizeHint": "保存时统一换算为每 100 克或每 100 毫升；千焦会换算为千卡。缺失的选填值保留未知。",
+  "labelScanRequired": "请填写可核对的有效数值或名称",
+  "quickRecordFood": "记录饮食",
+  "@labelScanDisclosure": {
+    "placeholders": {
+      "destination": {
+        "type": "String"
+      }
+    }
+  }
 }

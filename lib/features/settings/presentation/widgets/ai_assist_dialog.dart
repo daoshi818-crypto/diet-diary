@@ -128,6 +128,9 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
   final _modelFocus = FocusNode();
   final _endpointFieldKey = GlobalKey();
   final _modelFieldKey = GlobalKey();
+  final _modelSectionKey = GlobalKey();
+  final _modelErrorKey = GlobalKey();
+  bool _manualModelExpanded = false;
 
   bool _loading = true;
   bool _changed = false;
@@ -273,7 +276,6 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
     // own LAN does not get to quietly break that from a screen they may have
     // opened to change the theme. #738.
     _load();
-    _endpointFocus.addListener(_onEndpointFocusChanged);
   }
 
   /// The second half of [_revealRefusal]. OK pressed with the keyboard down
@@ -295,7 +297,9 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
     // The text fields scroll too; only the dialog's own viewport counts.
     if (notification.depth != 0) return false;
     final BuildContext? fieldContext;
-    if (_modelError != null && _modelFocus.hasFocus) {
+    if (_modelError != null && !_manualModelExpanded) {
+      fieldContext = _modelErrorKey.currentContext;
+    } else if (_modelError != null && _modelFocus.hasFocus) {
       fieldContext = _modelFieldKey.currentContext;
     } else if (_endpointError != null && _endpointFocus.hasFocus) {
       fieldContext = _endpointFieldKey.currentContext;
@@ -308,10 +312,6 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
     return false;
   }
 
-  void _onEndpointFocusChanged() {
-    if (!_endpointFocus.hasFocus) _endpointCommitted();
-  }
-
   @override
   void dispose() {
     _apiKeyController.dispose();
@@ -320,7 +320,6 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
     _scrollController.dispose();
     // Removed before the node goes, or tearing the dialog down unfocuses the
     // field and the listener answers by calling setState on a dead State.
-    _endpointFocus.removeListener(_onEndpointFocusChanged);
     _endpointFocus.dispose();
     _modelFocus.dispose();
     _ownedModelList?.close();
@@ -384,6 +383,7 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
       _model = AiModelCatalogue.resolve(provider, modelId);
       _endpointController.text = summary.endpoint ?? '';
       _modelController.text = modelId ?? '';
+      _manualModelExpanded = false;
       _unconfirmedModel = null;
       // The stored address counts as already asked-about, so returning to a
       // configured server and leaving the field alone is not a URL change.
@@ -517,38 +517,6 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
         : address;
   }
 
-  /// The user has finished with the address field.
-  ///
-  /// **A URL change is the second of the two moments a fetch may happen**
-  /// (#738), because typing an address and moving on is the user unambiguously
-  /// pointing the app at that machine. Every other moment — opening the
-  /// dialog, switching provider, coming back to a configured server — is
-  /// silent, and the guard that keeps it silent is [_lastEndpoint]: unchanged
-  /// text asks nothing, however many times focus crosses this field.
-  ///
-  /// Not on every keystroke, which would send a request to `http://h`,
-  /// `http://ht`, and every other prefix of what someone is typing.
-  void _endpointCommitted() {
-    if (!mounted || _provider != AiProvider.ownServer) return;
-    // **Leaving is not an explicit ask.** Tearing this route down takes focus
-    // off the address field, and answering that with a request would contact
-    // a machine on the user's network at the one moment they cannot see the
-    // answer. A route stops being current the moment `pop` is called, which
-    // is before it moves focus — so this catches every way out at once:
-    // Cancel, OK, and the system back button, whose own handler (#848) ends
-    // in the same `pop` and so is covered by the same check.
-    //
-    // One check rather than a flag set on each exit. A flag was tried first
-    // and could not see the back button; adding this made every one of its
-    // own writes dead, and a fifth exit would have had to remember it.
-    if (ModalRoute.of(context)?.isCurrent == false) return;
-    final resolved = AiCredentialStorage.resolveEndpoint(
-      _endpointController.text.trim(),
-    );
-    if (resolved == null || resolved == _lastEndpoint) return;
-    _loadModels();
-  }
-
   /// Asks the configured server what it has.
   ///
   /// **A picker's contents and nothing else.** `/v1/models` reports an `id`,
@@ -572,14 +540,7 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
     }
     final asking = AiCredentialStorage.resolveEndpoint(typed);
 
-    // **One request per address, not one at a time.** Finishing with the
-    // address field and pressing the button can land in the same gesture —
-    // tapping a control moves focus off the field — and two requests to
-    // somebody's server for one act is one too many. That is a statement
-    // about *this* address, though, and reading it as "busy" swallowed the
-    // next one: typing a second address while the first was still out
-    // cleared the model field, sent nothing, and then filled the picker with
-    // the first server's models under the second server's address.
+    // Ignore repeated requests for the same address while it is loading.
     if (_fetchingModels && asking == _lastEndpoint) return;
 
     // The model may belong to the address that just changed — #755's rule,
@@ -588,12 +549,6 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
     // empty with nothing to pick from, and OK refused (#1364). So the field
     // is left alone until the new server answers without it.
     //
-    // Here rather than in [_endpointCommitted], because Load models can be
-    // the first request for an edited address — the field need not lose
-    // focus first, through a semantics action for one. Tagged there only, a
-    // name kept for an earlier address stayed bound to it, the answer from
-    // this one could not settle it, and OK stored the old server's model
-    // against the new one.
     if (asking != _lastEndpoint) {
       final model = _modelController.text.trim();
       _unconfirmedModel = model.isEmpty
@@ -850,12 +805,20 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
   /// error text has been laid out. #1364: the dialog is taller than a phone,
   /// so a refusal rendered below the fold made OK look dead.
   void _revealRefusal(bool onEndpoint) {
-    final key = onEndpoint ? _endpointFieldKey : _modelFieldKey;
+    final key = onEndpoint
+        ? _endpointFieldKey
+        : _manualModelExpanded
+        ? _modelFieldKey
+        : _modelErrorKey;
     final focus = onEndpoint ? _endpointFocus : _modelFocus;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final fieldContext = key.currentContext;
       if (!mounted || fieldContext == null) return;
-      focus.requestFocus();
+      if (onEndpoint || _manualModelExpanded) {
+        focus.requestFocus();
+      } else {
+        FocusScope.of(context).unfocus();
+      }
       unawaited(
         Scrollable.ensureVisible(
           fieldContext,
@@ -978,8 +941,10 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
     return literal != null && !isPrivateDestination(literal);
   }
 
-  String _providerName(BuildContext context, AiProvider provider) =>
-      switch (provider) {
+  String _providerName(
+    BuildContext context,
+    AiProvider provider,
+  ) => switch (provider) {
     // Brand names, deliberately not localized.
     AiProvider.anthropic => 'Anthropic',
     AiProvider.openrouter => 'OpenRouter',
@@ -1084,17 +1049,15 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
                           focusNode: _endpointFocus,
                           keyboardType: TextInputType.url,
                           autocorrect: false,
-                          // Finishing with the address is the second of the
-                          // two moments a fetch may happen (#738). The focus
-                          // node covers moving on to another field; this
-                          // covers the keyboard's own done key, which never
-                          // moves focus anywhere.
-                          onSubmitted: (_) => _endpointCommitted(),
+                          onSubmitted: (_) =>
+                              FocusScope.of(context).nextFocus(),
                           decoration: InputDecoration(
                             labelText: s.aiAssistEndpointFieldLabel,
                             // A base address, which the store completes to
                             // the chat route the runtimes actually answer on.
-                            hintText: 'http://192.168.1.5:11434',
+                            hintText: 'https://api.example.com/v1',
+                            helperText: s.aiAssistCustomEndpointHint,
+                            helperMaxLines: 3,
                             errorText: _endpointError,
                             border: const OutlineInputBorder(),
                           ),
@@ -1169,9 +1132,13 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
                           enableSuggestions: false,
                           obscureText: true,
                           decoration: InputDecoration(
-                            labelText: s.aiAssistKeyFieldLabel(
-                              _providerName(context, _provider),
-                            ),
+                            labelText: s
+                                .aiAssistKeyFieldLabel(
+                                  _provider == AiProvider.ownServer
+                                      ? ''
+                                      : _providerName(context, _provider),
+                                )
+                                .trim(),
                             border: const OutlineInputBorder(),
                           ),
                         ),
@@ -1342,9 +1309,10 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
       AiModelListFailure.rejected => s.aiAssistModelsRejectedLabel(host),
       // A list did come back. Only its being empty is worth a sentence — a
       // list with entries in it speaks for itself, in the picker below.
-      null => _modelIds != null && _modelIds!.isEmpty
-          ? s.aiAssistModelsEmptyLabel(host)
-          : null,
+      null =>
+        _modelIds != null && _modelIds!.isEmpty
+            ? s.aiAssistModelsEmptyLabel(host)
+            : null,
     };
   }
 
@@ -1451,9 +1419,8 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
   _ProbeRowState _rowStateFor(AiCapability capability) => switch (capability) {
     AiCapability.passed => _ProbeRowState.passed,
     AiCapability.failed => _ProbeRowState.failed,
-    AiCapability.unknown => _probe.checked
-        ? _ProbeRowState.noAnswer
-        : _ProbeRowState.neverChecked,
+    AiCapability.unknown =>
+      _probe.checked ? _ProbeRowState.noAnswer : _ProbeRowState.neverChecked,
   };
 
   /// One capability, its verdict, and what that verdict means for the user.
@@ -1555,44 +1522,12 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
   Widget _buildModelSection(BuildContext context, S s, ThemeData theme) {
     final models = AiModelCatalogue.forProvider(_provider);
     if (models.isEmpty) {
-      // No curated list, so nothing measured to say about what the user
-      // pulled. #738: no *Recommended*, no row notes, and no `servedBy` —
-      // that line asserts a guarantee about a third party, and the whole
-      // point here is that there is not one.
-      //
-      // **The field comes first and never goes away.** #757 adds a fetch, and
-      // the fetch has a real failure mode — settings opened while the server
-      // is asleep, on another network, or behind a VPN that is off. A dialog
-      // that could only offer what it can reach would be unconfigurable
-      // exactly when someone is setting it up ahead of time, so the list
-      // fills this field in rather than replacing it: one value, typed or
-      // picked, and the picker is an input method for it rather than a rival.
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        key: _modelSectionKey,
         children: [
           _label(theme, s.aiAssistModelLabel),
-          Semantics(
-            identifier: 'ai-assist-model-field',
-            child: TextField(
-              key: _modelFieldKey,
-              controller: _modelController,
-              focusNode: _modelFocus,
-              autocorrect: false,
-              decoration: InputDecoration(
-                labelText: s.aiAssistModelFieldLabel,
-                hintText: 'gemma3:4b',
-                errorText: _modelError,
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (_) => setState(() {
-                _modelError = null;
-                _unconfirmedModel = null;
-              }),
-            ),
-          ),
-          // The **only** control that starts a fetch, alongside finishing with
-          // the address field. Never on open, never on a provider switch,
-          // never on a timer. #738.
+          // Fetch only after the user explicitly requests the model list.
           Semantics(
             identifier: 'ai-assist-load-models',
             child: TextButton.icon(
@@ -1619,42 +1554,81 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
                 ),
               ),
             ),
-          // A **dropdown**, not a row per model: an Ollama host with twenty
-          // pulled models would otherwise push the disclosure and the OK
-          // button off a phone screen, and this dialog has already overflowed
-          // once for less. One entry is an ordinary list here rather than a
-          // special case — llama.cpp serves exactly the one file it was
-          // started with, so a single-element reply is the normal shape and
-          // gets the ordinary picker.
-          if (_modelIds case final ids? when ids.isNotEmpty)
-            Semantics(
-              identifier: 'ai-assist-model-picker',
-              child: DropdownButton<String>(
-                // Long ids ellipsize instead of overflowing the dialog.
-                isExpanded: true,
-                hint: Text(s.aiAssistPickModelLabel),
-                // Null rather than a guess when the field holds something the
-                // server did not offer: a typed id is still a valid answer,
-                // and `DropdownButton` asserts on a value that is not in its
-                // items.
-                value: ids.contains(_modelController.text)
-                    ? _modelController.text
-                    : null,
-                items: [
-                  for (final id in ids)
-                    DropdownMenuItem(
-                      value: id,
-                      child: Text(
-                        id,
-                        style: theme.textTheme.bodyMedium,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+          Semantics(
+            identifier: 'ai-assist-model-picker',
+            child: DropdownButton<String>(
+              isExpanded: true,
+              hint: Text(s.aiAssistPickModelLabel),
+              value:
+                  (_modelIds ?? [_modelController.text]).contains(
+                        _modelController.text,
+                      ) &&
+                      _modelController.text.isNotEmpty
+                  ? _modelController.text
+                  : null,
+              items: [
+                for (final id
+                    in _modelIds ??
+                        [
+                          if (_modelController.text.isNotEmpty)
+                            _modelController.text,
+                        ])
+                  DropdownMenuItem(
+                    value: id,
+                    child: Text(
+                      id,
+                      style: theme.textTheme.bodyMedium,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                ],
-                onChanged: (id) => id == null ? null : _pickModel(id),
+                  ),
+              ],
+              onChanged: _modelIds == null || _fetchingModels
+                  ? null
+                  : (id) => id == null ? null : _pickModel(id),
+            ),
+          ),
+          if (_modelError != null && !_manualModelExpanded)
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _modelError!,
+                key: _modelErrorKey,
+                style: TextStyle(color: theme.colorScheme.error),
               ),
             ),
+          Text(s.aiAssistPhotoCapabilityHint, style: theme.textTheme.bodySmall),
+          const SizedBox(height: 8),
+          Semantics(
+            identifier: 'ai-assist-manual-model-advanced',
+            child: ExpansionTile(
+              key: ValueKey('manual-model-$_loadGeneration'),
+              tilePadding: EdgeInsets.zero,
+              onExpansionChanged: (expanded) =>
+                  setState(() => _manualModelExpanded = expanded),
+              title: Text(s.aiAssistManualModelAdvanced),
+              children: [
+                Semantics(
+                  identifier: 'ai-assist-model-field',
+                  child: TextField(
+                    key: _modelFieldKey,
+                    controller: _modelController,
+                    focusNode: _modelFocus,
+                    autocorrect: false,
+                    decoration: InputDecoration(
+                      labelText: s.aiAssistModelFieldLabel,
+                      errorText: _modelError,
+                      border: const OutlineInputBorder(),
+                    ),
+                    onChanged: (_) => setState(() {
+                      _modelError = null;
+                      _unconfirmedModel = null;
+                    }),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       );
     }

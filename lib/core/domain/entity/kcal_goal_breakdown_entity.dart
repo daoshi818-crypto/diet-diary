@@ -164,7 +164,7 @@ class KcalGoalBreakdownEntity extends Equatable {
     final tdeeFemale = usesFemaleSide
         ? TDEECalc.iom2005FemaleReferenceKcal(user, palValue)
         : null;
-    final tdee = TDEECalc.getTDEEKcalIOM2005(user);
+    final tdee = CalorieGoalCalc.getTdee(user, plan: plan);
 
     final baseAdjustment = CalorieGoalCalc.getKcalGoalAdjustment(
       user.goal,

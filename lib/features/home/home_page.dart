@@ -6,7 +6,6 @@ import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
 import 'package:opennutritracker/core/domain/entity/intake_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_gender_entity.dart';
-import 'package:opennutritracker/core/presentation/widgets/empty_hint.dart';
 import 'package:opennutritracker/core/presentation/widgets/low_kcal_warning_card.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/calc/calorie_goal_calc.dart';
@@ -16,7 +15,6 @@ import 'package:opennutritracker/core/domain/entity/user_activity_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/activity_vertial_list.dart';
 import 'package:opennutritracker/core/presentation/widgets/edit_activity_dialog.dart';
 import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
-import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/core/presentation/widgets/delete_dialog.dart';
 import 'package:opennutritracker/core/presentation/widgets/disclaimer_dialog.dart';
 import 'package:opennutritracker/core/domain/usecase/import_workouts_usecase.dart';
@@ -178,122 +176,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       children: [
         ListView(
           children: [
-            DashboardWidget(
-              totalKcalDaily: totalKcalDaily,
-              tdeeKcal: tdeeKcal,
-              totalKcalLeft: totalKcalLeft,
-              totalKcalSupplied: totalKcalSupplied,
-              totalKcalBurned: totalKcalBurned,
-              totalCarbsIntake: totalCarbsIntake,
-              totalFatsIntake: totalFatsIntake,
-              totalProteinsIntake: totalProteinsIntake,
-              totalCarbsGoal: totalCarbsGoal,
-              totalFatsGoal: totalFatsGoal,
-              totalProteinsGoal: totalProteinsGoal,
-            ),
-            // Day-one / empty-day guidance: when nothing is logged yet, point
-            // the way to the centre + rather than leaving a silent dashboard.
-            if (breakfastIntakeList.isEmpty &&
-                lunchIntakeList.isEmpty &&
-                dinnerIntakeList.isEmpty &&
-                snackIntakeList.isEmpty &&
-                userActivities.isEmpty)
-              EmptyHint(
-                icon: Icons.add_circle_outline_rounded,
-                title: S.of(context).homeFirstMealHint,
-              ),
-            if (CalorieGoalCalc.isBelowRecommendedDailyKcalFloor(
-              goalKcal: totalKcalDaily,
-              gender: userGender,
-              caloriesProfile: userCaloriesProfile,
-            ))
-              LowKcalWarningCard(
-                thresholdKcal: CalorieGoalCalc.recommendedDailyKcalFloor(
-                  gender: userGender,
-                  caloriesProfile: userCaloriesProfile,
-                ),
-              ),
-            // #150 follow-up: a 0% share (e.g. OMAD sets snack to 0) hides an
-            // empty section so the home view doesn't carry a header the user
-            // explicitly opted out of. A section that holds intakes always
-            // shows, so they stay editable and deletable (#1305).
-            if (IntakeVerticalList.isShown(
-              sharePct: breakfastSharePct,
-              intakes: breakfastIntakeList,
-            ))
-              IntakeVerticalList(
-                day: DateTime.now(),
-                title: S.of(context).breakfastLabel,
-                listIcon: IntakeTypeEntity.breakfast.getIconData(),
-                addMealType: AddMealType.breakfastType,
-                intakeList: breakfastIntakeList,
-                onDeleteIntakeCallback: onDeleteIntake,
-                onItemDragCallback: onIntakeItemDrag,
-                onItemTappedCallback: onIntakeItemTapped,
-                usesImperialUnits: usesImperialUnits,
-                showMealMacros: showMealMacros,
-                mealKcalTarget: breakfastKcalTarget,
-              ),
-            if (IntakeVerticalList.isShown(
-              sharePct: lunchSharePct,
-              intakes: lunchIntakeList,
-            ))
-              IntakeVerticalList(
-                day: DateTime.now(),
-                title: S.of(context).lunchLabel,
-                listIcon: IntakeTypeEntity.lunch.getIconData(),
-                addMealType: AddMealType.lunchType,
-                intakeList: lunchIntakeList,
-                onDeleteIntakeCallback: onDeleteIntake,
-                onItemDragCallback: onIntakeItemDrag,
-                onItemTappedCallback: onIntakeItemTapped,
-                usesImperialUnits: usesImperialUnits,
-                showMealMacros: showMealMacros,
-                mealKcalTarget: lunchKcalTarget,
-              ),
-            if (IntakeVerticalList.isShown(
-              sharePct: dinnerSharePct,
-              intakes: dinnerIntakeList,
-            ))
-              IntakeVerticalList(
-                day: DateTime.now(),
-                title: S.of(context).dinnerLabel,
-                addMealType: AddMealType.dinnerType,
-                listIcon: IntakeTypeEntity.dinner.getIconData(),
-                intakeList: dinnerIntakeList,
-                onDeleteIntakeCallback: onDeleteIntake,
-                onItemDragCallback: onIntakeItemDrag,
-                onItemTappedCallback: onIntakeItemTapped,
-                usesImperialUnits: usesImperialUnits,
-                showMealMacros: showMealMacros,
-                mealKcalTarget: dinnerKcalTarget,
-              ),
-            if (IntakeVerticalList.isShown(
-              sharePct: snackSharePct,
-              intakes: snackIntakeList,
-            ))
-              IntakeVerticalList(
-                day: DateTime.now(),
-                title: S.of(context).snackLabel,
-                listIcon: IntakeTypeEntity.snack.getIconData(),
-                addMealType: AddMealType.snackType,
-                intakeList: snackIntakeList,
-                onDeleteIntakeCallback: onDeleteIntake,
-                onItemDragCallback: onIntakeItemDrag,
-                onItemTappedCallback: onIntakeItemTapped,
-                usesImperialUnits: usesImperialUnits,
-                showMealMacros: showMealMacros,
-                mealKcalTarget: snackKcalTarget,
-              ),
-            if (showActivityTracking)
-              ActivityVerticalList(
-                day: DateTime.now(),
-                title: S.of(context).activityLabel,
-                userActivityList: userActivities,
-                onItemLongPressedCallback: onActivityItemLongPressed,
-                onItemTappedCallback: onActivityItemTapped,
-                onItemDragCallback: onActivityItemDrag,
-              ),
             Padding(
               padding: const EdgeInsets.fromLTRB(
                 Dimens.spacing16,
@@ -319,9 +201,114 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ],
               ),
             ),
+            DashboardWidget(
+              totalKcalDaily: totalKcalDaily,
+              tdeeKcal: tdeeKcal,
+              totalKcalLeft: totalKcalLeft,
+              totalKcalSupplied: totalKcalSupplied,
+              totalKcalBurned: totalKcalBurned,
+              totalCarbsIntake: totalCarbsIntake,
+              totalFatsIntake: totalFatsIntake,
+              totalProteinsIntake: totalProteinsIntake,
+              totalCarbsGoal: totalCarbsGoal,
+              totalFatsGoal: totalFatsGoal,
+              totalProteinsGoal: totalProteinsGoal,
+            ),
+            if (CalorieGoalCalc.isBelowRecommendedDailyKcalFloor(
+              goalKcal: totalKcalDaily,
+              gender: userGender,
+              caloriesProfile: userCaloriesProfile,
+            ))
+              LowKcalWarningCard(
+                thresholdKcal: CalorieGoalCalc.recommendedDailyKcalFloor(
+                  gender: userGender,
+                  caloriesProfile: userCaloriesProfile,
+                ),
+              ),
+            // #150 follow-up: a 0% share (e.g. OMAD sets snack to 0) hides an
+            // empty section so the home view doesn't carry a header the user
+            // explicitly opted out of. A section that holds intakes always
+            // shows, so they stay editable and deletable (#1305).
+            if (IntakeVerticalList.isShown(
+              sharePct: breakfastSharePct,
+              intakes: breakfastIntakeList,
+            ))
+              IntakeVerticalList(
+                day: _homeBloc.currentDay,
+                title: S.of(context).breakfastLabel,
+                listIcon: IntakeTypeEntity.breakfast.getIconData(),
+                addMealType: AddMealType.breakfastType,
+                intakeList: breakfastIntakeList,
+                onDeleteIntakeCallback: onDeleteIntake,
+                onItemDragCallback: onIntakeItemDrag,
+                onItemTappedCallback: onIntakeItemTapped,
+                usesImperialUnits: usesImperialUnits,
+                showMealMacros: showMealMacros,
+                mealKcalTarget: breakfastKcalTarget,
+              ),
+            if (IntakeVerticalList.isShown(
+              sharePct: lunchSharePct,
+              intakes: lunchIntakeList,
+            ))
+              IntakeVerticalList(
+                day: _homeBloc.currentDay,
+                title: S.of(context).lunchLabel,
+                listIcon: IntakeTypeEntity.lunch.getIconData(),
+                addMealType: AddMealType.lunchType,
+                intakeList: lunchIntakeList,
+                onDeleteIntakeCallback: onDeleteIntake,
+                onItemDragCallback: onIntakeItemDrag,
+                onItemTappedCallback: onIntakeItemTapped,
+                usesImperialUnits: usesImperialUnits,
+                showMealMacros: showMealMacros,
+                mealKcalTarget: lunchKcalTarget,
+              ),
+            if (IntakeVerticalList.isShown(
+              sharePct: dinnerSharePct,
+              intakes: dinnerIntakeList,
+            ))
+              IntakeVerticalList(
+                day: _homeBloc.currentDay,
+                title: S.of(context).dinnerLabel,
+                addMealType: AddMealType.dinnerType,
+                listIcon: IntakeTypeEntity.dinner.getIconData(),
+                intakeList: dinnerIntakeList,
+                onDeleteIntakeCallback: onDeleteIntake,
+                onItemDragCallback: onIntakeItemDrag,
+                onItemTappedCallback: onIntakeItemTapped,
+                usesImperialUnits: usesImperialUnits,
+                showMealMacros: showMealMacros,
+                mealKcalTarget: dinnerKcalTarget,
+              ),
+            if (IntakeVerticalList.isShown(
+              sharePct: snackSharePct,
+              intakes: snackIntakeList,
+            ))
+              IntakeVerticalList(
+                day: _homeBloc.currentDay,
+                title: S.of(context).snackLabel,
+                listIcon: IntakeTypeEntity.snack.getIconData(),
+                addMealType: AddMealType.snackType,
+                intakeList: snackIntakeList,
+                onDeleteIntakeCallback: onDeleteIntake,
+                onItemDragCallback: onIntakeItemDrag,
+                onItemTappedCallback: onIntakeItemTapped,
+                usesImperialUnits: usesImperialUnits,
+                showMealMacros: showMealMacros,
+                mealKcalTarget: snackKcalTarget,
+              ),
+            if (showActivityTracking)
+              ActivityVerticalList(
+                day: _homeBloc.currentDay,
+                title: S.of(context).activityLabel,
+                userActivityList: userActivities,
+                onItemLongPressedCallback: onActivityItemLongPressed,
+                onItemTappedCallback: onActivityItemTapped,
+                onItemDragCallback: onActivityItemDrag,
+              ),
             const FastingHomeChip(),
             const SizedBox(height: Dimens.spacing8),
-            const SizedBox(height: 48.0),
+            const SizedBox(height: 24.0),
           ],
         ),
         Align(
@@ -394,7 +381,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       builder: (context) => const DeleteDialog(),
     );
 
-    if (deleteIntake != null) {
+    if (deleteIntake == true) {
       await _homeBloc.deleteUserActivityItem(activityEntity);
       _homeBloc.add(const LoadItemsEvent());
       if (context.mounted) {
@@ -414,7 +401,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       builder: (context) => const DeleteDialog(),
     );
 
-    if (deleteIntake != null) {
+    if (deleteIntake == true) {
       // The write can wait for the tracked-day lock (#1317), and Home
       // reloads only once it is stored, so it does not show the old totals.
       await _homeBloc.deleteIntakeItem(intakeEntity);
@@ -467,15 +454,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     IntakeEntity intakeEntity,
     bool usesImperialUnits,
   ) async {
-    final changeIntakeAmount = await showDialog<LogTrayItem>(
+    final changeIntakeAmount = await showFoodQuantitySheet(
       context: context,
-      builder: (context) => FoodQuantityDialog(
-        meal: intakeEntity.meal,
-        day: intakeEntity.dateTime,
-        type: intakeEntity.type,
-        editingIntake: intakeEntity,
-        usesImperialUnits: usesImperialUnits,
-      ),
+      meal: intakeEntity.meal,
+      day: intakeEntity.dateTime,
+      type: intakeEntity.type,
+      editingIntake: intakeEntity,
+      usesImperialUnits: usesImperialUnits,
     );
     if (changeIntakeAmount != null) {
       await _homeBloc.updateIntakeItem(intakeEntity.id, {

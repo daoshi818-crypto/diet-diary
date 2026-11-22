@@ -25,6 +25,7 @@ import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments
 import 'package:opennutritracker/features/add_meal/domain/usecase/search_products_usecase.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_screen.dart';
 import 'package:opennutritracker/features/add_meal/presentation/widgets/meal_search_bar.dart';
+import 'package:opennutritracker/features/add_meal/presentation/widgets/meal_item_card.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/add_meal_bloc.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/favourite_meal_bloc.dart';
@@ -356,6 +357,13 @@ Finder _plusOn(String name) => find.descendant(
 Finder _card(String name) =>
     find.textContaining(name, findRichText: true).first;
 
+Finder _detailsOn(String name) => find.descendant(
+  of: find.byWidgetPredicate(
+    (widget) => widget is MealItemCard && widget.mealEntity.name == name,
+  ),
+  matching: find.bySemanticsIdentifier('meal-item-detail'),
+);
+
 /// Scrolls the result into view first: once the list has items, the log
 /// button takes the bottom of the screen and the results scroll above it.
 Future<void> _tapPlus(
@@ -461,7 +469,7 @@ void main() {
       await tester.ensureVisible(snack);
       await tester.tap(snack);
       await tester.pumpAndSettle();
-      await tester.tap(_card('Oats'));
+      await tester.tap(_detailsOn('Oats'));
       await tester.pumpAndSettle();
       final detail = pushed.last.arguments as MealDetailScreenArguments;
       expect(detail.intakeTypeEntity, IntakeTypeEntity.snack);
@@ -684,7 +692,11 @@ void main() {
         await _register([_meal('Oats', kcal100: 380)]);
         await _openAddMeal(tester, []);
         await _tapPlus(tester, 'Oats', confirm: false);
-        await tester.tap(find.bySemanticsIdentifier('meal-detail-chip-150g'));
+        await tester.tap(
+          find.bySemanticsIdentifier('meal-detail-more-portions'),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('portion-option-150g')));
         await tester.pumpAndSettle();
         await _confirmAmount(tester);
         await tester.tap(_logButton());
@@ -795,7 +807,7 @@ void main() {
       final pushed = <RouteSettings>[];
       await _openAddMeal(tester, pushed);
 
-      await tester.tap(_card('Oats'));
+      await tester.tap(_detailsOn('Oats'));
       await tester.pumpAndSettle();
       final detail = pushed.last.arguments as MealDetailScreenArguments;
       tester.state<NavigatorState>(find.byType(Navigator)).pop();

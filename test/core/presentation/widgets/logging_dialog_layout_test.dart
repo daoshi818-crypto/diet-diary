@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:opennutritracker/core/domain/entity/intake_entity.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/add_item_bottom_sheet.dart';
-import 'package:opennutritracker/core/presentation/widgets/floating_card_panel.dart';
 import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
 import 'package:opennutritracker/core/presentation/widgets/intake_details_dialog.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
@@ -37,7 +36,7 @@ final _meal = MealEntity(
 );
 
 void main() {
-  testWidgets('compact hub shows all five entrances on a 360x640 phone', (
+  testWidgets('compact hub shows six entrances in the lower half of a phone', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -80,13 +79,14 @@ void main() {
       'logging-food-library',
       'logging-ai-photo',
       'logging-ai-describe',
+      'logging-nutrition-label',
       'logging-hub-close',
     ]) {
       expect(id(value).hitTestable(), findsOneWidget);
     }
     expect(
       tester.getRect(id('logging-record-water')).top,
-      tester.getRect(id('logging-food-library')).top,
+      tester.getRect(id('logging-record-meal')).top,
     );
     expect(
       tester.getRect(id('logging-ai-photo')).top,
@@ -94,20 +94,15 @@ void main() {
     );
     expect(
       tester.getSize(find.byType(AddItemBottomSheet)).height,
-      lessThan(520),
+      lessThanOrEqualTo(320),
     );
-    final card = find
-        .descendant(
-          of: find.byType(FloatingCardPanel),
-          matching: find.byType(Material),
-        )
-        .first;
+    final card = find.byKey(const ValueKey('logging-hub-panel'));
     final close = id('logging-hub-close');
     expect(
-      tester.getRect(close).top - tester.getRect(card).bottom,
-      greaterThanOrEqualTo(16),
+      tester.getRect(close).top,
+      greaterThanOrEqualTo(tester.getRect(card).top),
     );
-    expect(tester.getSize(close), const Size(56, 56));
+    expect(tester.getSize(close), const Size(48, 48));
     expect(tester.takeException(), isNull);
   });
 
@@ -124,14 +119,12 @@ void main() {
             body: Builder(
               builder: (context) => TextButton(
                 onPressed: () async {
-                  final item = await showDialog<dynamic>(
+                  final item = await showFoodQuantitySheet(
                     context: context,
-                    builder: (_) => FoodQuantityDialog(
-                      meal: _meal,
-                      day: DateTime(2026, 11, 21),
-                      type: IntakeTypeEntity.lunch,
-                      usesImperialUnits: false,
-                    ),
+                    meal: _meal,
+                    day: DateTime(2026, 11, 21),
+                    type: IntakeTypeEntity.lunch,
+                    usesImperialUnits: false,
                   );
                   if (context.mounted && item != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -175,6 +168,7 @@ void main() {
           tester.view.physicalSize = size;
           addTearDown(tester.view.resetPhysicalSize);
           addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetViewInsets);
           await tester.pumpWidget(
             ChangeNotifierProvider(
               create: (_) => EnergyUnitProvider(),
@@ -205,6 +199,14 @@ void main() {
                             context: context,
                             isScrollControlled: true,
                             builder: (_) => AddItemBottomSheet(day: day),
+                          );
+                        } else if (surface == 'quantity') {
+                          showFoodQuantitySheet(
+                            context: context,
+                            meal: _meal,
+                            day: day,
+                            type: IntakeTypeEntity.lunch,
+                            usesImperialUnits: false,
                           );
                         } else {
                           showDialog<void>(
@@ -248,9 +250,19 @@ void main() {
             expect(find.text('15.0 g'), findsOneWidget);
             expect(find.text('7.5 g'), findsOneWidget);
           }
-          final close = surface == 'quantity'
-              ? find.text('关闭')
-              : find.byTooltip('关闭');
+          if (surface == 'quantity') {
+            final keyboard = size.height > 400 ? 260.0 : 140.0;
+            tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+            await tester.pumpAndSettle();
+            expect(
+              tester
+                  .getRect(find.bySemanticsIdentifier('meal-detail-add'))
+                  .bottom,
+              lessThanOrEqualTo(size.height - keyboard),
+            );
+            expect(tester.takeException(), isNull);
+          }
+          final close = find.byTooltip('关闭');
           await tester.ensureVisible(close);
           await tester.tap(close);
           await tester.pumpAndSettle();

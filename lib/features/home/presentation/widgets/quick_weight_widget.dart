@@ -48,6 +48,7 @@ class QuickWeightWidget extends StatelessWidget {
           borderRadius: Dimens.borderRadiusM,
           onTap: () => _showWeightDialog(context),
           child: Container(
+            constraints: const BoxConstraints(minHeight: 48),
             padding: const EdgeInsets.symmetric(
               horizontal: Dimens.spacing12,
               vertical: Dimens.spacing8,
@@ -66,11 +67,15 @@ class QuickWeightWidget extends StatelessWidget {
                   color: Theme.of(context).colorScheme.primary,
                 ),
                 const SizedBox(width: Dimens.spacing8),
-                Text(
-                  displayStr,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: palette.textStrong,
-                    fontWeight: FontWeight.w700,
+                Flexible(
+                  child: Text(
+                    displayStr,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: palette.textStrong,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const SizedBox(width: Dimens.spacing4),
@@ -86,10 +91,8 @@ class QuickWeightWidget extends StatelessWidget {
   Future<void> _showWeightDialog(BuildContext context) async {
     final newKg = await showDialog<double>(
       context: context,
-      builder: (context) => SetWeightDialog(
-        initialKg: weightKg,
-        unit: bodyWeightUnit,
-      ),
+      builder: (context) =>
+          SetWeightDialog(initialKg: weightKg, unit: bodyWeightUnit),
     );
 
     if (newKg == null || !context.mounted) return;

@@ -336,6 +336,27 @@ void main() {
   );
 
   test(
+    'refreshed volume foods scale in ml without a density conversion',
+    () async {
+      final actual = ChineseFoodDataSource();
+      final drink = await actual.bySourceId('fatsecret', '/热量营养/喜茶/咸酪藏茶/100毫升');
+      expect(drink.isLiquid, true);
+      expect(drink.mealUnit, 'ml');
+      expect(drink.nutriments.energyKcal100, 48);
+      expect(kcalForQuantity(250, 'ml', drink), closeTo(120, .001));
+      final sauce = await actual.bySourceId('fatsecret', '/热量营养/东古/海鲜酱油/1份');
+      expect(sauce.mealUnit, 'ml');
+      expect(kcalForQuantity(15, 'ml', sauce), closeTo(13, .001));
+      final greens = await actual.bySourceId('cn_fct', '48040');
+      expect(greens.nutriments.energyKcal100, 53);
+      for (final option in quickServingOptionsFor(sauce, '克')) {
+        expect(option.unit, 'ml');
+        expect(option.label.contains('克'), false);
+      }
+    },
+  );
+
+  test(
     'private snapshot has Chinese names, unique ids and three sources',
     () async {
       final file = File('assets/foods/catalog.json');

@@ -27,13 +27,11 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: ./.github/actions/setup-flutter-cache
-      - uses: actions/cache@v6
+      - name: Cache Gradle dependencies and build state
+        uses: gradle/actions/setup-gradle@v5
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-apk-gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
-          restore-keys: ${{ runner.os }}-apk-gradle-
+          cache-cleanup: on-success
+          build-scan-publish: false
       - uses: ./.github/actions/write-env-file
         with:
           sentry_dns: https://stub@sentry.io/0
@@ -47,6 +45,7 @@ jobs:
       - name: Check food library and nutrition goals
         run: |
           python3 tool/test_build_chinese_food_catalog.py
+          python3 tool/test_verify_android_apk.py
           flutter analyze --no-pub
           flutter test --no-pub \
             test/unit_test/chinese_food_catalog_test.dart \
@@ -59,6 +58,12 @@ jobs:
             test/unit_test/config_default_to_raw_food_units_test.dart \
             test/core/presentation/widgets/logging_dialog_layout_test.dart \
             test/unit_test/nutrition_goal_plan_test.dart \
+            test/unit_test/tdee_method_test.dart \
+            test/unit_test/nutrition_label_test.dart \
+            test/unit_test/ai_model_list_api_test.dart \
+            test/features/add_meal/presentation/nutrition_label_screen_test.dart \
+            test/features/home/presentation/home_page_layout_test.dart \
+            test/features/settings/presentation/ai_assist_dialog_test.dart \
             test/unit_test/calorie_goal_calc_test.dart \
             test/unit_test/import_goal_settings_test.dart \
             test/unit_test/import_workouts_usecase_test.dart \
@@ -92,20 +97,9 @@ jobs:
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-full-release.apk dist/diet-diary.apk
           sha256sum dist/diet-diary.apk > dist/SHA256SUMS.txt
-      - name: Verify APK architecture
+      - name: Verify APK architecture and packaged food catalog
         run: |
-          python3 - <<'PY'
-          import zipfile
-          with zipfile.ZipFile("dist/diet-diary.apk") as apk:
-              names = set(apk.namelist())
-          abis = {name.split("/")[1] for name in names if name.startswith("lib/") and name.endswith(".so")}
-          if abis != {"arm64-v8a"}:
-              raise SystemExit(f"Unexpected APK architectures: {sorted(abis)}")
-          for library in ("libapp.so", "libflutter.so"):
-              if f"lib/arm64-v8a/{library}" not in names:
-                  raise SystemExit(f"Missing ARM64 runtime library: {library}")
-          print("APK contains only ARM64 native libraries.")
-          PY
+          python3 tool/verify_android_apk.py dist/diet-diary.apk --report dist/BUILD_INFO.json
       - name: Upload APK
         uses: actions/upload-artifact@v7
         with:

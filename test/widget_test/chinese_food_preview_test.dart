@@ -71,6 +71,9 @@ class _FakeCustomMealDataSource implements CustomMealDataSource {
   final List<MealDBO> meals = [];
 
   @override
+  Stream<void> watch() => const Stream.empty();
+
+  @override
   List<MealDBO> getAllCustomMeals() => meals;
 
   @override

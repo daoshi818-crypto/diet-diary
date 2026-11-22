@@ -1,4 +1,11 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:opennutritracker/core/styles/app_theme.dart';
+import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/add_item_bottom_sheet.dart';
@@ -13,16 +20,34 @@ import '../../../helpers/test_l10n.dart';
 Finder _id(String id) => find.byWidgetPredicate(
   (w) => w is Semantics && w.properties.identifier == id,
 );
+final _capture = GlobalKey();
 
 Future<void> _open(
   WidgetTester tester, {
   bool activity = true,
+  bool dark = false,
+  double scale = 1,
+  Locale locale = const Locale('en'),
   void Function(RouteSettings)? onRoute,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
-      localizationsDelegates: const [S.delegate],
+      locale: locale,
+      localizationsDelegates: const [
+        S.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      theme: buildAppTheme(dark ? AppPalette.dark : AppPalette.light),
       supportedLocales: S.supportedLocales,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(scale),
+          disableAnimations: true,
+        ),
+        child: RepaintBoundary(key: _capture, child: child!),
+      ),
       onGenerateRoute: (settings) {
         onRoute?.call(settings);
         return MaterialPageRoute<void>(
@@ -53,8 +78,23 @@ Future<void> _open(
 }
 
 void main() {
+  setUpAll(() async {
+    if (!const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) return;
+    await (FontLoader('Nunito')..addFont(
+          File(
+            'C:/Windows/Fonts/msyh.ttc',
+          ).readAsBytes().then(ByteData.sublistView),
+        ))
+        .load();
+    final icons = Platform.environment['FOOD_PREVIEW_ICON_FONT'];
+    if (icons != null) {
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(File(icons).readAsBytes().then(ByteData.sublistView))).load();
+    }
+  });
   testWidgets(
-    'hub presents five card entrances and close; meal choices stay together',
+    'hub presents six card entrances and close; meal choices stay together',
     (tester) async {
       await _open(tester);
       for (final id in [
@@ -63,6 +103,7 @@ void main() {
         'logging-food-library',
         'logging-ai-photo',
         'logging-ai-describe',
+        'logging-nutrition-label',
         'logging-hub-close',
       ]) {
         expect(_id(id), findsOneWidget);
@@ -141,4 +182,69 @@ void main() {
     expect(find.text(l10nEn.activityLabel), findsNothing);
     expect(_id('logging-record-meal'), findsOneWidget);
   });
+
+  for (final size in [const Size(375, 667), const Size(812, 375)]) {
+    for (final dark in [false, true]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'hub stays below half screen $size dark=$dark scale=$scale',
+          (tester) async {
+            tester.view.physicalSize = size;
+            tester.view.devicePixelRatio = 1;
+            tester.view.padding = const FakeViewPadding(bottom: 24);
+            addTearDown(tester.view.reset);
+            await _open(
+              tester,
+              dark: dark,
+              scale: scale,
+              locale: const Locale('zh'),
+            );
+            final panel = tester.getRect(
+              find.byKey(const ValueKey('logging-hub-panel')),
+            );
+            expect(panel.height, lessThanOrEqualTo(size.height * .48 + 1));
+            expect(panel.top, greaterThanOrEqualTo(size.height * .45));
+            expect(panel.bottom, lessThanOrEqualTo(size.height - 24));
+            expect(tester.takeException(), isNull);
+            if (const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) {
+              await tester.runAsync(() async {
+                final folder = Directory(
+                  const String.fromEnvironment('GOAL_PREVIEW_DIR'),
+                );
+                await folder.create(recursive: true);
+                final boundary =
+                    _capture.currentContext!.findRenderObject()!
+                        as RenderRepaintBoundary;
+                final img = await boundary.toImage(pixelRatio: 1.5);
+                final data = await img.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                await File(
+                  '${folder.path}/hub-${size.width.toInt()}-$dark-$scale.png',
+                ).writeAsBytes(data!.buffer.asUint8List());
+                img.dispose();
+              });
+            }
+            for (final id in [
+              'logging-record-meal',
+              'logging-record-water',
+              'logging-nutrition-label',
+              'logging-food-library',
+              'logging-ai-photo',
+              'logging-ai-describe',
+              'add-item-recipes',
+            ]) {
+              await tester.ensureVisible(_id(id));
+              await tester.pumpAndSettle();
+              expect(_id(id).hitTestable(), findsOneWidget);
+              expect(tester.getSize(_id(id)).height, greaterThanOrEqualTo(48));
+            }
+            await tester.tap(_id('logging-hub-close'));
+            await tester.pumpAndSettle();
+            expect(find.byType(AddItemBottomSheet), findsNothing);
+          },
+        );
+      }
+    }
+  }
 }

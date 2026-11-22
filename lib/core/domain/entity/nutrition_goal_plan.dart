@@ -6,6 +6,8 @@ enum MacroGoalMode { grams, percentage, perKg }
 
 enum EnergyGoalMode { fixed, deficit }
 
+enum TdeeMethod { iom2005, mifflinStJeor }
+
 class MacroGoals extends Equatable {
   final double carbs;
   final double protein;
@@ -33,6 +35,8 @@ class NutritionGoalPlan extends Equatable {
   final double protein;
   final double fat;
   final double referenceWeightKg;
+  final TdeeMethod tdeeMethod;
+  final double activityMultiplier;
 
   const NutritionGoalPlan({
     required this.effectiveFrom,
@@ -43,6 +47,8 @@ class NutritionGoalPlan extends Equatable {
     required this.protein,
     required this.fat,
     required this.referenceWeightKg,
+    this.tdeeMethod = TdeeMethod.iom2005,
+    this.activityMultiplier = 1.5,
   });
 
   double calorieTarget(double tdee) =>
@@ -69,9 +75,11 @@ class NutritionGoalPlan extends Equatable {
       protein,
       fat,
       referenceWeightKg,
+      activityMultiplier,
     ].every((v) => v.isFinite)) {
       return false;
     }
+    if (activityMultiplier < 1.1 || activityMultiplier > 2.5) return false;
     if (referenceWeightKg <= 0 || referenceWeightKg > 1000) return false;
     if (energyMode == EnergyGoalMode.fixed &&
         (energyValue <= 0 || energyValue > 20000)) {
@@ -102,6 +110,8 @@ class NutritionGoalPlan extends Equatable {
       protein: grams.protein / divisor,
       fat: grams.fat / divisor,
       referenceWeightKg: referenceWeightKg,
+      tdeeMethod: tdeeMethod,
+      activityMultiplier: activityMultiplier,
     );
   }
 
@@ -134,6 +144,8 @@ class NutritionGoalPlan extends Equatable {
     'protein': protein,
     'fat': fat,
     'referenceWeightKg': referenceWeightKg,
+    'tdeeMethod': tdeeMethod.name,
+    'activityMultiplier': activityMultiplier,
   };
 
   factory NutritionGoalPlan.fromJson(Map<String, dynamic> json) {
@@ -158,6 +170,12 @@ class NutritionGoalPlan extends Equatable {
       protein: number('protein'),
       fat: number('fat'),
       referenceWeightKg: number('referenceWeightKg'),
+      tdeeMethod: json.containsKey('tdeeMethod')
+          ? TdeeMethod.values.byName(json['tdeeMethod'] as String)
+          : TdeeMethod.iom2005,
+      activityMultiplier: json.containsKey('activityMultiplier')
+          ? number('activityMultiplier')
+          : 1.5,
     );
     if (!plan.isValid) throw const FormatException('Invalid nutrition goals');
     return plan;
@@ -173,6 +191,8 @@ class NutritionGoalPlan extends Equatable {
     protein,
     fat,
     referenceWeightKg,
+    tdeeMethod,
+    activityMultiplier,
   ];
 }
 

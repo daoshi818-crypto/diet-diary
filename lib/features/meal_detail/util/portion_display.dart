@@ -10,7 +10,9 @@ List<int> visiblePortionIndices(MealEntity meal, {String? selectedUnit}) {
   for (var i = 0; i < meal.portions.length; i++) {
     final portion = meal.portions[i];
     final onlyWeight = RegExp(
-      r'^\s*\d+(?:\.\d+)?\s*(?:克|g|grams?)\s*$',
+      meal.isLiquid
+          ? r'^\s*\d+(?:\.\d+)?\s*(?:毫升|ml)\s*$'
+          : r'^\s*\d+(?:\.\d+)?\s*(?:克|g|grams?)\s*$',
       caseSensitive: false,
     ).hasMatch(portion.label);
     if (onlyWeight && i != selected) continue;
@@ -28,8 +30,11 @@ String portionDisplayLabel(
   String? localizedLabel,
 }) {
   final label = localizedLabel ?? portion.label;
+  final volume = gramUnitLabel == 'ml' || gramUnitLabel == '毫升';
   final mass = RegExp(
-    r'(\d+(?:\.\d+)?)\s*(?:克|g|grams?)\s*[)）]?$',
+    volume
+        ? r'(\d+(?:\.\d+)?)\s*(?:毫升|ml)\s*[)）]?$'
+        : r'(\d+(?:\.\d+)?)\s*(?:克|g|grams?)\s*[)）]?$',
     caseSensitive: false,
   ).firstMatch(label);
   if (mass != null &&

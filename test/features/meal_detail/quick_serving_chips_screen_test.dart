@@ -138,9 +138,14 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Finder chip(String id) => find.byWidgetPredicate(
-    (w) => w is Semantics && w.properties.identifier == 'meal-detail-chip-$id',
-  );
+  Future<void> selectPortion(WidgetTester tester, String id) async {
+    await tester.tap(find.bySemanticsIdentifier('meal-detail-more-portions'));
+    await tester.pumpAndSettle();
+    final item = find.byKey(ValueKey('portion-option-$id'));
+    await tester.ensureVisible(item);
+    await tester.tap(item);
+    await tester.pumpAndSettle();
+  }
 
   testWidgets(
     '0.5x on a 30 g serving lands 15 g in state.totalQuantityConverted',
@@ -152,7 +157,7 @@ void main() {
       expect(bloc!.state.selectedUnit, 'serving');
       expect(bloc!.state.totalQuantityConverted, '30.0');
 
-      await tester.tap(chip('half-serving'));
+      await selectPortion(tester, 'half-serving');
       await tester.pumpAndSettle();
 
       expect(bloc!.state.selectedUnit, 'serving');
@@ -164,7 +169,7 @@ void main() {
       'and recomputes against it', (tester) async {
     await pumpMealDetail(tester, _solidThirtyGramServing());
 
-    await tester.tap(chip('half-serving'));
+    await selectPortion(tester, 'half-serving');
     await tester.pumpAndSettle();
     expect(bloc!.state.totalQuantityConverted, '15.0');
 
@@ -186,7 +191,7 @@ void main() {
 
       expect(bloc!.state.selectedUnit, 'serving');
 
-      await tester.tap(chip('100g'));
+      await selectPortion(tester, '100g');
       await tester.pumpAndSettle();
 
       expect(bloc!.state.selectedUnit, 'g');

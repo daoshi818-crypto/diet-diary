@@ -130,6 +130,21 @@ void main() {
   });
 
   group('asking', () {
+    test(
+      'trims ids and removes duplicates while preserving server order',
+      () async {
+        final result = await AiModelListApi(
+          client: MockClient(
+            (_) async => http.Response(
+              _reply([' vision-a ', 'vision-b', 'vision-a', ' ', 'vision-b']),
+              200,
+            ),
+          ),
+        ).list(Uri.parse('https://models.example/v1/models'));
+        expect(result.ids, ['vision-a', 'vision-b']);
+        expect(result.failure, isNull);
+      },
+    );
     test('reports the ids the server listed, in the order it listed them',
         () async {
       // Order is the server's. Sorting would invent a ranking over a list

@@ -7,7 +7,6 @@ import 'package:opennutritracker/core/domain/entity/tracked_day_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_activity_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/edit_activity_dialog.dart';
 import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
-import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/calc/met_calc.dart';
 import 'package:opennutritracker/core/domain/usecase/get_user_usecase.dart';
@@ -326,15 +325,13 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
     // The day the entry is listed under now: "today" can move on while
     // the dialog is open (#1360), and the row to adjust is this one.
     final day = _selectedDate;
-    final changeIntakeAmount = await showDialog<LogTrayItem>(
+    final changeIntakeAmount = await showFoodQuantitySheet(
       context: context,
-      builder: (context) => FoodQuantityDialog(
-        meal: intakeEntity.meal,
-        day: intakeEntity.dateTime,
-        type: intakeEntity.type,
-        editingIntake: intakeEntity,
-        usesImperialUnits: usesImperialUnits,
-      ),
+      meal: intakeEntity.meal,
+      day: intakeEntity.dateTime,
+      type: intakeEntity.type,
+      editingIntake: intakeEntity,
+      usesImperialUnits: usesImperialUnits,
     );
     if (changeIntakeAmount != null) {
       await _calendarDayBloc.updateIntakeItem(intakeEntity.id, {

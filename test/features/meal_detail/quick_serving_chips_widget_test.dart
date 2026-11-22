@@ -16,12 +16,6 @@ import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_det
 import 'package:opennutritracker/features/meal_detail/presentation/widgets/meal_detail_bottom_sheet.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
-// Widget-side counterpart to `quick_serving_option_test.dart`. Drives the
-// real MealDetailBottomSheet with a scalable-serving solid product,
-// finds each chip by its stable ASCII Semantics identifier (locked in
-// via option.id — see review round on #1101), taps it, and asserts that
-// the callback fires with the paired quantity + unit for that chip.
-
 class _FakeAddIntakeUsecase extends Fake implements AddIntakeUsecase {}
 
 class _FakeAddTrackedDayUsecase extends Fake implements AddTrackedDayUsecase {}
@@ -63,7 +57,7 @@ const _nutriments = MealNutrimentsEntity(
 MealEntity _solidWithServing({List<MealPortionEntity> portions = const []}) =>
     MealEntity(
       portions: portions,
-      code: 'chip-widget-test',
+      code: 'preset-widget-test',
       name: 'Test product',
       url: null,
       mealQuantity: null,
@@ -128,6 +122,15 @@ MealEntity _riceWithPortions() => MealEntity(
   ],
 );
 
+Future<void> choosePortion(WidgetTester tester, String id) async {
+  await tester.tap(find.bySemanticsIdentifier('meal-detail-more-portions'));
+  await tester.pumpAndSettle();
+  final option = find.byKey(ValueKey('portion-option-$id'));
+  await tester.ensureVisible(option);
+  await tester.tap(option);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('a household portion fills grams and confirms that weight', (
     tester,
@@ -147,8 +150,7 @@ void main() {
       find.byType(DropdownButton<String>),
     );
     expect(menu.items!.map((i) => i.value), ['g', 'oz']);
-    await tester.tap(find.bySemanticsIdentifier('meal-detail-chip-portion-0'));
-    await tester.pumpAndSettle();
+    await choosePortion(tester, 'portion-0');
     expect(controller.text, '150');
     expect(changes, [('150', 'g')]);
     await tester.tap(find.text('Confirm amount'));
@@ -182,37 +184,35 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('renders one chip per option with a stable ASCII identifier', (
-    tester,
-  ) async {
-    final quantityController = TextEditingController(text: '1');
-
-    await _pumpSheet(
-      tester,
-      product: _solidWithServing(),
-      quantityController: quantityController,
-      onChanged: (_, _) {},
-    );
-
-    for (final id in const [
-      'half-serving',
-      'one-serving',
-      'double-serving',
-      '100g',
-    ]) {
-      expect(
-        find.byWidgetPredicate((w) {
-          if (w is! Semantics) return false;
-          return w.properties.identifier == 'meal-detail-chip-$id';
-        }),
-        findsOneWidget,
-        reason: 'chip identifier meal-detail-chip-$id',
+  testWidgets(
+    'one portion button opens all presets without duplicate presets',
+    (tester) async {
+      await _pumpSheet(
+        tester,
+        product: _solidWithServing(),
+        quantityController: TextEditingController(text: '1'),
+        onChanged: (_, _) {},
       );
-    }
-  });
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('meal-detail-more-portions'),
+        findsOneWidget,
+      );
+      await tester.tap(find.bySemanticsIdentifier('meal-detail-more-portions'));
+      await tester.pumpAndSettle();
+      for (final id in [
+        'half-serving',
+        'one-serving',
+        'double-serving',
+        '100g',
+      ]) {
+        expect(find.byKey(ValueKey('portion-option-$id')), findsOneWidget);
+      }
+    },
+  );
 
   testWidgets(
-    'tapping the 100 g chip writes 100 into the quantity field and fires the '
+    'tapping the 100 g preset writes 100 into the quantity field and fires the '
     'callback with unit=g',
     (tester) async {
       final quantityController = TextEditingController(text: '1');
@@ -229,13 +229,7 @@ void main() {
         },
       );
 
-      final chip = find.byWidgetPredicate(
-        (w) =>
-            w is Semantics &&
-            w.properties.identifier == 'meal-detail-chip-100g',
-      );
-      await tester.tap(chip);
-      await tester.pumpAndSettle();
+      await choosePortion(tester, '100g');
 
       expect(quantityController.text, '100');
       expect(cbQuantity, '100');
@@ -244,7 +238,7 @@ void main() {
   );
 
   testWidgets(
-    'tapping the 1× chip writes 1 into the quantity field and fires the '
+    'tapping the 1× preset writes 1 into the quantity field and fires the '
     'callback with unit=serving',
     (tester) async {
       final quantityController = TextEditingController(text: '30');
@@ -262,13 +256,7 @@ void main() {
         initialUnit: 'g',
       );
 
-      final chip = find.byWidgetPredicate(
-        (w) =>
-            w is Semantics &&
-            w.properties.identifier == 'meal-detail-chip-one-serving',
-      );
-      await tester.tap(chip);
-      await tester.pumpAndSettle();
+      await choosePortion(tester, 'one-serving');
 
       expect(quantityController.text, '1');
       expect(cbQuantity, '1');
@@ -277,7 +265,7 @@ void main() {
   );
 
   testWidgets(
-    'tapping the 0.5× chip writes 0.5 (not 1 or 0) into the quantity field',
+    'tapping the 0.5× preset writes 0.5 (not 1 or 0) into the quantity field',
     (tester) async {
       final quantityController = TextEditingController(text: '1');
       String? cbQuantity;
@@ -293,13 +281,7 @@ void main() {
         },
       );
 
-      final chip = find.byWidgetPredicate(
-        (w) =>
-            w is Semantics &&
-            w.properties.identifier == 'meal-detail-chip-half-serving',
-      );
-      await tester.tap(chip);
-      await tester.pumpAndSettle();
+      await choosePortion(tester, 'half-serving');
 
       expect(quantityController.text, '0.5');
       expect(cbQuantity, '0.5');
@@ -402,9 +384,12 @@ void main() {
         onChanged: (_, _) {},
         onConfirm: (item) async => result = item,
       );
-      expect(find.bySemanticsIdentifier('meal-detail-chip-50g'), findsNothing);
       expect(
-        find.bySemanticsIdentifier('meal-detail-chip-portion-1'),
+        find.bySemanticsIdentifier('meal-detail-preset-50g'),
+        findsNothing,
+      );
+      expect(
+        find.bySemanticsIdentifier('meal-detail-preset-portion-1'),
         findsNothing,
       );
       final dropdown = tester.widget<DropdownButton<String>>(
@@ -484,9 +469,7 @@ void main() {
       find.byType(DropdownButton<String>),
     );
     expect(menu.items!.where((item) => item.value == 'serving'), isEmpty);
-    expect(
-      menu.items!.where((item) => item.value == 'serving#1'),
-      hasLength(1),
-    );
+    expect(menu.items!.where((item) => item.value == 'serving#1'), isEmpty);
+    await choosePortion(tester, 'portion-1');
   });
 }

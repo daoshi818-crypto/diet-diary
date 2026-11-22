@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
 import 'package:opennutritracker/core/domain/entity/kcal_goal_breakdown_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_gender_entity.dart';
@@ -155,7 +156,9 @@ class _InputsCard extends StatelessWidget {
         ),
         _ValueRow(
           label: l10n.activityLabel,
-          value: breakdown.palCategory.getName(context),
+          value: breakdown.plan?.tdeeMethod == TdeeMethod.mifflinStJeor
+              ? '× ${breakdown.plan!.activityMultiplier.toStringAsFixed(2)}'
+              : breakdown.palCategory.getName(context),
         ),
         _ValueRow(
           label: l10n.goalLabel,
@@ -196,6 +199,39 @@ class _TdeeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = S.of(context);
+    if (breakdown.plan?.tdeeMethod == TdeeMethod.mifflinStJeor) {
+      final factor = breakdown.plan!.activityMultiplier;
+      return _SectionCard(
+        title: l10n.kcalGoalInfoTdeeSection,
+        children: [
+          Text(l10n.goalTdeeMifflin),
+          const SizedBox(height: 12),
+          _ValueRow(
+            label: l10n.goalRestingEnergy,
+            value: EnergyDisplay.formatWithUnit(
+              context,
+              breakdown.tdeeKcal / factor,
+            ),
+          ),
+          _ValueRow(
+            label: l10n.goalActivityFactor,
+            value: factor.toStringAsFixed(2),
+          ),
+          const Divider(height: 24),
+          _ValueRow(
+            label: l10n.goalTdeeLabel,
+            value: EnergyDisplay.formatWithUnit(context, breakdown.tdeeKcal),
+          ),
+          const SizedBox(height: 8),
+          Text(l10n.goalActivityIncluded),
+          const SizedBox(height: 8),
+          Text(
+            l10n.goalTdeeEstimateHint,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      );
+    }
     return _SectionCard(
       title: l10n.kcalGoalInfoTdeeSection,
       children: [

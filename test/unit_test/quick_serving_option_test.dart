@@ -47,6 +47,32 @@ MealEntity _meal({
 }
 
 void main() {
+  test('volume portions fill ml and never append a gram label', () {
+    final drink = MealEntity(
+      code: 'local-volume',
+      name: '茶饮',
+      url: null,
+      mealQuantity: '100',
+      mealUnit: 'ml',
+      servingQuantity: null,
+      servingUnit: 'ml',
+      servingSize: null,
+      nutriments: _nutriments,
+      source: MealSourceEntity.fdc,
+      portions: const [
+        MealPortionEntity(label: '100毫升', gramWeight: 100, localized: true),
+        MealPortionEntity(label: '一杯（250毫升）', gramWeight: 250, localized: true),
+        MealPortionEntity(label: '一杯', gramWeight: 250, localized: true),
+      ],
+    );
+    final options = quickServingOptionsFor(drink, '克');
+    expect(options, hasLength(1));
+    expect(options.single.unit, 'ml');
+    expect(options.single.quantity, 250);
+    expect(options.single.label.contains('克'), false);
+    expect(options.single.label, '一杯（250毫升）');
+  });
+
   test('count entry is limited to packaged food and saved recipe servings', () {
     MealEntity product(
       MealSourceEntity source,

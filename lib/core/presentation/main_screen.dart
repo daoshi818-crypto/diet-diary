@@ -1,3 +1,6 @@
+import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
+import 'package:opennutritracker/features/home/presentation/widgets/log_water_dialog.dart';
+import 'package:opennutritracker/features/add_meal/presentation/add_meal_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/usecase/get_config_usecase.dart';
 import 'package:opennutritracker/core/presentation/widgets/add_item_bottom_sheet.dart';
@@ -136,68 +139,147 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      floatingActionButton: Semantics(
-        identifier: 'fab-add-item',
-        child: FloatingActionButton(
-          onPressed: () => _onFabPressed(context),
-          tooltip: S.of(context).addLabel,
-          child: const Icon(Icons.add, size: 30),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+      floatingActionButton: _selectedPageIndex == 0
+          ? null
+          : Semantics(
+              identifier: 'fab-add-item',
+              child: SizedBox.square(
+                dimension: 48,
+                child: FloatingActionButton.small(
+                  onPressed: () => _onFabPressed(context),
+                  tooltip: S.of(context).addLabel,
+                  child: const Icon(Icons.add),
+                ),
+              ),
+            ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomAppBar(
         color: palette.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        height: 78,
+        height:
+            78 +
+            (_selectedPageIndex == 0 ? 60 : 0) +
+            (MediaQuery.textScalerOf(context).scale(12) - 12).clamp(0, 24),
         padding: EdgeInsets.zero,
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8,
-        child: Row(
+
+        child: Column(
           children: [
-            _NavItem(
-              id: 'nav-home',
-              icon: Icons.home_outlined,
-              selectedIcon: Icons.home_rounded,
-              label: S.of(context).homeLabel,
-              index: 0,
-              selectedIndex: _selectedPageIndex,
-              palette: palette,
-              onTap: _setPage,
-            ),
-            _NavItem(
-              id: 'nav-diary',
-              icon: Icons.book_outlined,
-              selectedIcon: Icons.book_rounded,
-              label: S.of(context).diaryLabel,
-              index: 1,
-              selectedIndex: _selectedPageIndex,
-              palette: palette,
-              onTap: _setPage,
-            ),
-            const SizedBox(width: 64), // notch gap for the centre Add FAB
-            _NavItem(
-              id: 'nav-trends',
-              icon: Icons.insights_outlined,
-              selectedIcon: Icons.insights_rounded,
-              label: S.of(context).trendsLabel,
-              index: 2,
-              selectedIndex: _selectedPageIndex,
-              palette: palette,
-              onTap: _setPage,
-            ),
-            _NavItem(
-              id: 'nav-you',
-              icon: Icons.account_circle_outlined,
-              selectedIcon: Icons.account_circle_rounded,
-              label: S.of(context).youLabel,
-              index: 3,
-              selectedIndex: _selectedPageIndex,
-              palette: palette,
-              onTap: _setPage,
+            if (_selectedPageIndex == 0) _homeQuickActions(context),
+            Expanded(
+              child: Row(
+                children: [
+                  _NavItem(
+                    id: 'nav-home',
+                    icon: Icons.home_outlined,
+                    selectedIcon: Icons.home_rounded,
+                    label: S.of(context).homeLabel,
+                    index: 0,
+                    selectedIndex: _selectedPageIndex,
+                    palette: palette,
+                    onTap: _setPage,
+                  ),
+                  _NavItem(
+                    id: 'nav-diary',
+                    icon: Icons.book_outlined,
+                    selectedIcon: Icons.book_rounded,
+                    label: S.of(context).diaryLabel,
+                    index: 1,
+                    selectedIndex: _selectedPageIndex,
+                    palette: palette,
+                    onTap: _setPage,
+                  ),
+                  _NavItem(
+                    id: 'nav-trends',
+                    icon: Icons.insights_outlined,
+                    selectedIcon: Icons.insights_rounded,
+                    label: S.of(context).trendsLabel,
+                    index: 2,
+                    selectedIndex: _selectedPageIndex,
+                    palette: palette,
+                    onTap: _setPage,
+                  ),
+                  _NavItem(
+                    id: 'nav-you',
+                    icon: Icons.account_circle_outlined,
+                    selectedIcon: Icons.account_circle_rounded,
+                    label: S.of(context).youLabel,
+                    index: 3,
+                    selectedIndex: _selectedPageIndex,
+                    palette: palette,
+                    onTap: _setPage,
+                  ),
+                ],
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _homeQuickActions(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            S.of(context).loggingHubTitle,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+        ),
+        Semantics(
+          identifier: 'home-quick-water',
+          child: SizedBox.square(
+            dimension: 48,
+            child: IconButton.filledTonal(
+              tooltip: S.of(context).logWaterDialogTitle,
+              onPressed: _openWater,
+              icon: const Icon(Icons.water_drop_rounded),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Semantics(
+          identifier: 'home-quick-food',
+          child: SizedBox.square(
+            dimension: 48,
+            child: IconButton.filled(
+              tooltip: S.of(context).quickRecordFood,
+              onPressed: _openFood,
+              icon: const Icon(Icons.restaurant_rounded),
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Future<void> _openWater() async {
+    final config = await locator<GetConfigUsecase>().getConfig();
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (_) =>
+          LogWaterDialog(usesImperialUnits: config.usesImperialFoodUnits),
+    );
+  }
+
+  Future<void> _openFood() async {
+    final config = await locator<GetConfigUsecase>().getConfig();
+    if (!mounted) return;
+    await Navigator.of(context).pushNamed(
+      NavigationOptions.addMealRoute,
+      arguments: AddMealScreenArguments(
+        AddMealExtension.fromIntakeTypeEntity(
+          MealTypeSuggester.suggestFromTime(
+            DateTime.now(),
+            mealSharesPct: config.mealKcalSharesPct,
+          ),
+        ),
+        locator<HomeBloc>().currentDay,
       ),
     );
   }
@@ -265,6 +347,7 @@ class _NavItem extends StatelessWidget {
     return Expanded(
       child: Semantics(
         identifier: id,
+        container: true,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: () => onTap(index),
@@ -277,6 +360,8 @@ class _NavItem extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(
                     context,
                   ).textTheme.labelSmall?.copyWith(color: color),

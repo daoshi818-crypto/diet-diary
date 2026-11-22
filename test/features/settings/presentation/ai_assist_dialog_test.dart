@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:opennutritracker/core/styles/app_palette.dart';
+import 'package:opennutritracker/core/styles/app_theme.dart';
 import 'package:opennutritracker/core/utils/ai_credential_storage.dart';
 import 'package:opennutritracker/core/utils/ai_model_catalogue.dart';
 import 'package:opennutritracker/core/utils/ai_model_list_api.dart';
@@ -164,7 +168,9 @@ class _Server {
     (_) => http.Response(
       jsonEncode({
         'object': 'list',
-        'data': [for (final id in ids) {'id': id, 'object': 'model'}],
+        'data': [
+          for (final id in ids) {'id': id, 'object': 'model'},
+        ],
       }),
       200,
     ),
@@ -185,13 +191,20 @@ class _Server {
   );
 }
 
+final _aiCapture = GlobalKey();
+
 Widget _app(
   AiCredentialStorage storage, {
   Locale? locale,
   AiModelListApi? modelList,
   AiEndpointProbeRunner? probeRunner,
+  ThemeData? theme,
 }) => MaterialApp(
   locale: locale,
+  theme: theme,
+  builder: const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')
+      ? (context, child) => RepaintBoundary(key: _aiCapture, child: child!)
+      : null,
   localizationsDelegates: const [
     S.delegate,
     GlobalMaterialLocalizations.delegate,
@@ -211,29 +224,64 @@ Widget _app(
 /// The dialog on a real dialog route, behind an `open` button, where a
 /// keyboard inset is what shrinks its scroll viewport — [_app] puts it in a
 /// Scaffold body, which no inset reaches.
-Widget _routeApp(
-  AiCredentialStorage storage, {
-  AiModelListApi? modelList,
-}) => MaterialApp(
-  localizationsDelegates: const [
-    S.delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ],
-  supportedLocales: S.supportedLocales,
-  home: Builder(
-    builder: (context) => Scaffold(
-      body: TextButton(
-        onPressed: () =>
-            AiAssistDialog.show(context, storage, modelList: modelList),
-        child: const Text('open'),
+Widget _routeApp(AiCredentialStorage storage, {AiModelListApi? modelList}) =>
+    MaterialApp(
+      localizationsDelegates: const [
+        S.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: S.supportedLocales,
+      home: Builder(
+        builder: (context) => Scaffold(
+          body: TextButton(
+            onPressed: () =>
+                AiAssistDialog.show(context, storage, modelList: modelList),
+            child: const Text('open'),
+          ),
+        ),
       ),
-    ),
-  ),
-);
+    );
+
+Future<Finder> manualModelField(WidgetTester tester) async {
+  final field = find.bySemanticsIdentifier('ai-assist-model-field');
+  if (field.evaluate().isEmpty) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump(const Duration(milliseconds: 300));
+    final advanced = find.bySemanticsIdentifier(
+      'ai-assist-manual-model-advanced',
+    );
+    final title = find
+        .descendant(of: advanced, matching: find.byType(ListTile))
+        .first;
+    await tester.ensureVisible(title);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(title);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+  }
+  await tester.ensureVisible(field);
+  await tester.pump();
+  return field;
+}
 
 void main() {
+  setUpAll(() async {
+    if (!const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) return;
+    await (FontLoader('Nunito')..addFont(
+          File(
+            'C:/Windows/Fonts/msyh.ttc',
+          ).readAsBytes().then(ByteData.sublistView),
+        ))
+        .load();
+    final icons = Platform.environment['FOOD_PREVIEW_ICON_FONT'];
+    if (icons != null) {
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(File(icons).readAsBytes().then(ByteData.sublistView))).load();
+    }
+  });
   late _MemoryStorage backing;
   late AiCredentialStorage storage;
 
@@ -354,7 +402,8 @@ void main() {
     expect(
       find.textContaining(l10nEn.aiAssistDisclosureOpenRouter),
       findsNothing,
-      reason: 'naming a destination the user is not configured for is the '
+      reason:
+          'naming a destination the user is not configured for is the '
           'one thing this dialog must never do',
     );
   });
@@ -563,11 +612,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final vendors = AiModelCatalogue.openrouter.map((m) => m.servedBy).toSet();
-    expect(
-      vendors,
-      {'Anthropic', 'OpenAI'},
-      reason: 'the mixed-vendor branch is what this test exists to cover',
-    );
+    expect(vendors, {
+      'Anthropic',
+      'OpenAI',
+    }, reason: 'the mixed-vendor branch is what this test exists to cover');
 
     for (final vendor in vendors) {
       final rows = AiModelCatalogue.openrouter
@@ -657,20 +705,30 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(l10nEn.aiAssistProviderOwnServerLabel), findsOneWidget);
-      expect(l10nEn.aiAssistProviderOwnServerLabel.toLowerCase(),
-          isNot(contains('local')));
+      expect(
+        l10nEn.aiAssistProviderOwnServerLabel.toLowerCase(),
+        isNot(contains('local')),
+      );
     });
 
-    testWidgets('takes an address and a typed model name', (tester) async {
+    testWidgets('offers model retrieval before advanced manual input', (
+      tester,
+    ) async {
       // No curated list to pick from, so the model is typed. #757 adds the
       // fetch; this is what works until then.
       await tester.pumpWidget(_app(storage));
       await tester.pumpAndSettle();
 
-      expect(find.bySemanticsIdentifier('ai-assist-endpoint-field'),
-          findsOneWidget);
-      expect(find.bySemanticsIdentifier('ai-assist-model-field'),
-          findsOneWidget);
+      expect(
+        find.bySemanticsIdentifier('ai-assist-endpoint-field'),
+        findsOneWidget,
+      );
+      expect(find.bySemanticsIdentifier('ai-assist-model-field'), findsNothing);
+      expect(
+        find.bySemanticsIdentifier('ai-assist-load-models'),
+        findsOneWidget,
+      );
+      expect(await manualModelField(tester), findsOneWidget);
     });
 
     testWidgets('offers no curated model rows, and no served-by line', (
@@ -684,8 +742,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(RadioListTile<String>), findsNothing);
-      expect(find.textContaining(l10nEn.aiAssistModelRecommendedLabel),
-          findsNothing);
+      expect(
+        find.textContaining(l10nEn.aiAssistModelRecommendedLabel),
+        findsNothing,
+      );
       expect(find.textContaining('Served by'), findsNothing);
     });
 
@@ -797,10 +857,7 @@ void main() {
         find.bySemanticsIdentifier('ai-assist-endpoint-field'),
         'http://192.168.1.5:11434',
       );
-      await tester.enterText(
-        find.bySemanticsIdentifier('ai-assist-model-field'),
-        'gemma3:4b',
-      );
+      await tester.enterText(await manualModelField(tester), 'gemma3:4b');
       await tester.pumpAndSettle();
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
@@ -810,8 +867,10 @@ void main() {
         'http://192.168.1.5:11434/v1/chat/completions',
         reason: 'a base address is completed to the route runtimes answer on',
       );
-      expect(await storage.readModel(provider: AiProvider.ownServer),
-          'gemma3:4b');
+      expect(
+        await storage.readModel(provider: AiProvider.ownServer),
+        'gemma3:4b',
+      );
       expect(
         (await storage.readSummary()).configured,
         isTrue,
@@ -834,16 +893,16 @@ void main() {
         find.bySemanticsIdentifier('ai-assist-endpoint-field'),
         '192.168.1.5:11434',
       );
-      await tester.enterText(
-        find.bySemanticsIdentifier('ai-assist-model-field'),
-        'gemma3:4b',
-      );
+      await tester.enterText(await manualModelField(tester), 'gemma3:4b');
       await tester.pumpAndSettle();
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
       expect(find.text(l10nEn.aiAssistEndpointInvalidLabel), findsOneWidget);
-      expect(await storage.readEndpoint(provider: AiProvider.ownServer), isNull);
+      expect(
+        await storage.readEndpoint(provider: AiProvider.ownServer),
+        isNull,
+      );
       expect(
         find.byType(AiAssistDialog),
         findsOneWidget,
@@ -869,7 +928,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(l10nEn.aiAssistModelRequiredLabel), findsOneWidget);
-      expect(await storage.readEndpoint(provider: AiProvider.ownServer), isNull);
+      expect(
+        await storage.readEndpoint(provider: AiProvider.ownServer),
+        isNull,
+      );
       expect(
         await storage.isEnabled(),
         isFalse,
@@ -877,176 +939,47 @@ void main() {
       );
     });
 
-    testWidgets('a refusal on OK is brought into view, with the cursor in '
-        'the field (#1364)', (tester) async {
-      // The dialog is taller than a phone, and the model field sits below
-      // the address. With the address still being edited, OK refused below
-      // the fold and looked like it did nothing.
-      tester.view.physicalSize = const Size(720, 1280);
-      tester.view.devicePixelRatio = 2;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(
-        _app(storage, modelList: _Server.unreachable().api),
+    for (final keyboard in [false, true]) {
+      testWidgets(
+        'missing model reveals picker error with keyboard=$keyboard',
+        (tester) async {
+          tester.view.physicalSize = const Size(720, 1280);
+          tester.view.devicePixelRatio = 2;
+          addTearDown(tester.view.reset);
+          await tester.pumpWidget(
+            _routeApp(storage, modelList: _Server.unreachable().api),
+          );
+          await tester.tap(find.text('open'));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.bySemanticsIdentifier('ai-assist-endpoint-field'),
+            'https://models.example/v1',
+          );
+          if (keyboard) {
+            tester.view.viewInsets = const FakeViewPadding(bottom: 560);
+          }
+          await tester.pumpAndSettle();
+          await tester.tap(find.text(l10nEn.dialogOKLabel));
+          await tester.pumpAndSettle();
+          expect(
+            find.bySemanticsIdentifier('ai-assist-model-field'),
+            findsNothing,
+          );
+          final viewport = tester.getRect(
+            find.descendant(
+              of: find.byType(AiAssistDialog),
+              matching: find.byType(SingleChildScrollView),
+            ),
+          );
+          final error = tester.getRect(
+            find.text(l10nEn.aiAssistModelRequiredLabel),
+          );
+          expect(error.top, greaterThanOrEqualTo(viewport.top));
+          expect(error.bottom, lessThanOrEqualTo(viewport.bottom));
+          expect(tester.takeException(), isNull);
+        },
       );
-      await tester.pumpAndSettle();
-      await tester.enterText(
-        find.bySemanticsIdentifier('ai-assist-endpoint-field'),
-        'http://192.168.1.5:11434',
-      );
-      await tester.pumpAndSettle();
-
-      final scroll = find.descendant(
-        of: find.byType(AiAssistDialog),
-        matching: find.byType(Scrollable),
-      );
-      tester.state<ScrollableState>(scroll.first).position.jumpTo(0);
-      await tester.pumpAndSettle();
-      final viewport = tester.getRect(find.byType(SingleChildScrollView));
-      final modelField = find.descendant(
-        of: find.bySemanticsIdentifier('ai-assist-model-field'),
-        matching: find.byType(TextField),
-      );
-      expect(
-        tester.getRect(modelField).bottom,
-        greaterThan(viewport.bottom),
-        reason: 'precondition: the model field starts below the fold',
-      );
-
-      await tester.tap(find.text(l10nEn.dialogOKLabel));
-      await tester.pumpAndSettle();
-
-      final error = tester.getRect(
-        find.text(l10nEn.aiAssistModelRequiredLabel),
-      );
-      expect(error.top, greaterThanOrEqualTo(viewport.top));
-      expect(error.bottom, lessThanOrEqualTo(viewport.bottom));
-      expect(tester.widget<TextField>(modelField).focusNode?.hasFocus, isTrue);
-    });
-
-    testWidgets('a refusal on OK is in view with the keyboard up (#1364)', (
-      tester,
-    ) async {
-      // The case #1364 was filed from. `enterText` raises no keyboard, so
-      // the inset is set by hand, on the real dialog route, where it is what
-      // shrinks the scroll viewport the refusal has to land inside.
-      tester.view.physicalSize = const Size(720, 1280);
-      tester.view.devicePixelRatio = 2;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(
-        _routeApp(storage, modelList: _Server.unreachable().api),
-      );
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-
-      final endpointField = find.bySemanticsIdentifier(
-        'ai-assist-endpoint-field',
-      );
-      await tester.ensureVisible(endpointField);
-      await tester.pumpAndSettle();
-      await tester.showKeyboard(endpointField);
-      // A phone keyboard: 280 of the 640 logical pixels.
-      tester.view.viewInsets = const FakeViewPadding(bottom: 560);
-      await tester.enterText(endpointField, 'http://192.168.1.5:11434');
-      await tester.pumpAndSettle();
-
-      final scroll = find.descendant(
-        of: find.byType(AiAssistDialog),
-        matching: find.byType(SingleChildScrollView),
-      );
-      final keyboardUp = tester.getRect(scroll);
-      final modelField = find.descendant(
-        of: find.bySemanticsIdentifier('ai-assist-model-field'),
-        matching: find.byType(TextField),
-      );
-      expect(
-        tester.getRect(modelField).top,
-        greaterThan(keyboardUp.bottom),
-        reason: 'precondition: the model field starts below the fold',
-      );
-
-      final ok = find.text(l10nEn.dialogOKLabel);
-      expect(tester.getRect(ok).bottom, lessThanOrEqualTo(640 - 280));
-      await tester.tap(ok);
-      await tester.pumpAndSettle();
-
-      expect(tester.widget<TextField>(modelField).focusNode?.hasFocus, isTrue);
-      // Measured again rather than reused: the viewport is whatever it is
-      // once focus and layout have settled, keyboard still up.
-      final viewport = tester.getRect(scroll);
-      final error = tester.getRect(
-        find.text(l10nEn.aiAssistModelRequiredLabel),
-      );
-      expect(error.top, greaterThanOrEqualTo(viewport.top));
-      expect(error.bottom, lessThanOrEqualTo(viewport.bottom));
-      expect(viewport.bottom, lessThanOrEqualTo(640 - 280));
-    });
-
-    testWidgets('a refusal on OK stays in view when the keyboard rises '
-        'after it (#1364)', (tester) async {
-      // OK pressed with the keyboard down: the refusal is scrolled into the
-      // tall viewport, and only then does the focus it moved bring the
-      // keyboard up and shrink that viewport. The field's own caret reveal
-      // keeps the cursor in view and can leave the error line under the keys.
-      tester.view.physicalSize = const Size(720, 1280);
-      tester.view.devicePixelRatio = 2;
-      addTearDown(tester.view.reset);
-
-      await tester.pumpWidget(
-        _routeApp(storage, modelList: _Server.unreachable().api),
-      );
-      await tester.tap(find.text('open'));
-      await tester.pumpAndSettle();
-
-      final endpointField = find.bySemanticsIdentifier(
-        'ai-assist-endpoint-field',
-      );
-      await tester.ensureVisible(endpointField);
-      await tester.pumpAndSettle();
-      await tester.enterText(endpointField, 'http://192.168.1.5:11434');
-      await tester.pumpAndSettle();
-      // The keyboard dismissed, and the dialog back at its top.
-      FocusManager.instance.primaryFocus?.unfocus();
-      await tester.pumpAndSettle();
-      final scroll = find.descendant(
-        of: find.byType(AiAssistDialog),
-        matching: find.byType(SingleChildScrollView),
-      );
-      tester
-          .state<ScrollableState>(
-            find
-                .descendant(of: scroll, matching: find.byType(Scrollable))
-                .first,
-          )
-          .position
-          .jumpTo(0);
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text(l10nEn.dialogOKLabel));
-      await tester.pumpAndSettle();
-      // A phone keyboard: 280 of the 640 logical pixels, arriving once the
-      // focus OK moved has reached the platform.
-      tester.view.viewInsets = const FakeViewPadding(bottom: 560);
-      await tester.pumpAndSettle();
-
-      final modelField = find.descendant(
-        of: find.bySemanticsIdentifier('ai-assist-model-field'),
-        matching: find.byType(TextField),
-      );
-      expect(tester.widget<TextField>(modelField).focusNode?.hasFocus, isTrue);
-      final viewport = tester.getRect(scroll);
-      expect(
-        viewport.bottom,
-        lessThanOrEqualTo(640 - 280),
-        reason: 'precondition: the keyboard shrank the dialog',
-      );
-      final error = tester.getRect(
-        find.text(l10nEn.aiAssistModelRequiredLabel),
-      );
-      expect(error.top, greaterThanOrEqualTo(viewport.top));
-      expect(error.bottom, lessThanOrEqualTo(viewport.bottom));
-    });
+    }
 
     testWidgets('a refusal clears as soon as the field is edited', (
       tester,
@@ -1056,10 +989,7 @@ void main() {
 
       // A model with nowhere to send it is still a refusal, and it lands on
       // the field that is missing rather than the one that is filled in.
-      await tester.enterText(
-        find.bySemanticsIdentifier('ai-assist-model-field'),
-        'gemma3:4b',
-      );
+      await tester.enterText(await manualModelField(tester), 'gemma3:4b');
       await tester.pumpAndSettle();
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
@@ -1108,10 +1038,7 @@ void main() {
         find.bySemanticsIdentifier('ai-assist-endpoint-field'),
         '',
       );
-      await tester.enterText(
-        find.bySemanticsIdentifier('ai-assist-model-field'),
-        '',
-      );
+      await tester.enterText(await manualModelField(tester), '');
       await tester.pumpAndSettle();
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
@@ -1125,9 +1052,7 @@ void main() {
       );
     });
 
-    testWidgets('the address stays editable after it is saved', (
-      tester,
-    ) async {
+    testWidgets('the address stays editable after it is saved', (tester) async {
       // The dialog rendered the address and model fields unconditionally but
       // hung OK off "has a credential", which for this provider is true as
       // soon as an address exists. Reopening therefore showed two editable
@@ -1147,16 +1072,15 @@ void main() {
         find.bySemanticsIdentifier('ai-assist-endpoint-field'),
         'http://192.168.1.9:11434',
       );
-      await tester.enterText(
-        find.bySemanticsIdentifier('ai-assist-model-field'),
-        'qwen3:8b',
-      );
+      await tester.enterText(await manualModelField(tester), 'qwen3:8b');
       await tester.pumpAndSettle();
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
-      expect(await storage.readEndpoint(provider: AiProvider.ownServer),
-          'http://192.168.1.9:11434/v1/chat/completions');
+      expect(
+        await storage.readEndpoint(provider: AiProvider.ownServer),
+        'http://192.168.1.9:11434/v1/chat/completions',
+      );
       expect(
         await storage.readModel(provider: AiProvider.ownServer),
         'qwen3:8b',
@@ -1196,13 +1120,13 @@ void main() {
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
-      expect(await storage.readEndpoint(provider: AiProvider.ownServer),
-          'http://192.168.1.9:11434/v1/chat/completions');
+      expect(
+        await storage.readEndpoint(provider: AiProvider.ownServer),
+        'http://192.168.1.9:11434/v1/chat/completions',
+      );
     });
 
-    testWidgets('no key stored is not reported as a key saved', (
-      tester,
-    ) async {
+    testWidgets('no key stored is not reported as a key saved', (tester) async {
       // "Key saved ••••••••••••" over a slot holding nothing, in the one
       // dialog whose whole job is to be checkable on sight. `configured` and
       // `has a key` are the same fact for the hosted three and different for
@@ -1218,10 +1142,7 @@ void main() {
       expect(find.textContaining(l10nEn.aiAssistKeySavedLabel), findsNothing);
       // Still offered, because the key here is optional rather than absent —
       // a reverse-proxied server may want one after the address is working.
-      expect(
-        find.bySemanticsIdentifier('ai-assist-key-field'),
-        findsOneWidget,
-      );
+      expect(find.bySemanticsIdentifier('ai-assist-key-field'), findsOneWidget);
     });
 
     testWidgets('OK on an unchanged address does not un-pause it', (
@@ -1303,10 +1224,7 @@ void main() {
     group('the model list', () {
       /// Puts the address on screen without going near the store, so a test
       /// starts where a user who has just typed one does.
-      Future<void> typeEndpoint(
-        WidgetTester tester,
-        String endpoint,
-      ) async {
+      Future<void> typeEndpoint(WidgetTester tester, String endpoint) async {
         await tester.enterText(
           find.bySemanticsIdentifier('ai-assist-endpoint-field'),
           endpoint,
@@ -1327,8 +1245,13 @@ void main() {
           find.bySemanticsIdentifier('ai-assist-endpoint-field'),
           endpoint,
         );
-        await tester.pump();
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pump(const Duration(milliseconds: 300));
+        final load = find.bySemanticsIdentifier('ai-assist-load-models');
+        final button = tester.widget<TextButton>(
+          find.descendant(of: load, matching: find.byType(TextButton)),
+        );
+        expect(button.onPressed, isNotNull);
+        button.onPressed!();
         await tester.pump();
       }
 
@@ -1469,8 +1392,7 @@ void main() {
             .text;
 
         Future<void> leaveEndpoint(WidgetTester tester) async {
-          await tester.testTextInput.receiveAction(TextInputAction.done);
-          await tester.pumpAndSettle();
+          await pressLoad(tester);
         }
 
         testWidgets('editing to another server clears it', (tester) async {
@@ -1570,7 +1492,8 @@ void main() {
         expect(
           server.requests,
           isEmpty,
-          reason: 'a configured server must not be contacted by a dialog '
+          reason:
+              'a configured server must not be contacted by a dialog '
               'simply being opened',
         );
       });
@@ -1616,37 +1539,79 @@ void main() {
         );
       });
 
-      testWidgets('picking a fetched model stores it', (tester) async {
-        final server = _Server.listing(['qwen3:8b', 'gemma3:4b']);
-        await tester.pumpWidget(_app(storage, modelList: server.api));
-        await tester.pumpAndSettle();
+      testWidgets(
+        'address and API key fetch models before a selected model is saved',
+        (tester) async {
+          tester.view.physicalSize = const Size(375, 812);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          final server = _Server.listing(['qwen3:8b', 'gemma3:4b']);
+          await tester.pumpWidget(
+            _app(
+              storage,
+              modelList: server.api,
+              locale: const Locale('zh'),
+              theme: buildAppTheme(AppPalette.light),
+            ),
+          );
+          await tester.pumpAndSettle();
 
-        await typeEndpoint(tester, 'http://192.168.1.5:11434');
-        await pressLoad(tester);
+          await typeEndpoint(tester, 'http://192.168.1.5:11434');
+          await tester.enterText(
+            find.bySemanticsIdentifier('ai-assist-key-field'),
+            'test-api-key',
+          );
+          await tester.pumpAndSettle();
+          await pressLoad(tester);
+          expect(server.authorizations, ['Bearer test-api-key']);
+          expect(
+            find.bySemanticsIdentifier('ai-assist-model-field'),
+            findsNothing,
+          );
 
-        await tester.ensureVisible(find.byType(DropdownButton<String>));
-        await tester.pumpAndSettle();
-        await tester.tap(find.byType(DropdownButton<String>));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('qwen3:8b').last);
-        await tester.pumpAndSettle();
+          await tester.ensureVisible(find.byType(DropdownButton<String>));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byType(DropdownButton<String>));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('qwen3:8b').last);
+          await tester.pumpAndSettle();
+          if (const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) {
+            await tester.runAsync(() async {
+              final dir = Directory(
+                const String.fromEnvironment('GOAL_PREVIEW_DIR'),
+              );
+              await dir.create(recursive: true);
+              final boundary =
+                  _aiCapture.currentContext!.findRenderObject()!
+                      as RenderRepaintBoundary;
+              final img = await boundary.toImage(pixelRatio: 1.5);
+              final bytes = await img.toByteData(
+                format: ui.ImageByteFormat.png,
+              );
+              await File(
+                '${dir.path}/ai-custom-models.png',
+              ).writeAsBytes(bytes!.buffer.asUint8List());
+              img.dispose();
+            });
+          }
 
-        // OK is the one commit point for this provider: the address is typed
-        // text and a model belongs to an address, so writing one against an
-        // address that is not stored yet would be wiped by the endpoint write
-        // that followed it.
-        await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
-        await tester.pumpAndSettle();
+          // OK is the one commit point for this provider: the address is typed
+          // text and a model belongs to an address, so writing one against an
+          // address that is not stored yet would be wiped by the endpoint write
+          // that followed it.
+          await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
+          await tester.pumpAndSettle();
 
-        expect(
-          await storage.readModel(provider: AiProvider.ownServer),
-          'qwen3:8b',
-        );
-        expect(
-          await storage.readEndpoint(provider: AiProvider.ownServer),
-          'http://192.168.1.5:11434/v1/chat/completions',
-        );
-      });
+          expect(
+            await storage.readModel(provider: AiProvider.ownServer),
+            'qwen3:8b',
+          );
+          expect(
+            await storage.readEndpoint(provider: AiProvider.ownServer),
+            'http://192.168.1.5:11434/v1/chat/completions',
+          );
+        },
+      );
 
       testWidgets('an unreachable server leaves the model typeable', (
         tester,
@@ -1664,16 +1629,14 @@ void main() {
         await pressLoad(tester);
 
         expect(
-          find.bySemanticsIdentifier('ai-assist-model-field'),
+          await manualModelField(tester),
           findsOneWidget,
-          reason: 'the field a user can type into must survive the fetch '
+          reason:
+              'the field a user can type into must survive the fetch '
               'failing, or the feature is unconfigurable off the network',
         );
 
-        await tester.enterText(
-          find.bySemanticsIdentifier('ai-assist-model-field'),
-          'gemma3:4b',
-        );
+        await tester.enterText(await manualModelField(tester), 'gemma3:4b');
         await tester.pumpAndSettle();
         await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
         await tester.pumpAndSettle();
@@ -1696,9 +1659,7 @@ void main() {
         await pressLoad(tester);
 
         expect(
-          find.text(
-            l10nEn.aiAssistModelsUnreachableLabel('192.168.1.5:11434'),
-          ),
+          find.text(l10nEn.aiAssistModelsUnreachableLabel('192.168.1.5:11434')),
           findsOneWidget,
         );
         expect(
@@ -1717,9 +1678,7 @@ void main() {
           findsOneWidget,
         );
         expect(
-          find.text(
-            l10nEn.aiAssistModelsUnreachableLabel('192.168.1.5:11434'),
-          ),
+          find.text(l10nEn.aiAssistModelsUnreachableLabel('192.168.1.5:11434')),
           findsNothing,
         );
       });
@@ -1789,7 +1748,7 @@ void main() {
         expect(server.requests, isEmpty, reason: 'nothing on open');
 
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await pressLoad(tester);
         await tester.pumpAndSettle();
 
         expect(server.requests, [
@@ -1799,7 +1758,7 @@ void main() {
           tester
               .widget<TextField>(
                 find.descendant(
-                  of: find.bySemanticsIdentifier('ai-assist-model-field'),
+                  of: await manualModelField(tester),
                   matching: find.byType(TextField),
                 ),
               )
@@ -1810,15 +1769,23 @@ void main() {
         );
       });
 
-      String? modelText(WidgetTester tester) => tester
-          .widget<TextField>(
-            find.descendant(
-              of: find.bySemanticsIdentifier('ai-assist-model-field'),
-              matching: find.byType(TextField),
-            ),
-          )
-          .controller
-          ?.text;
+      String modelText(WidgetTester tester) {
+        final manual = find.bySemanticsIdentifier('ai-assist-model-field');
+        if (manual.evaluate().isNotEmpty) {
+          return tester
+              .widget<TextField>(
+                find.descendant(of: manual, matching: find.byType(TextField)),
+              )
+              .controller!
+              .text;
+        }
+        return tester
+                .widget<DropdownButton<String>>(
+                  find.byType(DropdownButton<String>),
+                )
+                .value ??
+            '';
+      }
 
       testWidgets('a failed fetch after an address change leaves the model '
           'alone (#1364)', (tester) async {
@@ -1835,7 +1802,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await pressLoad(tester);
         await tester.pumpAndSettle();
 
         expect(server.requests, hasLength(1));
@@ -1878,7 +1845,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await pressLoad(tester);
         await tester.pumpAndSettle();
         expect(modelText(tester), 'gemma3:4b');
 
@@ -1903,9 +1870,9 @@ void main() {
         await tester.pumpAndSettle();
 
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await pressLoad(tester);
         await tester.pumpAndSettle();
-        final modelField = find.bySemanticsIdentifier('ai-assist-model-field');
+        final modelField = await manualModelField(tester);
         await tester.enterText(modelField, 'gemma3');
         await tester.enterText(modelField, 'gemma3:4b');
         await tester.pump();
@@ -1927,7 +1894,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await pressLoad(tester);
         await tester.pumpAndSettle();
 
         expect(modelText(tester), 'gemma3:4b');
@@ -2000,7 +1967,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await pressLoad(tester);
         await tester.pumpAndSettle();
         expect(modelText(tester), 'gemma3:4b');
 
@@ -2035,10 +2002,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await commitEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.enterText(
-          find.bySemanticsIdentifier('ai-assist-model-field'),
-          'llama3.2:3b',
-        );
+        await tester.enterText(await manualModelField(tester), 'llama3.2:3b');
         await tester.pump();
         server.gates['192.168.1.9']!.complete();
         await tester.pumpAndSettle();
@@ -2154,9 +2118,15 @@ void main() {
         // provider check alone cannot see: by the time this request returns,
         // the provider it was started for is selected again. What makes it
         // stale is the reload in between, not who is on screen.
+        await tester.ensureVisible(find.text('Anthropic'));
+        await tester.pump(const Duration(milliseconds: 300));
         await tester.tap(find.text('Anthropic'));
         await tester.pump();
         await tester.pump();
+        await tester.ensureVisible(
+          find.text(l10nEn.aiAssistProviderOwnServerLabel),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
         await tester.tap(find.text(l10nEn.aiAssistProviderOwnServerLabel));
         await tester.pump();
         await tester.pump();
@@ -2164,21 +2134,26 @@ void main() {
         server.gates['192.168.1.9']!.complete();
         await tester.pumpAndSettle();
 
-        // No picker at all rather than an empty one: `_load` clears the list
-        // on a switch, and nothing may put it back.
         expect(
-          find.bySemanticsIdentifier('ai-assist-model-picker'),
-          findsNothing,
+          tester
+              .widget<DropdownButton<String>>(
+                find.byType(DropdownButton<String>),
+              )
+              .onChanged,
+          isNull,
         );
         final button = find.bySemanticsIdentifier('ai-assist-load-models');
         await tester.ensureVisible(button);
         await tester.pumpAndSettle();
         expect(
-          tester.widget<TextButton>(
-            find.descendant(of: button, matching: find.byType(TextButton)),
-          ).onPressed,
+          tester
+              .widget<TextButton>(
+                find.descendant(of: button, matching: find.byType(TextButton)),
+              )
+              .onPressed,
           isNotNull,
-          reason: 'a request nobody wants any more must not disable the '
+          reason:
+              'a request nobody wants any more must not disable the '
               'button for the rest of the dialog',
         );
       });
@@ -2231,13 +2206,15 @@ void main() {
         expect(
           server.requests,
           isEmpty,
-          reason: 'a dialog being dismissed must not contact the address on '
+          reason:
+              'a dialog being dismissed must not contact the address on '
               'its way out',
         );
       });
 
-      testWidgets('moving on from a changed address fetches, without pressing '
-          'anything', (tester) async {
+      testWidgets('moving to the API key field waits for an explicit fetch', (
+        tester,
+      ) async {
         // The positive half of the two exit tests above. They prove the fetch
         // is *suppressed* while the route is going away; without this, they
         // would all still pass if the trigger were deleted outright and no
@@ -2254,11 +2231,11 @@ void main() {
         await tester.pumpAndSettle();
 
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.showKeyboard(
-          find.bySemanticsIdentifier('ai-assist-model-field'),
-        );
+        await tester.showKeyboard(await manualModelField(tester));
         await tester.pumpAndSettle();
 
+        expect(server.requests, isEmpty);
+        await pressLoad(tester);
         expect(server.requests, [
           Uri.parse('http://192.168.1.9:11434/v1/models'),
         ]);
@@ -2280,10 +2257,7 @@ void main() {
         await tester.pumpAndSettle();
 
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.enterText(
-          find.bySemanticsIdentifier('ai-assist-model-field'),
-          'qwen3:8b',
-        );
+        await tester.enterText(await manualModelField(tester), 'qwen3:8b');
         await tester.pumpAndSettle();
         await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
         await tester.pumpAndSettle();
@@ -2493,7 +2467,8 @@ void main() {
           expect(
             find.text(l10nEn.aiAssistModelsInsecureLabel),
             findsOneWidget,
-            reason: 'the refusal has to be announced at all, or #758 is '
+            reason:
+                'the refusal has to be announced at all, or #758 is '
                 'undone',
           );
           expect(server.requests, isEmpty, reason: 'nothing was sent');
@@ -2503,7 +2478,8 @@ void main() {
           expect(
             find.text(l10nEn.aiAssistModelsInsecureLabel),
             findsNothing,
-            reason: 'the sentence was about an address that is no longer in '
+            reason:
+                'the sentence was about an address that is no longer in '
                 'the field',
           );
         });
@@ -2530,9 +2506,8 @@ void main() {
 
           expect(
             find.bySemanticsIdentifier('ai-assist-model-picker'),
-            findsNothing,
-            reason: 'the list belonged to the address that was just edited '
-                'away',
+            findsOneWidget,
+            reason: 'the empty picker stays visible after editing',
           );
         });
 
@@ -2559,10 +2534,7 @@ void main() {
             findsOneWidget,
           );
 
-          await tester.enterText(
-            find.bySemanticsIdentifier('ai-assist-model-field'),
-            'llama3.2:3b',
-          );
+          await tester.enterText(await manualModelField(tester), 'llama3.2:3b');
           await tester.pumpAndSettle();
 
           final toggle = find.bySemanticsIdentifier('ai-assist-enabled');
@@ -2631,11 +2603,11 @@ void main() {
           server.gates['192.168.1.9']!.complete();
           await tester.pumpAndSettle();
 
-          expect(
-            find.bySemanticsIdentifier('ai-assist-model-picker'),
-            findsNothing,
-            reason: 'nothing has been asked about the address on screen',
+          final picker = tester.widget<DropdownButton<String>>(
+            find.byType(DropdownButton<String>),
           );
+          expect(picker.onChanged, isNull);
+          expect(picker.items, isEmpty);
           for (final message in messagesFor('192.168.1.9:11434')) {
             expect(find.text(message), findsNothing);
           }
@@ -2643,11 +2615,17 @@ void main() {
           await tester.ensureVisible(button);
           await tester.pumpAndSettle();
           expect(
-            tester.widget<TextButton>(
-              find.descendant(of: button, matching: find.byType(TextButton)),
-            ).onPressed,
+            tester
+                .widget<TextButton>(
+                  find.descendant(
+                    of: button,
+                    matching: find.byType(TextButton),
+                  ),
+                )
+                .onPressed,
             isNotNull,
-            reason: 'the button has to be pressable against the address that '
+            reason:
+                'the button has to be pressable against the address that '
                 'replaced the one being fetched for',
           );
         });
@@ -2697,10 +2675,7 @@ void main() {
           find.bySemanticsIdentifier('ai-assist-endpoint-field'),
           'http://192.168.1.5:11434',
         );
-        await tester.enterText(
-          find.bySemanticsIdentifier('ai-assist-model-field'),
-          'gemma3:4b',
-        );
+        await tester.enterText(await manualModelField(tester), 'gemma3:4b');
         await tester.pumpAndSettle();
         await tester.tap(find.text(l10nEn.dialogOKLabel));
         await tester.pumpAndSettle();
@@ -2871,7 +2846,8 @@ void main() {
         expect(
           noAnswer,
           isNot(contains(Icons.error_outline_rounded)),
-          reason: 'nothing failed: a server that did not answer is not a '
+          reason:
+              'nothing failed: a server that did not answer is not a '
               'model that cannot see, and an error icon says it did',
         );
         expect(
@@ -2924,17 +2900,12 @@ void main() {
         await tapRetry(tester);
 
         expect(find.text(l10nEn.aiAssistProbePassedLabel), findsOneWidget);
-        expect(
-          find.text(l10nEn.aiAssistProbePhotoFailedLabel),
-          findsOneWidget,
-        );
+        expect(find.text(l10nEn.aiAssistProbePhotoFailedLabel), findsOneWidget);
         expect(find.text(l10nEn.aiAssistProbeNoAnswerLabel), findsNothing);
         expect(find.text(l10nEn.aiAssistProbeUnknownLabel), findsNothing);
       });
 
-      testWidgets('the wait it quotes covers both legs (#851)', (
-        tester,
-      ) async {
+      testWidgets('the wait it quotes covers both legs (#851)', (tester) async {
         // The copy invites the user to walk away, so the number in it is what
         // they use to decide when to come back. Two legs of the own-server
         // budget run back to back — measured at 4m00s on a Pixel 6 — under a
@@ -3060,7 +3031,9 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.text(l10nEn.aiAssistProbeRunningLabel(aiProbeWorstCaseMinutes())),
+          find.text(
+            l10nEn.aiAssistProbeRunningLabel(aiProbeWorstCaseMinutes()),
+          ),
           findsOneWidget,
         );
         final retry = tester.widget<TextButton>(
@@ -3075,7 +3048,9 @@ void main() {
         prober.gate!.complete();
         await tester.pumpAndSettle();
         expect(
-          find.text(l10nEn.aiAssistProbeRunningLabel(aiProbeWorstCaseMinutes())),
+          find.text(
+            l10nEn.aiAssistProbeRunningLabel(aiProbeWorstCaseMinutes()),
+          ),
           findsNothing,
         );
         expect(find.text(l10nEn.aiAssistProbePassedLabel), findsOneWidget);
@@ -3096,10 +3071,7 @@ void main() {
           find.bySemanticsIdentifier('ai-assist-endpoint-field'),
           'http://203.0.113.1:11434',
         );
-        await tester.enterText(
-          find.bySemanticsIdentifier('ai-assist-model-field'),
-          'gemma3:4b',
-        );
+        await tester.enterText(await manualModelField(tester), 'gemma3:4b');
         await tester.pumpAndSettle();
         await tester.tap(find.text(l10nEn.dialogOKLabel));
         await tester.pumpAndSettle();
@@ -3108,8 +3080,10 @@ void main() {
           find.text(l10nEn.aiAssistEndpointPublicPlaintextLabel),
           findsOneWidget,
         );
-        expect(await storage.readEndpoint(provider: AiProvider.ownServer),
-            isNull);
+        expect(
+          await storage.readEndpoint(provider: AiProvider.ownServer),
+          isNull,
+        );
         expect(prober.calls, 0, reason: 'nothing was configured to check');
       });
 
@@ -3144,10 +3118,7 @@ void main() {
           find.bySemanticsIdentifier('ai-assist-endpoint-field'),
           'http://ollama.lan:11434',
         );
-        await tester.enterText(
-          find.bySemanticsIdentifier('ai-assist-model-field'),
-          'gemma3:4b',
-        );
+        await tester.enterText(await manualModelField(tester), 'gemma3:4b');
         await tester.pumpAndSettle();
         await tester.tap(find.text(l10nEn.dialogOKLabel));
         await tester.pumpAndSettle();
@@ -3243,12 +3214,14 @@ void main() {
     await tester.pumpAndSettle();
 
     final field = tester.getRect(find.byType(TextField));
-    final viewport = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    final viewport =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
 
     expect(
       field.bottom,
       lessThanOrEqualTo(viewport),
-      reason: 'the key field must be reachable without scrolling: it is the '
+      reason:
+          'the key field must be reachable without scrolling: it is the '
           'one thing this dialog exists for',
     );
   });
@@ -3273,7 +3246,8 @@ void main() {
     expect(
       scrollbar.thumbVisibility,
       isTrue,
-      reason: 'a disclosure that silently continues below the fold is a '
+      reason:
+          'a disclosure that silently continues below the fold is a '
           'disclosure the reader thinks they have finished',
     );
   });
@@ -3399,7 +3373,8 @@ void main() {
       expect(
         await storage.activeProvider(),
         AiProvider.openai,
-        reason: 'the selection still persists on the way in — the reload '
+        reason:
+            'the selection still persists on the way in — the reload '
             'below the selector reads the store for whoever is now active',
       );
 
@@ -3445,7 +3420,8 @@ void main() {
       expect(
         find.bySemanticsIdentifier('ai-assist-save-key'),
         findsOneWidget,
-        reason: 'a change with no way to confirm it is a change that cannot '
+        reason:
+            'a change with no way to confirm it is a change that cannot '
             'be made',
       );
 
@@ -3765,7 +3741,10 @@ void main() {
   group('agreeing before anything is stored', () {
     setUp(() async => storage.setTermsAccepted(false));
 
-    Future<void> typeKeyAndSave(WidgetTester tester, {String key = 'sk-x'}) async {
+    Future<void> typeKeyAndSave(
+      WidgetTester tester, {
+      String key = 'sk-x',
+    }) async {
       await tester.enterText(find.byType(TextField).first, key);
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
@@ -3802,8 +3781,9 @@ void main() {
       // Scrolled to first: the consent screen is a ListView and Decline is its
       // last child, so it sits below the fold on a short viewport. #985 added a
       // paragraph above it, which is what pushed it out of reach here.
-      await tester.ensureVisible(
+      await tester.scrollUntilVisible(
         find.bySemanticsIdentifier('ai-consent-decline'),
+        200,
       );
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('ai-consent-decline'));
@@ -3827,6 +3807,11 @@ void main() {
       await tester.pumpAndSettle();
       await typeKeyAndSave(tester);
 
+      await tester.scrollUntilVisible(
+        find.bySemanticsIdentifier('ai-consent-agree'),
+        200,
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('ai-consent-agree'));
       await tester.pumpAndSettle();
 
@@ -3879,6 +3864,7 @@ void main() {
       // The Google paragraph is long enough to push the button past the fold.
       final agree = find.bySemanticsIdentifier('ai-consent-agree');
       await tester.scrollUntilVisible(agree, 200);
+      await tester.pumpAndSettle();
       await tester.tap(agree);
       await tester.pumpAndSettle();
 
@@ -3931,6 +3917,7 @@ void main() {
         );
         final agree = find.bySemanticsIdentifier('ai-consent-agree');
         await tester.scrollUntilVisible(agree, 200);
+        await tester.pumpAndSettle();
         await tester.tap(agree);
         await tester.pumpAndSettle();
 
@@ -3946,6 +3933,7 @@ void main() {
 
         final decline = find.bySemanticsIdentifier('ai-consent-decline');
         await tester.scrollUntilVisible(decline, 200);
+        await tester.pumpAndSettle();
         await tester.tap(decline);
         await tester.pumpAndSettle();
 
@@ -4000,9 +3988,7 @@ void main() {
       expect(find.text(l10nEn.aiConsentChangeProviderNote), findsOneWidget);
     });
 
-    testWidgets('the terms are set at a size meant to be read', (
-      tester,
-    ) async {
+    testWidgets('the terms are set at a size meant to be read', (tester) async {
       await tester.pumpWidget(_app(storage));
       await tester.pumpAndSettle();
       await typeKeyAndSave(tester);
@@ -4010,9 +3996,7 @@ void main() {
       final context = tester.element(find.text(l10nEn.aiConsentTitle));
       final smallest = Theme.of(context).textTheme.bodySmall?.fontSize;
       final rendered = tester
-          .widget<Text>(
-            find.textContaining(l10nEn.aiAssistDisclosureAnthropic),
-          )
+          .widget<Text>(find.textContaining(l10nEn.aiAssistDisclosureAnthropic))
           .style
           ?.fontSize;
 
@@ -4023,7 +4007,8 @@ void main() {
       expect(
         rendered,
         greaterThan(smallest!),
-        reason: 'the terms are set in the same small type they were meant to '
+        reason:
+            'the terms are set in the same small type they were meant to '
             'escape',
       );
     });

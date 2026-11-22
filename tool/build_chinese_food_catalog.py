@@ -81,7 +81,7 @@ def clean_food_name(text):
     return text.translate(str.maketrans({'(': '（', ')': '）'}))
 
 
-def clean_portions(portions):
+def clean_portions(portions, unit='g'):
     unique = {}
     for portion in portions:
         grams = number(portion.get('grams'))
@@ -89,9 +89,10 @@ def clean_portions(portions):
         if not grams or not label or '\ufffd' in label or not balanced_name(label):
             continue
         label = re.sub(r'\s*([()])\s*', r'\1', label)
-        mass = re.fullmatch(r'(\d+(?:\.\d+)?)\s*(?:g|克)', label, re.I)
+        suffix = r'(?:ml|毫升)' if unit == 'ml' else r'(?:g|克)'
+        mass = re.fullmatch(r'(\d+(?:\.\d+)?)\s*' + suffix, label, re.I)
         if mass:
-            label = f'{float(mass[1]):g}克'
+            label = f'{float(mass[1]):g}' + ('毫升' if unit == 'ml' else '克')
         label = re.sub(r'^1\s*(份|个)$', r'一\1', label)
         label = {
             '一个中等大小鸡蛋': '中个', '一个中等鸡蛋': '中个',
@@ -104,8 +105,9 @@ def clean_portions(portions):
     by_weight = {}
     for (_, weight), portion in unique.items():
         previous = by_weight.get(weight)
-        previous_is_mass = previous is not None and re.fullmatch(r'\d+(?:\.\d+)?克', previous['label'])
-        current_is_mass = re.fullmatch(r'\d+(?:\.\d+)?克', portion['label'])
+        mass_label = r'\d+(?:\.\d+)?(?:克|毫升)'
+        previous_is_mass = previous is not None and re.fullmatch(mass_label, previous['label'])
+        current_is_mass = re.fullmatch(mass_label, portion['label'])
         if previous is None or (previous_is_mass and not current_is_mass):
             by_weight[weight] = portion
     unique = {(normalized(p['label']), w): p for w, p in by_weight.items()}
@@ -113,7 +115,7 @@ def clean_portions(portions):
     result = []
     for (key, _), portion in unique.items():
         if counts[key] > 1:
-            portion['label'] += f'（{portion["grams"]:g}克）'
+            portion['label'] += f'（{portion["grams"]:g}' + ('毫升）' if unit == 'ml' else '克）')
         result.append(portion)
     return result
 
@@ -142,10 +144,93 @@ def read_csv(path, manifest):
     return rows
 
 
-def build(source_root, output=ROOT):
+def metric_quantity(text):
+    text = clean_text(text)
+    matches = re.findall(r'(\d+(?:\.\d+)?)\s*(毫升|ml|克|g)\b', text, re.I)
+    # Chinese unit boundaries need not be word boundaries, e.g. “每100毫升装”.
+    if not matches:
+        matches = re.findall(r'(\d+(?:\.\d+)?)\s*(毫升|克)', text)
+    units = {(float(n), 'ml' if u.lower() in {'ml', '毫升'} else 'g') for n, u in matches}
+    if len(units) != 1:
+        return None
+    amount, unit = units.pop()
+    return (amount, unit) if amount > 0 else None
+
+
+def fatsecret_values(row):
+    basis = metric_quantity(row.get('计量基准', ''))
+    derived = row.get('基准来源') == 'derived'
+    if derived and basis is None:
+        raise ValueError('份量重量为能量反推，缺少明示计量基准')
+    unit = basis[1] if basis else 'g'
+    raw_keys = dict(zip(CORE, ['热量kcal', '蛋白g', '碳水g', '脂肪g']))
+    raw = {key: number(row.get(value)) for key, value in raw_keys.items()}
+    if basis and all(value is not None for value in raw.values()):
+        nutrients = {key: value * 100 / basis[0] for key, value in raw.items()}
+    elif unit == 'g':
+        nutrients = {key: number(row.get(value)) for key, value in zip(
+            CORE, ['每100g_热量', '每100g_蛋白', '每100g_碳水', '每100g_脂肪'])}
+    else:
+        raise ValueError('每毫升营养缺失，不能使用每克字段或假定密度')
+    serving = []
+    amount = basis[0] if basis else number(row.get('基准克重'))
+    if amount and not derived:
+        serving.append({'label': row.get('计量基准', '').removeprefix('每'), 'grams': amount})
+    try:
+        alternatives = json.loads(row.get('其他份量') or '[]')
+    except (ValueError, TypeError):
+        alternatives = []
+    for portion in alternatives if isinstance(alternatives, list) else []:
+        if not isinstance(portion, dict):
+            continue
+        label = portion.get('name', '')
+        metric = metric_quantity(label)
+        if metric and metric[1] != unit:
+            continue
+        quantity = metric[0] if metric else number(portion.get('grams')) if unit == 'g' else None
+        if quantity:
+            serving.append({'label': label, 'grams': quantity})
+    return nutrients, unit, serving
+
+
+def fatsecret_rows(source_root, updates, manifest, rejected, refresh_audit):
+    batches = [read_csv(source_root / 'fatsecret' / '有效数据.csv', manifest)]
+    for folder in updates:
+        original = read_csv(folder / '全量原始.csv', manifest)
+        current = read_csv(folder / '有效数据.csv', manifest)
+        raw_by_key = {row['key']: row for row in original}
+        valid_by_key = {row['key']: row for row in current}
+        if len(raw_by_key) != len(original) or len(valid_by_key) != len(current):
+            raise ValueError('更新快照的原始 key 不唯一')
+        if any(raw_by_key.get(key) != row for key, row in valid_by_key.items()):
+            raise ValueError('有效数据与全量原始不属于同一快照')
+        superseded = [row for batch in batches for row in batch if row['key'] in raw_by_key]
+        batches = [[row for row in batch if row['key'] not in raw_by_key] for batch in batches]
+        invalid = [row for row in original if row['key'] not in valid_by_key]
+        for row in invalid:
+            rejected.append({'source': 'fatsecret', 'source_id': row['key'],
+                             'name': row['名称'], 'reason': '本次抓取有效表未收录，隔离且不回退旧快照',
+                             'original': row})
+        refresh_audit.append({'snapshot': folder.name, 'raw_rows': len(original),
+                              'valid_rows': len(current), 'superseded_rows': len(superseded),
+                              'excluded_rows': len(invalid)})
+        batches.append(current)
+    return [row for batch in batches for row in batch]
+
+
+def reference_energy(row):
+    kcal, kj = number(row.get('能量(kcal)')), number(row.get('能量(kJ)'))
+    swapped = (kcal is not None and kj is not None and kcal > kj > 0 and
+               abs(kcal / 4.184 - kj) <= max(2, .02 * kj))
+    return (kj if swapped else kcal), swapped
+
+
+def build(source_root, output=ROOT, fatsecret_updates=()):
     manifest, rejected, candidates = [], [], []
     name_corrections, preparation_audit = [], []
     portions = defaultdict(list)
+    refresh_audit = []
+    energy_corrections = []
     report = source_root / 'report'
     for row in read_csv(next(report.glob('08_*.csv')), manifest):
         grams = number(row['份量克重'])
@@ -168,9 +253,9 @@ def build(source_root, output=ROOT):
             reason = '无中文名称'
         elif any(nutrients.get(k) is None for k in CORE):
             reason = '缺少可归一的热量或三大营养素'
-        elif nutrients['energy_kcal'] > 1000 or any(nutrients[k] > 100 for k in CORE[1:]):
-            reason = '超出每100克合理上限'
-        elif sum(nutrients[k] for k in CORE[1:]) > 105:
+        elif nutrients['energy_kcal'] > 1000 or any(nutrients[k] > (100 if unit == 'g' else 250) for k in CORE[1:]):
+            reason = '超出每100克或毫升合理上限'
+        elif unit == 'g' and sum(nutrients[k] for k in CORE[1:]) > 105:
             reason = '三大营养素合计超过105克'
         if reason:
             rejected.append({'source': source, 'source_id': str(source_id),
@@ -228,6 +313,12 @@ def build(source_root, output=ROOT):
                     'vitamin_a_ug': '总维生素A(μgRAE)', 'vitamin_c_mg': '维生素C(mg)',
                     'niacin_mg': '烟酸(mg)'}
         nutrients = {k: number(row.get(v)) for k, v in mappings.items()}
+        nutrients['energy_kcal'], swapped = reference_energy(row)
+        if swapped:
+            energy_corrections.append({'source': 'cn_fct', 'source_id': row['食物编码'],
+                                       'name': row['食物名称'], 'original_kcal': number(row['能量(kcal)']),
+                                       'corrected_kcal': nutrients['energy_kcal'],
+                                       'reason': '源表kcal/kJ列反置，按两列4.184换算关系纠正'})
         # Insoluble fibre is not interchangeable with total dietary fibre.
         nutrients['insoluble_fiber_g'] = number(row.get('不溶性膳食纤维(g)'))
         add('cn_fct', row['食物编码'], row['食物名称'], '', row['一级分类'],
@@ -248,24 +339,15 @@ def build(source_root, output=ROOT):
             row['分类'] if row['分类'] in BRANDS else '', row['分类'], nutrients,
             serving=serving, aliases=[row['英文名']], provenance=row)
 
-    fatsecret = source_root / 'fatsecret' / '有效数据.csv'
-    for row in read_csv(fatsecret, manifest):
-        nutrients = {k: number(row[v]) for k, v in {
-            'energy_kcal': '每100g_热量', 'protein_g': '每100g_蛋白',
-            'carbohydrate_g': '每100g_碳水', 'fat_g': '每100g_脂肪'}.items()}
-        grams = number(row['基准克重'])
-        serving = []
-        if grams:
-            serving.append({'label': row['计量基准'].removeprefix('每'), 'grams': grams})
+    for row in fatsecret_rows(source_root, fatsecret_updates, manifest, rejected, refresh_audit):
         try:
-            for p in json.loads(row['其他份量'] or '[]'):
-                weight = number(p.get('grams'))
-                if weight:
-                    serving.append({'label': p['name'], 'grams': weight})
-        except (ValueError, TypeError):
-            pass
+            nutrients, unit, serving = fatsecret_values(row)
+        except ValueError as error:
+            rejected.append({'source': 'fatsecret', 'source_id': row['key'],
+                             'name': row['名称'], 'reason': str(error), 'original': row})
+            continue
         add('fatsecret', row['key'], row['名称'], row['品牌'], row['类型'],
-            nutrients, serving=serving, provenance=row)
+            nutrients, serving=serving, provenance=row, unit=unit)
 
     groups = defaultdict(list)
     for item in candidates:
@@ -303,14 +385,16 @@ def build(source_root, output=ROOT):
                               'brand': target['brand'], 'nutrition_source': target['nutrition_source'],
                               'selected_nutrients': target['nutrients'], 'alternatives': alternatives})
         target.pop('_representative')
-        target['portions'] = clean_portions(target['portions'])
+        target['portions'] = clean_portions(target['portions'], target['unit'])
         foods.append(target)
     foods.sort(key=lambda x: x['id'])
     merged_count = len(candidates) - len(foods)
     summary = {'schema_version': 1, 'inputs': manifest,
                'candidate_rows': len(candidates), 'food_count': len(foods),
                'merged_duplicates': merged_count, 'rejected_rows': len(rejected),
-               'cleaning_version': 4,
+               'cleaning_version': 5,
+               'refresh_snapshots': refresh_audit,
+               'energy_unit_corrections': len(energy_corrections),
                'preparation_portions_removed': len(preparation_audit),
                'weight_basis_coverage': dict(Counter(f['weight_basis'] or 'unspecified' for f in foods)),
                'conflict_groups_resolved': len(conflicts),
@@ -318,7 +402,7 @@ def build(source_root, output=ROOT):
                'name_corrections': len(name_corrections),
                'source_coverage': dict(Counter(s['source'] for f in foods for s in f['sources'])),
                'serving_count': sum(len(f['portions']) for f in foods),
-               'normalization': '每100克可食部；kcal/g/mg/µg；不推测份量克重或饮品密度',
+               'normalization': '每100克可食部或每100毫升；kcal/g/mg/µg；不推测份量克重或饮品密度',
                'deduplication': '清洗后名称+品牌+单位+生熟干湿状态唯一；中国食物成分表>吃有数>FatSecret；同源优先代表值及完整营养，数值不平均，冲突进审计不重复展示',
                'distribution': '私人本地数据；来源许可未授权公开再分发，不得上传公共仓库'}
     asset = output / 'assets' / 'foods'
@@ -332,6 +416,7 @@ def build(source_root, output=ROOT):
     (data / 'food_conflicts.json').write_text(json.dumps(conflicts, ensure_ascii=False, indent=2), encoding='utf-8')
     (data / 'food_preparation_audit.json').write_text(json.dumps(preparation_audit, ensure_ascii=False, indent=2), encoding='utf-8')
     (data / 'food_name_corrections.json').write_text(json.dumps(name_corrections, ensure_ascii=False, indent=2), encoding='utf-8')
+    (data / 'food_energy_corrections.json').write_text(json.dumps(energy_corrections, ensure_ascii=False, indent=2), encoding='utf-8')
     csv_fields = ['id', 'name', 'brand', 'unit', *CORE, 'sources']
     with (data / 'food_library.csv').open('w', encoding='utf-8-sig', newline='') as fp:
         writer = csv.DictWriter(fp, fieldnames=csv_fields)
@@ -360,5 +445,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source-root', required=True, type=Path)
     parser.add_argument('--output', type=Path, default=ROOT)
+    parser.add_argument('--fatsecret-update', action='append', type=Path, default=[],
+                        help='Additional snapshot folder containing 全量原始.csv and 有效数据.csv; newest last')
     args = parser.parse_args()
-    build(args.source_root, args.output)
+    build(args.source_root, args.output, args.fatsecret_update)

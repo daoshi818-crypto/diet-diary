@@ -55,7 +55,7 @@ class MealItemCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: AppCard(
-        onTap: () => _onItemPressed(context),
+        onTap: onQuickAdd ?? () => _onItemPressed(context),
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -168,6 +168,15 @@ class MealItemCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onQuickAdd != null)
+                  Semantics(
+                    identifier: 'meal-item-detail',
+                    child: IconButton(
+                      tooltip: s.nutritionInfoLabel,
+                      icon: const Icon(Icons.info_outline_rounded),
+                      onPressed: () => _onItemPressed(context),
+                    ),
+                  ),
                 FavouriteToggleButton(
                   meal: mealEntity,
                   semanticsIdentifier: favouriteSemanticsIdentifier,

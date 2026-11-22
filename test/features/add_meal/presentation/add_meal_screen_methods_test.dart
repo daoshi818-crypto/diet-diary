@@ -3,15 +3,19 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
+import 'package:provider/provider.dart';
 import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
 import 'package:opennutritracker/core/domain/entity/config_entity.dart';
 import 'package:opennutritracker/core/domain/entity/intake_entity.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
+import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
 import 'package:opennutritracker/core/domain/usecase/get_config_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/get_intake_usecase.dart';
 import 'package:opennutritracker/core/utils/ai_credential_storage.dart';
+import 'package:opennutritracker/core/utils/energy_unit_provider.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/nutrition_label_draft.dart';
 import 'package:opennutritracker/features/add_meal/domain/usecase/search_products_usecase.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_screen.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
@@ -22,6 +26,7 @@ import 'package:opennutritracker/features/add_meal/presentation/bloc/food_bloc.d
 import 'package:opennutritracker/features/add_meal/presentation/bloc/products_bloc.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/recent_meal_bloc.dart';
 import 'package:opennutritracker/features/add_meal/presentation/screens/bulk_add_screen.dart';
+import 'package:opennutritracker/features/add_meal/presentation/widgets/log_tray_widgets.dart';
 import 'package:opennutritracker/features/scanner/scanner_screen.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
@@ -128,36 +133,89 @@ Future<void> _register({bool imperial = false, bool aiHidden = false}) async {
 
 /// The add-food screen at the root, and a stub for every route it pushes
 /// that records what it was asked for.
-Widget _app(List<RouteSettings> pushed) => MaterialApp(
-  localizationsDelegates: const [
-    S.delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-  ],
-  supportedLocales: S.supportedLocales,
-  onGenerateRoute: (settings) {
-    if (settings.name == Navigator.defaultRouteName) {
-      return MaterialPageRoute<void>(
-        settings: RouteSettings(
-          name: settings.name,
-          arguments: AddMealScreenArguments(
-            AddMealType.breakfastType,
-            DateTime(2026, 10, 18),
-          ),
-        ),
-        builder: (_) => const AddMealScreen(),
-      );
-    }
-    pushed.add(settings);
-    return MaterialPageRoute<void>(
-      settings: settings,
-      builder: (_) => const Scaffold(body: SizedBox()),
+Widget _app(List<RouteSettings> pushed, {MealEntity? initialMeal}) =>
+    ChangeNotifierProvider(
+      create: (_) => EnergyUnitProvider(),
+      child: MaterialApp(
+        localizationsDelegates: const [
+          S.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: S.supportedLocales,
+        onGenerateRoute: (settings) {
+          if (settings.name == Navigator.defaultRouteName) {
+            return MaterialPageRoute<void>(
+              settings: RouteSettings(
+                name: settings.name,
+                arguments: AddMealScreenArguments(
+                  AddMealType.breakfastType,
+                  DateTime(2026, 10, 18),
+                  initialMeal: initialMeal,
+                ),
+              ),
+              builder: (_) => const AddMealScreen(),
+            );
+          }
+          pushed.add(settings);
+          return MaterialPageRoute<void>(
+            settings: settings,
+            builder: (_) => const Scaffold(body: SizedBox()),
+          );
+        },
+      ),
     );
-  },
-);
 
 void main() {
+  testWidgets(
+    'saved nutrition label opens grams and adds the corrected amount',
+    (tester) async {
+      await _register();
+      final meal = const NutritionLabelDraft(
+        name: '原味燕麦片',
+        basisQuantity: 30,
+        energy: 450,
+        energyUnit: 'kJ',
+        protein: 3,
+        fat: 2,
+        carbs: 20,
+      ).toMeal();
+      await tester.pumpWidget(_app([], initialMeal: meal));
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      final quantity = tester.widget<FoodQuantityDialog>(
+        find.byType(FoodQuantityDialog),
+      );
+      expect(quantity.meal.name, '原味燕麦片');
+      expect(quantity.asBottomSheet, isTrue);
+      expect(find.text('g'), findsWidgets);
+      final amount = find.descendant(
+        of: find.byType(FoodQuantityDialog),
+        matching: find.byType(TextFormField),
+      );
+      await tester.enterText(amount, '60');
+      await tester.tap(find.bySemanticsIdentifier('meal-detail-add'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FoodQuantityDialog), findsNothing);
+      expect(find.bySemanticsIdentifier('add-meal-tray-log'), findsOneWidget);
+      final item = tester
+          .widget<LogTrayLogButton>(find.byType(LogTrayLogButton))
+          .tray
+          .items
+          .single;
+      expect(item.amount, 60);
+      expect(item.amountLabel, '60 g');
+      expect(item.kcal, closeTo(900 / 4.184, .001));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await getIt.reset();
+      await _favourites?.dispose();
+      _favourites = null;
+    },
+  );
+
   testWidgets('the three entry methods sit under the search field', (
     tester,
   ) async {
