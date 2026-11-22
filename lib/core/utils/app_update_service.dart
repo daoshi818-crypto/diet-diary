@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -116,6 +117,46 @@ class AppUpdateService {
   }
 
   Future<AppUpdateRelease> check() async {
+    try {
+      return await _checkDirect();
+    } on HttpException {
+      return _checkApi();
+    } on TimeoutException {
+      return _checkApi();
+    } on http.ClientException {
+      return _checkApi();
+    } on SocketException {
+      return _checkApi();
+    }
+  }
+
+  Future<AppUpdateRelease> _checkDirect() async {
+    final metadata = await _json(
+      Uri.https(
+        'github.com',
+        '/$_repository/releases/latest/download/UPDATE.json',
+      ),
+    );
+    final build = metadata['versionCode'];
+    if (build is! int || build <= 1000) {
+      throw const FormatException('Invalid update build');
+    }
+    final tag = metadata['releaseTag'] ?? 'apk-${build - 1000}';
+    if (tag is! String ||
+        !RegExp(r'^apk-[1-9][0-9]*$').hasMatch(tag) ||
+        int.parse(tag.substring(4)) + 1000 != build) {
+      throw const FormatException('Invalid update release tag');
+    }
+    return AppUpdateRelease.parse(
+      metadata,
+      Uri.https(
+        'github.com',
+        '/$_repository/releases/download/$tag/diet-diary.apk',
+      ),
+    );
+  }
+
+  Future<AppUpdateRelease> _checkApi() async {
     final release = await _json(
       Uri.https('api.github.com', '/repos/$_repository/releases/latest'),
     );

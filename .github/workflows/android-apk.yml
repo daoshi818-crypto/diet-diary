@@ -13,6 +13,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup-flutter-cache
+      - uses: ./.github/actions/write-env-file
+        with:
+          sentry_dns: https://stub@sentry.io/0
+          supabase_project_url: https://stub.supabase.co
+          supabase_project_anon_key: ci-stub
+      - name: Prepare Flutter
+        run: |
+          flutter pub get
+          flutter gen-l10n
+          dart run build_runner build --delete-conflicting-outputs
+      - name: Check food library and nutrition goals
+        run: |
+          python3 tool/test_build_chinese_food_catalog.py
+          python3 tool/test_verify_android_apk.py
+          python3 tool/test_write_app_update_manifest.py
+          flutter analyze --no-pub
+          flutter test --no-pub --concurrency=2
+
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -42,13 +66,6 @@ jobs:
           flutter pub get
           flutter gen-l10n
           dart run build_runner build --delete-conflicting-outputs
-      - name: Check food library and nutrition goals
-        run: |
-          python3 tool/test_build_chinese_food_catalog.py
-          python3 tool/test_verify_android_apk.py
-          python3 tool/test_write_app_update_manifest.py
-          flutter analyze --no-pub
-          flutter test --no-pub --concurrency=2
       - name: Prepare release signing
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

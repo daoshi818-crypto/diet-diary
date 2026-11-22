@@ -55,6 +55,85 @@ void main() {
     }
   });
 
+  test(
+    'reads direct release metadata without using the rate-limited API',
+    () async {
+      final requested = <Uri>[];
+      final service = AppUpdateService(
+        client: MockClient((request) async {
+          requested.add(request.url);
+          if (request.url.host == 'api.github.com') {
+            return http.Response('rate limited', 403);
+          }
+          return http.Response(jsonEncode(metadata()), 200);
+        }),
+      );
+      addTearDown(service.close);
+      final release = await service.check();
+      expect(requested, [
+        Uri.parse(
+          'https://github.com/daoshi818-crypto/chiyoushu-food-data/releases/latest/download/UPDATE.json',
+        ),
+      ]);
+      expect(release.apkUrl, apkUrl);
+    },
+  );
+
+  test('direct release network failure falls back to the API', () async {
+    final requested = <Uri>[];
+    final service = AppUpdateService(
+      client: MockClient((request) async {
+        requested.add(request.url);
+        if (request.url.path.contains('/latest/download/')) {
+          return http.Response('unavailable', 503);
+        }
+        if (request.url.host == 'api.github.com') {
+          return http.Response(
+            jsonEncode({
+              'assets': [
+                {
+                  'name': 'UPDATE.json',
+                  'browser_download_url': apkUrl
+                      .resolve('UPDATE.json')
+                      .toString(),
+                },
+                {
+                  'name': 'diet-diary.apk',
+                  'browser_download_url': apkUrl.toString(),
+                  'size': bytes.length,
+                },
+              ],
+            }),
+            200,
+          );
+        }
+        return http.Response(jsonEncode(metadata()), 200);
+      }),
+    );
+    addTearDown(service.close);
+    expect((await service.check()).apkUrl, apkUrl);
+    expect(requested.any((u) => u.host == 'api.github.com'), isTrue);
+  });
+
+  test('direct release rejects mismatched or external release tags', () async {
+    for (final tag in [
+      'apk-14',
+      '../../other',
+      'https://untrusted.test/app.apk',
+    ]) {
+      final service = AppUpdateService(
+        client: MockClient(
+          (_) async => http.Response(
+            jsonEncode({...metadata(), 'releaseTag': tag}),
+            200,
+          ),
+        ),
+      );
+      await expectLater(service.check(), throwsFormatException);
+      service.close();
+    }
+  });
+
   test('reads published metadata and validates asset size', () async {
     final service = AppUpdateService(
       client: MockClient((request) async {
