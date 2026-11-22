@@ -2,6 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:opennutritracker/features/add_meal/util/meal_text_parser.dart';
 
 void main() {
+  test('space separated Chinese foods preserve ml and grams', () {
+    final result = parseMealText('美式100ml 玉米50g');
+    expect(result.errors, isEmpty);
+    expect(result.items.map((e) => e.query), ['美式', '玉米']);
+    expect(result.items.map((e) => e.quantity), [100, 50]);
+    expect(result.items.map((e) => e.unit), ['ml', 'g']);
+    expect(parseMealText('西麦 麦片50g').items.single.query, '西麦 麦片');
+  });
+
   group('parseMealText segmentation', () {
     test('a single item with no separator at all is one segment', () {
       final result = parseMealText('black coffee');

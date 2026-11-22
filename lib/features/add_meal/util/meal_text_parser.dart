@@ -326,6 +326,14 @@ final _separator = RegExp(r'[;+\n、，；]|(?<!\d),|,(?!\d)');
 /// `+` and their CJK equivalents, subject to the comma rule on
 /// [_separator].
 List<String> _segment(String input) => input
+    .replaceAllMapped(
+      RegExp(
+        r'(?<=[\p{L}])(\s*-?\d+(?:[.,]\d+)?\s*(?:kg|lb|ml|oz|g|l|毫升|千克|克|升))\s+(?=[\p{L}][^,;+\n、，；]*\d\s*(?:kg|lb|ml|oz|g|l|毫升|千克|克|升))',
+        unicode: true,
+        caseSensitive: false,
+      ),
+      (m) => '${m[1]};',
+    )
     .split(_separator)
     .map((s) => s.trim())
     .where((s) => s.isNotEmpty)

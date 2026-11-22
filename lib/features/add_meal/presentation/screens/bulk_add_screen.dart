@@ -421,22 +421,28 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
       body: SafeArea(
         child: BlocBuilder<BulkAddBloc, BulkAddState>(
           bloc: _bloc,
-          builder: (context, state) => SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (state is BulkAddLoadedState &&
-                    state.source == BulkAddReadSource.photo)
-                  _buildPhotoSource(context)
-                else
-                  _buildInput(context, state),
-                const Divider(height: 1),
-                _buildBody(context, state),
-                if (state is BulkAddLoadedState)
-                  _buildSubmitBar(context, state),
-              ],
-            ),
+          builder: (context, state) => Column(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (state is BulkAddLoadedState &&
+                          state.source == BulkAddReadSource.photo)
+                        _buildPhotoSource(context)
+                      else
+                        _buildInput(context, state),
+                      const Divider(height: 1),
+                      _buildBody(context, state),
+                    ],
+                  ),
+                ),
+              ),
+              if (state is BulkAddLoadedState) _buildSubmitBar(context, state),
+            ],
           ),
         ),
       ),
@@ -1196,15 +1202,7 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     final unitWidth = _unitDropdownWidth(context, row) + _unitPillPadding;
     final energyText = _energyLabel(context, row);
     final detailText = _energyDetailLabel(context, row);
-    final energyWidth = math.max(
-      _textWidth(context, energyText, theme.textTheme.titleSmall),
-      _textWidth(context, detailText, theme.textTheme.bodySmall),
-    );
-    // Nothing flexes 532px into 288px. Where the three do not fit, they take
-    // a line each rather than share one: the unit is a whole word in some
-    // locales, and a clipped unit is not a narrower reading of the amount,
-    // it is a wrong one.
-    final stacked = available < fieldWidth + 12 + unitWidth + 8 + energyWidth;
+    final stacked = available < fieldWidth + 12 + unitWidth;
 
     final field = TextField(
       controller: controller,
@@ -1266,7 +1264,12 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(energyText, style: theme.textTheme.titleSmall),
+        Text(
+          energyText,
+          maxLines: 1,
+          softWrap: false,
+          style: theme.textTheme.titleSmall,
+        ),
         if (detailText.isNotEmpty)
           Text(
             detailText,
@@ -1284,29 +1287,20 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (stacked)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                field,
-                const SizedBox(height: 8),
-                unit,
-                const SizedBox(height: 4),
-                Align(alignment: AlignmentDirectional.centerEnd, child: energy),
-              ],
-            )
-          // Unchanged wherever it fits, which is every ordinary text size:
-          // the figure stays on the same line, pushed to the trailing edge.
-          else
+          if (stacked) ...[
+            field,
+            const SizedBox(height: 8),
+            unit,
+          ] else
             Row(
               children: [
-                SizedBox(width: fieldWidth, child: field),
+                Expanded(child: field),
                 const SizedBox(width: 12),
                 unit,
-                const Spacer(),
-                energy,
               ],
             ),
+          const SizedBox(height: 8),
+          Align(alignment: AlignmentDirectional.centerEnd, child: energy),
           // The whole width, not the field's. `errorText` would put this
           // inside a 110px box, where every one of the three sentences
           // ellipsizes to nothing worth reading — and the decimal rule, the

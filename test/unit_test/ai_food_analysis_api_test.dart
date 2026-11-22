@@ -27,6 +27,45 @@ http.Response _response(Object value) => http.Response.bytes(
   headers: {'content-type': 'application/json; charset=utf-8'},
 );
 void main() {
+  test(
+    'custom provider retries unsupported tools as schema guided JSON',
+    () async {
+      var calls = 0;
+      final api = AiFoodAnalysisApi(
+        MockClient((request) async {
+          calls++;
+          final body = jsonDecode(request.body) as Map;
+          if (calls == 1) {
+            return http.Response('tool_choice not supported', 400);
+          }
+          expect(body.containsKey('tools'), isFalse);
+          expect(body['response_format'], {'type': 'json_object'});
+          expect(body['messages'][0]['content'], contains('basisUnit'));
+          return _response({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({
+                    'items': [_food],
+                  }),
+                },
+              },
+            ],
+          });
+        }),
+      );
+      final items = await api.analyze(
+        selection: const AiSelection(
+          provider: AiProvider.ownServer,
+          modelId: 'deepseek-chat',
+          endpoint: 'https://relay.example',
+        ),
+        text: '米饭220g',
+      );
+      expect(items.single.amount, 220);
+      expect(calls, 2);
+    },
+  );
   final photo = MealPhoto(
     bytes: Uint8List.fromList([1, 2, 3]),
     mediaType: 'image/jpeg',

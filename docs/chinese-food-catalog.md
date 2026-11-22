@@ -1,6 +1,6 @@
 # 本地中文食物库
 
-饮食日记的生产依赖注入使用 `ProductsRepository.local`：食品搜索、配方选材、AI 餐食匹配、条码查询均读取 `assets/foods/catalog.json`，不查询 Open Food Facts 或 Supabase。旧的 OFF/FDC 数据源代码保留用于兼容测试，不在应用中注册或初始化。
+饮食日记的生产依赖注入使用 `ProductsRepository.local`：食品搜索、配方选材、AI 餐食匹配、条码查询均读取完整中文离线快照（已安装的有效更新优先，其次 `assets/foods/catalog.json`），不查询 Open Food Facts 或 Supabase。旧的 OFF/FDC 数据源代码保留用于兼容测试，不在应用中注册或初始化。
 
 ## 生成
 
@@ -29,7 +29,7 @@ py -X utf8 tool/build_chinese_food_catalog.py --source-root 'D:\吃有数' `
 - `data/private_food_catalog/food_name_corrections.json`：原名称、清洗后的名称与来源ID。
 - `data/private_food_catalog/food_energy_corrections.json`：源表 kcal/kJ 列反置的修正依据。
 
-清洗后的 `assets/foods/catalog.json` 随代码提交到当前私有仓库，便于自动构建；原始CSV及审计产物保留本地，不上传。程序不会在读取失败时回退远程库。
+清洗后的 `assets/foods/catalog.json` 随 App 保留作为离线基础库。维护者已授权公开食物成分数据，完整更新发布到独立的 `daoshi818-crypto/chiyoushu-food-data` 公共仓库；原始 CSV、审计产物、用户记录与密钥不随数据仓库分发。更新失败继续使用当前有效库。
 
 2026-11-21 第二版本机快照：13,730 条食物、19,007 条份量，共合并 1,283 条重复；隔离 1,605 条无法安全导入的数据，333 条名称完成规范化，335 组营养冲突中的 448 条其他版本进入审计文件。相比第一版额外去掉 421 条默认展示记录。每次重新生成以 manifest 的实际统计为准。
 
@@ -39,7 +39,7 @@ py -X utf8 tool/build_chinese_food_catalog.py --source-root 'D:\吃有数' `
 
 清洗后名称、品牌与营养单位共同构成唯一身份，不再因同名食物的营养数值不同就重复展示。优先选择中国食物成分表，其次吃有数导出库，再其次 FatSecret；同源优先代表值和营养字段更完整的记录，最后用稳定ID确定次序。营养值不取平均，所有不同版本可在审计文件追溯；选定记录有明确的 `nutrition_source`。只有能量差不超过 `max(1 kcal, 1%)` 且各宏量差不超过 `max(0.2 g, 1%)` 时，才允许补充选定记录缺少的微量字段，避免拼出互相冲突的营养表。
 
-份量按实际克重去重，同重量优先保留“小个/一碗”等具名份量；界面不再重复追加相同重量的克重快捷项，也不重复标注标签已有的克重。手动输入克重仍可使用。“一份”对应不同重量时显式写出克重。稳定 ID 包含来源、原始 ID、原名称、品牌与营养指纹；被合并记录的原始来源 ID 仍可解析到选定食物。
+份量按实际克重去重，同重量优先保留“小个/一碗”等具名份量；界面不再重复追加相同重量的克重快捷项，也不重复标注标签已有的克重。手动输入克重仍可使用。“一份”对应不同重量时显式写出克重。现有 ID 保留为稳定逻辑 ID：重新导入时按规范化名称、品牌、单位和生熟状态复用旧 ID，营养修正不再改变现有 ID；公共数据源显式维护 id，revision 标记内容版本。被合并记录的原始来源 ID 仍可解析到选定食物。
 
 每 100 克或每 100 毫升为营养基准；宏量营养用 g，钠及大多数矿物质用 mg，维生素 A 用 µg RAE。未知微量营养保留为空，不补成 0；不溶性纤维不冒充总膳食纤维。饮品源数据明确为每 100 克时不擅自换成每 100 毫升，也不猜测一碗、一杯的重量。明确每毫升的饮品保留 ml，不用克字段或假定密度换算；克重仅由热量反推的记录隔离。成分表同时提供 kcal/kJ 且两列反置时，按明确的 4.184 换算关系改用原 kcal 数值，保留修正审计，不以宏量供能估算覆盖热量。
 
@@ -97,3 +97,7 @@ flutter test --no-pub --dart-define=GENERATE_FOOD_PREVIEW=true test/widget_test/
 本机完整Flutter回归3,755项通过、6项跳过、0失败；静态分析无问题。Python导入与APK校验回归14+1项通过；再次生成目录逐字节一致，归一食物身份与同重量分量重复均为0。构建及发布工作流的YAML和Shell语法检查通过。
 
 构建流程采用 `gradle/actions/setup-gradle@v5` 去重保存Gradle依赖和构建状态，保留单ARM64、构建前腾出runner空间及缓存前清理中间产物。关闭公开Build Scan上传。`tool/verify_android_apk.py` 在上传前核对ARM64运行库和APK内食物目录的逐字节一致性，`BUILD_INFO.json` 随Actions产物保存。首次仍需建立Gradle缓存，不把首次构建时长当作热缓存结果。
+
+## 云端更新
+
+首版公共目录包含 19,546 条。Pages 提供 manifest，jsDelivr 提供固定完整提交 SHA 的目录；完整下载校验后才发布版本通知。App 前台每小时至多检查一次，失败短暂退避，支持设置页手动检查。校验体积、SHA-256、结构、唯一 ID、份量和数量后切换快照，保留上一有效版本。新增更高发布序号可回滚，已记录餐食保持历史营养快照。详见 `food-catalog-updates.md`。

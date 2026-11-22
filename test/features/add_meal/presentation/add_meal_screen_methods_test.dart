@@ -379,9 +379,7 @@ void main() {
     },
   );
 
-  testWidgets('the three entry methods sit under the search field', (
-    tester,
-  ) async {
+  testWidgets('entry methods stay above search while typing', (tester) async {
     await _register();
     await tester.pumpWidget(_app([]));
     await tester.pumpAndSettle();
@@ -438,44 +436,42 @@ void main() {
     );
   });
 
-  testWidgets('Describe opens a panel, and Find foods takes the text along', (
+  testWidgets('Describe opens its own page without an inline panel', (
     tester,
   ) async {
     await _register(imperial: true);
     final pushed = <RouteSettings>[];
     await tester.pumpWidget(_app(pushed));
     await tester.pumpAndSettle();
-
-    expect(find.bySemanticsIdentifier('add-meal-describe-input'), findsNothing);
-    await tester.tap(find.bySemanticsIdentifier('add-meal-method-describe'));
-    await tester.pumpAndSettle();
-
-    // Nothing to find yet, so nothing to tap.
-    final submit = find.descendant(
-      of: find.bySemanticsIdentifier('add-meal-describe-submit'),
-      matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+    final search = find.bySemanticsIdentifier('meal-search-field');
+    expect(
+      tester
+          .getRect(find.bySemanticsIdentifier('add-meal-method-describe'))
+          .bottom,
+      lessThan(tester.getRect(search).top),
     );
-    expect(tester.widget<ButtonStyleButton>(submit).onPressed, isNull);
-
     await tester.enterText(
-      find.descendant(
-        of: find.bySemanticsIdentifier('add-meal-describe-input'),
-        matching: find.byType(TextField),
-      ),
-      '200g broccoli and 3 eggs',
+      find.descendant(of: search, matching: find.byType(TextField)),
+      '美式',
     );
-    await tester.pump();
-    await tester.ensureVisible(submit);
     await tester.pumpAndSettle();
-    await tester.tap(submit);
-    await tester.pumpAndSettle();
+    expect(
+      find.bySemanticsIdentifier('add-meal-method-photo').hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsIdentifier('add-meal-method-barcode').hitTestable(),
+      findsOneWidget,
+    );
+    await tester.tap(find.bySemanticsIdentifier('add-meal-method-describe'));
 
+    await tester.pumpAndSettle();
     expect(pushed.single.name, NavigationOptions.bulkAddRoute);
     final args = pushed.single.arguments as BulkAddScreenArguments;
-    expect(args.initialText, '200g broccoli and 3 eggs');
+    expect(args.initialText, isNull);
     expect(args.startWithPhoto, isFalse);
-    expect(args.intakeTypeEntity, IntakeTypeEntity.breakfast);
     expect(args.usesImperialUnits, isTrue);
+    expect(find.bySemanticsIdentifier('add-meal-describe-input'), findsNothing);
   });
 
   testWidgets('Snap meal goes to the review screen ready for a photo', (
@@ -503,7 +499,8 @@ void main() {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
-      await tester.pumpWidget(_app([]));
+      final pushed = <RouteSettings>[];
+      await tester.pumpWidget(_app(pushed));
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('add-meal-method-describe'));
       await tester.pumpAndSettle();
@@ -511,8 +508,9 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(
         find.bySemanticsIdentifier('add-meal-describe-input'),
-        findsOneWidget,
+        findsNothing,
       );
+      expect(pushed.single.name, NavigationOptions.bulkAddRoute);
     });
   }
 }

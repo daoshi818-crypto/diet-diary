@@ -600,6 +600,29 @@ Future<void> _parse(WidgetTester tester, String text) async {
 Finder _submitButton() => find.widgetWithIcon(FilledButton, Icons.add_rounded);
 
 void main() {
+  testWidgets('changing Americano from 40 to 400 keeps the amount row stable', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 780);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await _register({
+      '美式': [_meal('美式', mealUnit: 'ml')],
+    });
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    await _parse(tester, '美式40ml');
+    final field = find.byType(TextField).last;
+    final unit = find.byType(DropdownButton<String>);
+    final initialField = tester.getRect(field);
+    final initialUnit = tester.getRect(unit);
+    await tester.enterText(field, '400');
+    await tester.pumpAndSettle();
+    expect(tester.getRect(field), initialField);
+    expect(tester.getRect(unit), initialUnit);
+    expect(tester.takeException(), isNull);
+  });
+
   tearDown(() async => getIt.reset());
 
   testWidgets('Search mid-dictation ends dictation, so its pause timeout '

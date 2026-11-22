@@ -1,4 +1,4 @@
-"""Build a private, offline Chinese food library from the user's CSV exports.
+"""Build an offline Chinese food library from the user's CSV exports.
 
 Standard library only. Never edits inputs or infers missing serving weights.
 Run: python tool/build_chinese_food_catalog.py --source-root D:\\吃有数
@@ -225,6 +225,19 @@ def reference_energy(row):
     return (kj if swapped else kcal), swapped
 
 
+def preserve_stable_ids(foods, previous):
+    def identity(food):
+        return (normalized(food['name']), normalized(food.get('brand', '')),
+                food['unit'], food.get('weight_basis'))
+    old = defaultdict(list)
+    for food in previous:
+        old[identity(food)].append(food['id'])
+    for food in foods:
+        matches = old.get(identity(food), [])
+        if len(matches) == 1:
+            food['id'] = matches[0]
+
+
 def build(source_root, output=ROOT, fatsecret_updates=()):
     manifest, rejected, candidates = [], [], []
     name_corrections, preparation_audit = [], []
@@ -387,6 +400,10 @@ def build(source_root, output=ROOT, fatsecret_updates=()):
         target.pop('_representative')
         target['portions'] = clean_portions(target['portions'], target['unit'])
         foods.append(target)
+    previous_path = output / 'assets' / 'foods' / 'catalog.json'
+    if previous_path.exists():
+        previous = json.loads(previous_path.read_text(encoding='utf-8'))['foods']
+        preserve_stable_ids(foods, previous)
     foods.sort(key=lambda x: x['id'])
     merged_count = len(candidates) - len(foods)
     summary = {'schema_version': 1, 'inputs': manifest,
@@ -404,7 +421,7 @@ def build(source_root, output=ROOT, fatsecret_updates=()):
                'serving_count': sum(len(f['portions']) for f in foods),
                'normalization': '每100克可食部或每100毫升；kcal/g/mg/µg；不推测份量克重或饮品密度',
                'deduplication': '清洗后名称+品牌+单位+生熟干湿状态唯一；中国食物成分表>吃有数>FatSecret；同源优先代表值及完整营养，数值不平均，冲突进审计不重复展示',
-               'distribution': '私人本地数据；来源许可未授权公开再分发，不得上传公共仓库'}
+               'distribution': '维护者授权公开分发；保留原始来源，第三方数据权利归原权利人' }
     asset = output / 'assets' / 'foods'
     data = output / 'data' / 'private_food_catalog'
     asset.mkdir(parents=True, exist_ok=True)

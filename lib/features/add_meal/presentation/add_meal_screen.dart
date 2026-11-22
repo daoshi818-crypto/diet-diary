@@ -71,9 +71,6 @@ class _AddMealScreenState extends State<AddMealScreen> {
   late FavouriteMealBloc _favouriteMealBloc;
   late AddMealBloc _addMealBloc;
 
-  /// Whether the Describe tile's panel is open under the tiles.
-  bool _describeOpen = false;
-
   /// Whether the user hid the AI features (#1518): no Snap meal tile, and
   /// Describe without its AI badge, since the offline parser reads it then.
   /// Starts from the value read at app start, so the tile does not show for
@@ -228,7 +225,12 @@ class _AddMealScreenState extends State<AddMealScreen> {
       ),
       bottomNavigationBar: _logTray.isEmpty || keyboardVisible
           ? null
-          : SafeArea(top: false, child: _buildTrayFooter()),
+          : SafeArea(
+              top: false,
+              child: _buildTrayFooter(
+                compact: MediaQuery.sizeOf(context).height < 500,
+              ),
+            ),
       body: SafeArea(
         top: false,
         child: Center(
@@ -244,16 +246,32 @@ class _AddMealScreenState extends State<AddMealScreen> {
                           (MediaQuery.textScalerOf(context).scale(14) - 14) * 4;
                   return Column(
                     children: [
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 4),
+                      AddFoodMethodTiles(
+                        onBarcodePressed: _onBarcodeIconPressed,
+                        onSnapMealPressed: () =>
+                            _openBulkAdd(startWithPhoto: true),
+                        onDescribePressed: () => _openBulkAdd(),
+                        describeOpen: false,
+                        showAi: !_aiHidden,
+                        compact: compact || keyboardVisible,
+                        onNutritionLabelPressed: _openNutritionLabel,
+                      ),
+                      SizedBox(height: compact || keyboardVisible ? 4 : 8),
                       MealSearchBar(
                         searchStringListener: _searchStringListener,
                         onSearchSubmit: _onSearchSubmit,
                         onSearchChanged: _onSearchChanged,
                         onBarcodePressed: null,
+                        compact: compact || keyboardVisible,
                       ),
-                      const SizedBox(height: 8),
-                      _buildSourceChips(context, palette),
-                      const SizedBox(height: 8),
+                      SizedBox(height: compact || keyboardVisible ? 4 : 8),
+                      _buildSourceChips(
+                        context,
+                        palette,
+                        compact: compact || keyboardVisible,
+                      ),
+                      SizedBox(height: compact || keyboardVisible ? 4 : 8),
                       Expanded(
                         child: ValueListenableBuilder<String>(
                           valueListenable: _searchStringListener,
@@ -266,46 +284,6 @@ class _AddMealScreenState extends State<AddMealScreen> {
                                       crossAxisAlignment:
                                           CrossAxisAlignment.stretch,
                                       children: [
-                                        if (query.trim().isEmpty &&
-                                            !keyboardVisible) ...[
-                                          AddFoodMethodTiles(
-                                            onBarcodePressed:
-                                                _onBarcodeIconPressed,
-                                            onSnapMealPressed: () =>
-                                                _openBulkAdd(
-                                                  startWithPhoto: true,
-                                                ),
-                                            onDescribePressed: () => setState(
-                                              () => _describeOpen =
-                                                  !_describeOpen,
-                                            ),
-                                            describeOpen: _describeOpen,
-                                            showAi: !_aiHidden,
-                                          ),
-                                          if (!_aiHidden)
-                                            Semantics(
-                                              identifier:
-                                                  'add-meal-nutrition-label',
-                                              child: TextButton.icon(
-                                                onPressed: _openNutritionLabel,
-                                                icon: const Icon(
-                                                  Icons
-                                                      .document_scanner_outlined,
-                                                ),
-                                                label: Text(
-                                                  S.of(context).labelScanTitle,
-                                                ),
-                                              ),
-                                            ),
-                                        ],
-                                        if (_describeOpen &&
-                                            query.trim().isEmpty) ...[
-                                          const SizedBox(height: 8),
-                                          DescribeMealPanel(
-                                            onFindFoods: (text) =>
-                                                _openBulkAdd(initialText: text),
-                                          ),
-                                        ],
                                         if (_isFoodLibrary) ...[
                                           const SizedBox(height: 8),
                                           _buildLibraryMealSelector(context),
@@ -595,10 +573,15 @@ class _AddMealScreenState extends State<AddMealScreen> {
     ),
   );
 
-  Widget _buildSourceChips(BuildContext context, AppPalette palette) {
+  Widget _buildSourceChips(
+    BuildContext context,
+    AppPalette palette, {
+    bool compact = false,
+  }) {
     Widget chip(_SearchSource source, String label) => Padding(
       padding: const EdgeInsets.only(right: Dimens.spacing8),
       child: ChoiceChip(
+        visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
         label: Text(label),
         selected: _source == source,
         showCheckmark: false,
@@ -1293,7 +1276,6 @@ class _AddMealScreenState extends State<AddMealScreen> {
     bool startWithPhoto = false,
   }) async {
     final state = _addMealBloc.state;
-    final before = _logTray.length;
     await Navigator.of(context).pushNamed(
       NavigationOptions.bulkAddRoute,
       arguments: BulkAddScreenArguments(
@@ -1308,11 +1290,6 @@ class _AddMealScreenState extends State<AddMealScreen> {
     // The review screen can open the AI settings, where the features can be
     // hidden or shown again.
     await _refreshAiHidden();
-    // The description has become rows on the list; the panel that held it
-    // has done its job.
-    if (mounted && _logTray.length > before && _describeOpen) {
-      setState(() => _describeOpen = false);
-    }
   }
 
   void _onQuickAddPressed() {

@@ -7,7 +7,7 @@ import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dar
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 
-/// A private offline snapshot. Never falls back to a remote food database.
+/// Searches a complete offline snapshot; updates replace it after validation.
 class ChineseFoodDataSource {
   final Future<String> Function() _read;
   Future<List<_LocalFood>>? _loading;
@@ -25,6 +25,14 @@ class ChineseFoodDataSource {
       _loading = null;
       rethrow;
     }
+  }
+
+  static Future<int> validateCatalog(String text) async =>
+      compute(_countValidFoods, text);
+
+  Future<void> activate(String text) async {
+    final foods = await compute(_decodeFoods, text);
+    _loading = Future.value(foods);
   }
 
   Future<int> count() async => (await _foods()).length;
@@ -80,9 +88,39 @@ List<_LocalFood> _decodeFoods(String text) {
   if (decoded['schema_version'] != 1 || decoded['foods'] is! List) {
     throw const FormatException('Unsupported Chinese food catalogue');
   }
+  final ids = <String>{};
+  if ((decoded['foods'] as List).isEmpty) {
+    throw const FormatException('Empty catalogue');
+  }
   return (decoded['foods'] as List).map((entry) {
     final row = entry as Map<String, dynamic>;
+    if (row['id'] is! String ||
+        (row['id'] as String).isEmpty ||
+        !ids.add(row['id'] as String) ||
+        row['name'] is! String ||
+        (row['name'] as String).trim().isEmpty ||
+        !{'g', 'ml'}.contains(row['unit'])) {
+      throw const FormatException('Invalid food identity');
+    }
     final n = row['nutrients'] as Map<String, dynamic>;
+    for (final nutrient in n.values) {
+      if (nutrient != null &&
+          (nutrient is! num || !nutrient.isFinite || nutrient < 0)) {
+        throw const FormatException('Invalid food nutrients');
+      }
+    }
+    final weights = <num>{};
+    for (final p in row['portions'] as List) {
+      final grams = p['grams'];
+      if (p['label'] is! String ||
+          grams is! num ||
+          !grams.isFinite ||
+          grams <= 0 ||
+          grams > 10000 ||
+          !weights.add(grams)) {
+        throw const FormatException('Invalid portion');
+      }
+    }
     double? value(String key) => (n[key] as num?)?.toDouble();
     final portions = (row['portions'] as List)
         .map(
@@ -145,3 +183,5 @@ List<_LocalFood> _decodeFoods(String text) {
     );
   }).toList();
 }
+
+int _countValidFoods(String text) => _decodeFoods(text).length;

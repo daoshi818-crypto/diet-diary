@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:opennutritracker/features/add_meal/data/food_catalog_updater.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
 import 'package:opennutritracker/features/home/presentation/widgets/log_water_dialog.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_screen.dart';
@@ -29,6 +31,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _selectedPageIndex = 0;
+  Timer? _catalogTimer;
   DateTime? _diaryDate;
   bool _isDemoData = false;
 
@@ -45,10 +48,16 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _loadConfigDrivenUi();
+    _checkCatalog();
+    _catalogTimer = Timer.periodic(
+      const Duration(minutes: 10),
+      (_) => _checkCatalog(),
+    );
   }
 
   @override
   void dispose() {
+    _catalogTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -61,6 +70,15 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     // that an intent arrived.
     if (state == AppLifecycleState.resumed) {
       _maybeOpenHealthRationale();
+      _checkCatalog();
+    }
+  }
+
+  void _checkCatalog() {
+    final state = WidgetsBinding.instance.lifecycleState;
+    if (state != null && state != AppLifecycleState.resumed) return;
+    if (locator.isRegistered<FoodCatalogUpdater>()) {
+      unawaited(locator<FoodCatalogUpdater>().check());
     }
   }
 
@@ -141,7 +159,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
       ),
       floatingActionButton: _selectedPageIndex == 0
           ? _homeQuickActions(context)
-          : _addButton(context),
+          : null,
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomAppBar(
         color: palette.surface,
@@ -175,11 +193,10 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                     palette: palette,
                     onTap: _setPage,
                   ),
-                  if (_selectedPageIndex == 0)
-                    SizedBox(
-                      width: 56,
-                      child: Center(child: _addButton(context)),
-                    ),
+                  SizedBox(
+                    width: 56,
+                    child: Center(child: _addButton(context)),
+                  ),
                   _NavItem(
                     id: 'nav-trends',
                     icon: Icons.insights_outlined,

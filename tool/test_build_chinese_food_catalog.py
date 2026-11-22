@@ -9,12 +9,20 @@ import unittest
 from pathlib import Path
 
 from build_chinese_food_catalog import (
-    build, clean_food_name, clean_portions, close_nutrition, number,
+    preserve_stable_ids, build, clean_food_name, clean_portions, close_nutrition, number,
     fatsecret_values, metric_quantity, reference_energy,
 )
 
 
 class FoodCatalogueTest(unittest.TestCase):
+    def test_nutrition_corrections_preserve_existing_food_identity(self):
+        previous = [{'id': 'old-id', 'name': '熟米饭', 'brand': '', 'unit': 'g',
+                     'weight_basis': 'cooked', 'nutrients': {'energy_kcal': 116}}]
+        revised = [{**previous[0], 'id': 'new-hash', 'nutrients': {'energy_kcal': 120}}]
+        preserve_stable_ids(revised, previous)
+        self.assertEqual(revised[0]['id'], 'old-id')
+        self.assertEqual(revised[0]['nutrients']['energy_kcal'], 120)
+
     def test_reference_energy_only_repairs_explicit_reversed_kcal_kj_columns(self):
         self.assertEqual(reference_energy({'能量(kcal)': '221', '能量(kJ)': '53'}), (53, True))
         self.assertEqual(reference_energy({'能量(kcal)': '116', '能量(kJ)': '486'}), (116, False))

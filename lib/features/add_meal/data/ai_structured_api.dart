@@ -21,6 +21,7 @@ class AiStructuredApi {
     required String toolName,
     required Map<String, Object?> schema,
     MealPhoto? photo,
+    bool jsonFallback = false,
   }) async {
     final curated = AiModelCatalogue.resolve(
       selection.provider,
@@ -139,14 +140,15 @@ class AiStructuredApi {
             {'role': 'system', 'content': system},
             {
               'role': 'user',
-              'content': [
-                {'type': 'text', 'text': input},
-                if (photo != null)
-                  {
-                    'type': 'image_url',
-                    'image_url': {'url': imageUrl},
-                  },
-              ],
+              'content': photo == null
+                  ? input
+                  : [
+                      {'type': 'text', 'text': input},
+                      {
+                        'type': 'image_url',
+                        'image_url': {'url': imageUrl},
+                      },
+                    ],
             },
           ],
           'tools': [
@@ -180,6 +182,24 @@ class AiStructuredApi {
             },
         };
     }
+    final compatible = selection.provider == AiProvider.ownServer;
+    Future<Map<String, dynamic>> retryJson() => request(
+      selection: selection,
+      system: system,
+      input: input,
+      toolName: toolName,
+      schema: schema,
+      photo: photo,
+      jsonFallback: true,
+    );
+    if (compatible && jsonFallback) {
+      body.remove('tools');
+      body.remove('tool_choice');
+      body['response_format'] = {'type': 'json_object'};
+      final messages = body['messages'] as List;
+      (messages.first as Map)['content'] =
+          '$system\nReturn only a JSON object matching this schema: ${jsonEncode(schema)}';
+    }
     final http.Response response;
     try {
       final guarded = GuardedPlaintextClient(client);
@@ -204,6 +224,15 @@ class AiStructuredApi {
       );
     } catch (_) {
       throw const MealInterpreterException('Structured AI request failed');
+    }
+    if (compatible &&
+        !jsonFallback &&
+        {400, 422}.contains(response.statusCode) &&
+        RegExp(
+          r'tool|function|response_format',
+          caseSensitive: false,
+        ).hasMatch(response.body)) {
+      return retryJson();
     }
     if (response.statusCode != 200) {
       throw MealInterpreterException(
@@ -273,8 +302,18 @@ class AiStructuredApi {
           }
         }
         // Some compatible vision models return JSON content instead of a tool call.
-        if (result == null && message['content'] is String) {
-          var content = (message['content'] as String).trim();
+        final rawContent = message['content'];
+        final textContent = rawContent is String
+            ? rawContent
+            : rawContent is List
+            ? rawContent
+                  .whereType<Map>()
+                  .where((e) => e['type'] == 'text')
+                  .map((e) => e['text'] ?? '')
+                  .join()
+            : '';
+        if (result == null && textContent.isNotEmpty) {
+          var content = textContent.trim();
           if (content.startsWith('```')) {
             content = content
                 .replaceFirst(RegExp(r'^```(?:json)?\s*'), '')
@@ -287,6 +326,7 @@ class AiStructuredApi {
     } on MealInterpreterException {
       rethrow;
     } catch (_) {
+      if (compatible && !jsonFallback) return retryJson();
       throw const MealInterpreterException('Unreadable structured AI response');
     }
   }

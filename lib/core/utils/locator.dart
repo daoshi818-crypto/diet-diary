@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+import 'package:opennutritracker/features/add_meal/data/food_catalog_updater.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:get_it/get_it.dart';
 import 'package:opennutritracker/core/data/data_source/config_data_source.dart';
@@ -223,9 +225,7 @@ Future<void> initLocator() async {
   // The iOS home-screen widget's App Group copy. One instance for Home,
   // the language picker, delete-all and the profile switch, so they share
   // the App Group it resolves once from the bundle id.
-  locator.registerLazySingleton<CalorieWidgetStore>(
-    HomeWidgetCalorieStore.new,
-  );
+  locator.registerLazySingleton<CalorieWidgetStore>(HomeWidgetCalorieStore.new);
 
   // Cache manager
   locator.registerLazySingleton<CacheManager>(
@@ -687,8 +687,18 @@ Future<void> initLocator() async {
   locator.registerLazySingleton<PhysicalActivityDataSource>(
     () => PhysicalActivityDataSource(),
   );
+  locator.registerLazySingleton<FoodCatalogUpdater>(
+    () => FoodCatalogUpdater(
+      client: locator<http.Client>(),
+      activate: (text) => locator<ChineseFoodDataSource>().activate(text),
+    ),
+  );
   locator.registerLazySingleton<ChineseFoodDataSource>(
-    () => ChineseFoodDataSource(),
+    () => ChineseFoodDataSource(
+      read: () async =>
+          await locator<FoodCatalogUpdater>().readInstalledCatalog() ??
+          await rootBundle.loadString('assets/foods/catalog.json'),
+    ),
   );
   locator.registerLazySingleton(() => TrackedDayDataSource(hiveDBProvider));
   locator.registerLazySingleton<WeightLogDataSource>(

@@ -5,20 +5,14 @@ import 'package:opennutritracker/core/utils/custom_icons.dart';
 import 'package:opennutritracker/features/add_meal/presentation/voice/voice_input_button.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
-/// The three ways into the add-food screen besides typing a search: scan a
-/// barcode, photograph the meal, or describe it in words.
-///
-/// These used to be an icon inside the search field and an icon in the app
-/// bar that opened a second screen, which is where the photo action lived —
-/// two taps deep and unlabelled. Laid out side by side under the search
-/// field, each one names itself, and the two that a model reads say so.
 class AddFoodMethodTiles extends StatelessWidget {
   final VoidCallback onBarcodePressed;
   final VoidCallback onSnapMealPressed;
   final VoidCallback onDescribePressed;
 
-  /// Whether the describe panel below is open, so its tile reads as on.
   final bool describeOpen;
+  final bool compact;
+  final VoidCallback? onNutritionLabelPressed;
 
   /// False once the user has hidden the AI features (#1518): the Snap meal
   /// tile goes, since only a model can read a photo, and Describe stays
@@ -32,6 +26,8 @@ class AddFoodMethodTiles extends StatelessWidget {
     required this.onDescribePressed,
     required this.describeOpen,
     this.showAi = true,
+    this.compact = false,
+    this.onNutritionLabelPressed,
   });
 
   @override
@@ -41,6 +37,7 @@ class AddFoodMethodTiles extends StatelessWidget {
         : AppPalette.light;
     final scheme = Theme.of(context).colorScheme;
     final s = S.of(context);
+    final compact = this.compact || MediaQuery.textScalerOf(context).scale(12) > 18;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -49,6 +46,7 @@ class AddFoodMethodTiles extends StatelessWidget {
             identifier: 'add-meal-method-barcode',
             container: true,
             child: _MethodTile(
+              compact: compact,
               icon: CustomIcons.barcode_scan,
               label: s.customMealBarcodeLabel,
               background: palette.surface,
@@ -65,6 +63,7 @@ class AddFoodMethodTiles extends StatelessWidget {
               identifier: 'add-meal-method-photo',
               container: true,
               child: _MethodTile(
+                compact: compact,
                 icon: Icons.photo_camera_rounded,
                 label: s.addMealSnapMealLabel,
                 background: scheme.primary,
@@ -82,7 +81,8 @@ class AddFoodMethodTiles extends StatelessWidget {
             container: true,
             selected: describeOpen,
             child: _MethodTile(
-              // The sparkle reads as AI on its own, so it goes with the badge.
+              compact:
+                  compact, // The sparkle reads as AI on its own, so it goes with the badge.
               icon: showAi ? Icons.auto_awesome_rounded : Icons.notes_rounded,
               label: s.addMealDescribeLabel,
               background: describeOpen
@@ -100,6 +100,23 @@ class AddFoodMethodTiles extends StatelessWidget {
             ),
           ),
         ),
+        if (showAi && onNutritionLabelPressed != null) ...[
+          const SizedBox(width: Dimens.spacing8),
+          Expanded(
+            child: Semantics(
+              identifier: 'add-meal-nutrition-label',
+              container: true,
+              child: _MethodTile(
+                compact: compact,
+                icon: Icons.document_scanner_outlined,
+                label: s.labelScanShortTitle,
+                background: palette.surfaceMuted,
+                foreground: palette.textStrong,
+                onPressed: onNutritionLabelPressed!,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -112,8 +129,9 @@ class _MethodTile extends StatelessWidget {
   final Color foreground;
   final Color? border;
   final bool ai;
-  final VoidCallback onPressed;
+  final bool compact;
 
+  final VoidCallback onPressed;
   const _MethodTile({
     required this.icon,
     required this.label,
@@ -122,100 +140,48 @@ class _MethodTile extends StatelessWidget {
     required this.onPressed,
     this.border,
     this.ai = false,
-  });
+    this.compact = false,
 
+  });
   @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final shape = RoundedRectangleBorder(
-      borderRadius: Dimens.borderRadiusM,
-      side: border == null
-          ? BorderSide.none
-          : BorderSide(color: border!, width: Dimens.hairline),
-    );
-    return Material(
+  Widget build(BuildContext context) => Tooltip(
+    message: label,
+    child: Material(
       color: background,
-      shape: shape,
+      shape: RoundedRectangleBorder(
+        borderRadius: Dimens.borderRadiusS,
+        side: BorderSide(color: border ?? Colors.transparent),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed,
-        child: Stack(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Dimens.spacing4,
-                Dimens.spacing16,
-                Dimens.spacing4,
-                Dimens.spacing12,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(icon, size: 26, color: foreground),
-                  const SizedBox(height: Dimens.spacing8),
-                  // Wraps rather than ellipsizes: the labels are a word or
-                  // two, and a clipped "Snap m…" names nothing.
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: textTheme.labelLarge?.copyWith(
-                      color: foreground,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (ai)
-              PositionedDirectional(
-                top: 7,
-                end: 8,
-                child: _AiBadge(tileColor: background, textColor: foreground),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Marks the two methods a model reads. The word is not translated: it is the
-/// same two letters in every shipped language, and the experimental notice
-/// lives on the screens behind these tiles.
-class _AiBadge extends StatelessWidget {
-  final Color tileColor;
-  final Color textColor;
-
-  const _AiBadge({required this.tileColor, required this.textColor});
-
-  @override
-  Widget build(BuildContext context) {
-    // Inverted against whatever the tile is, so it reads on the accent tile
-    // and the muted one alike.
-    return ExcludeSemantics(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-        decoration: BoxDecoration(
-          color: textColor,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          'AI',
-          textScaler: TextScaler.noScaling,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: tileColor,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: compact ? 14 : 8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 20, color: foreground),
+              if (!compact) const SizedBox(height: 3),
+              if (!compact)
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelSmall?.copyWith(color: foreground),
+                ),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }
 
-/// The describe panel the Describe tile opens in place: type the meal, then
-/// let the review screen match it.
 class DescribeMealPanel extends StatefulWidget {
   final ValueChanged<String> onFindFoods;
 

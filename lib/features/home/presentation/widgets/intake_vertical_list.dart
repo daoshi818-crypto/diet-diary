@@ -195,7 +195,8 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
                 child: Icon(widget.listIcon, size: 20, color: accent),
               ),
               const SizedBox(width: Dimens.spacing12),
-              Expanded(
+              Flexible(
+                flex: 2,
                 child: AutoSizeText(
                   widget.title,
                   maxLines: 1,
@@ -216,17 +217,30 @@ class _IntakeVerticalListState extends State<IntakeVerticalList> {
                   ),
                 ),
               if (_shouldShowHeaderSummary && widget.intakeList.isNotEmpty)
-                Flexible(
-                  child: Text(
-                    _buildHeaderSummary(context),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium?.copyWith(
-                      color: palette.textMuted,
-                      fontWeight: FontWeight.w700,
-                      height: 1.3,
-                    ),
-                    textAlign: TextAlign.end,
+                Expanded(
+                  flex: 3,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (final line in _buildHeaderSummary(
+                        context,
+                      ).split('\n'))
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            line,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.labelMedium?.copyWith(
+                              color: palette.textMuted,
+                              fontWeight: FontWeight.w700,
+                              height: 1.3,
+                            ),
+                            textAlign: TextAlign.end,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               if (widget.onSortTypeChanged != null && totalKcal > 0)
