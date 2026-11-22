@@ -98,12 +98,14 @@ class SharedMealPreviewItem {
 class SharedMealPreviewDialog extends StatelessWidget {
   final List<SharedMealPreviewItem> items;
   final String mealType;
+  final Widget? mealSelector;
   final bool usesImperialUnits;
 
   const SharedMealPreviewDialog({
     super.key,
     required this.items,
     required this.mealType,
+    this.mealSelector,
     this.usesImperialUnits = false,
   });
 
@@ -129,7 +131,8 @@ class SharedMealPreviewDialog extends StatelessWidget {
             children: [
               Text(S.of(context).importMealConfirmContent(mealType)),
               const SizedBox(height: Dimens.spacing16),
-              Text(mealType, style: Theme.of(context).textTheme.titleMedium),
+              mealSelector ??
+                  Text(mealType, style: Theme.of(context).textTheme.titleMedium),
               for (final item in items)
                 Padding(
                   padding:

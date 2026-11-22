@@ -133,6 +133,7 @@ class _Intakes extends Fake implements MealDetailBloc {
   final meals = <MealEntity>[];
   final amounts = <String>[];
   final units = <String>[];
+  final types = <IntakeTypeEntity>[];
   Completer<void>? firstWrite;
   @override
   Future<void> addIntake(BuildContext context, String unit, String amountText,
@@ -140,6 +141,7 @@ class _Intakes extends Fake implements MealDetailBloc {
     meals.add(meal);
     amounts.add(amountText);
     units.add(unit);
+    types.add(type);
     if (meals.length == 1 && firstWrite != null) await firstWrite!.future;
   }
 }
@@ -358,6 +360,21 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('Import defaults to the source meal and allows changing it',
+      (tester) async {
+    await start(tester, payload());
+    expect(find.bySemanticsIdentifier('import-meal-type'), findsOneWidget);
+    expect(find.text(l10nEn.dinnerLabel), findsOneWidget);
+    await tester.tap(find.bySemanticsIdentifier('import-meal-type'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10nEn.lunchLabel).last);
+    await tester.pumpAndSettle();
+    expect(intakes.meals, isEmpty);
+    await tester.tap(find.text(l10nEn.importAction));
+    await tester.pumpAndSettle();
+    expect(intakes.types, [IntakeTypeEntity.lunch, IntakeTypeEntity.lunch]);
+  });
+
   testWidgets('Importer previews with the imperial food unit setting',
       (tester) async {
     config.imperial = true;
@@ -440,6 +457,7 @@ void main() {
     expect(intakes.meals.map((m) => m.name), ['Sardines', 'Bread', 'OFF food']);
     expect(intakes.amounts, ['90.0', '90.0', '50.0']);
     expect(intakes.units, ['g', 'g', 'g']);
+    expect(intakes.types, List.filled(3, IntakeTypeEntity.dinner));
     expect(meals.saved.length, 2);
     expect(barcode.calls, ['ok']);
     expect(home.refreshes, 1);

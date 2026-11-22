@@ -5,6 +5,7 @@ import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.d
 import 'package:opennutritracker/core/data/data_source/remote_search_cache_data_source.dart';
 import 'package:opennutritracker/core/data/dbo/meal_dbo.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
+import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
 import 'package:opennutritracker/core/domain/usecase/get_config_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/save_recipe_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/compute_recipe_nutrition_usecase.dart';
@@ -115,16 +116,30 @@ class SharedMealImporter {
       );
       if (prepared == null || !context.mounted) return false;
       final (items, usesImperialUnits) = prepared;
+      var selectedType = _intakeTypeEntity;
+      var selectedMeal = _addMealType;
       final confirmed = await showDialog<bool>(
         context: context,
-        builder: (_) => SharedMealPreviewDialog(
-          items: items,
-          mealType: _addMealType.getTypeName(context),
-          usesImperialUnits: usesImperialUnits,
+        builder: (_) => StatefulBuilder(
+          builder: (context, setDialogState) => SharedMealPreviewDialog(
+            items: items,
+            mealType: selectedMeal.getTypeName(context),
+            mealSelector: MealTypeSelector(
+              identifier: 'import-meal-type',
+              value: selectedType,
+              onChanged: (type) => setDialogState(() {
+                selectedType = type;
+                selectedMeal = AddMealType.values.firstWhere(
+                  (meal) => meal.getIntakeType() == type,
+                );
+              }),
+            ),
+            usesImperialUnits: usesImperialUnits,
+          ),
         ),
       );
       if (confirmed != true || !context.mounted) return false;
-      final completed = await _withProgress(() => _importItems(items));
+      final completed = await _withProgress(() => _importItems(items, selectedType));
       if (completed != true || !context.mounted) return false;
       _refreshPages();
       return true;
@@ -184,7 +199,10 @@ class SharedMealImporter {
     return [...items, ...offItems];
   }
 
-  Future<bool> _importItems(List<SharedMealPreviewItem> items) async {
+  Future<bool> _importItems(
+    List<SharedMealPreviewItem> items,
+    IntakeTypeEntity intakeType,
+  ) async {
     for (final item in items) {
       if (!context.mounted) return false;
       final meal = item.meal;
@@ -208,7 +226,7 @@ class SharedMealImporter {
         context,
         item.unit,
         item.amount.toString(),
-        _intakeTypeEntity,
+        intakeType,
         meal,
         _day,
       );
