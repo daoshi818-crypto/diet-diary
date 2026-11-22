@@ -240,19 +240,23 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                               runSpacing: 4,
                               children: [
                                 Text(
-                                  '${S.of(context).goalIntakeLabel} ${EnergyDisplay.formatWithUnit(context, widget.totalKcalDaily)}',
+                                  '${S.of(context).goalLabel} ${EnergyDisplay.formatWithUnit(context, widget.totalKcalDaily)}',
                                   style: textTheme.bodySmall,
                                 ),
                                 Text(
-                                  'TDEE ${EnergyDisplay.formatWithUnit(context, widget.tdeeKcal!)}',
+                                  '${S.of(context).burnedLabel} ${EnergyDisplay.formatWithUnit(context, widget.tdeeKcal!)}',
                                   style: textTheme.bodySmall,
                                 ),
                               ],
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${widget.tdeeKcal! < widget.totalKcalDaily ? S.of(context).goalExpectedSurplus : S.of(context).goalExpectedDeficit} '
-                              '${EnergyDisplay.formatWithUnit(context, (widget.tdeeKcal! - widget.totalKcalDaily).abs())}',
+                              (widget.tdeeKcal! - widget.totalKcalDaily)
+                                          .round() ==
+                                      0
+                                  ? S.of(context).homeGoalMaintenance
+                                  : '${widget.tdeeKcal! < widget.totalKcalDaily ? S.of(context).homeGoalSurplus : S.of(context).homeGoalDeficit} '
+                                        '${EnergyDisplay.formatWithUnit(context, (widget.tdeeKcal! - widget.totalKcalDaily).abs())}',
                               style: textTheme.labelLarge,
                             ),
                           ],

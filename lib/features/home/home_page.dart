@@ -178,6 +178,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Stack(
       children: [
         ListView(
+          padding: EdgeInsets.only(bottom: widget.bottomPadding),
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(
@@ -310,8 +311,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 onItemDragCallback: onActivityItemDrag,
               ),
             const FastingHomeChip(),
-            const SizedBox(height: Dimens.spacing8),
-            SizedBox(height: widget.bottomPadding),
           ],
         ),
         Align(

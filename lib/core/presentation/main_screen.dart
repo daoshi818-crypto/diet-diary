@@ -30,6 +30,7 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
+  static const _quickActionSize = 48.0;
   int _selectedPageIndex = 0;
   Timer? _catalogTimer;
   DateTime? _diaryDate;
@@ -126,7 +127,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     _bodyPages = [
-      const HomePage(bottomPadding: 128),
+      const HomePage(bottomPadding: 2 * _quickActionSize + 16),
       DiaryPage(onDateChanged: (date) => _diaryDate = date),
       const TrendsPage(),
       const ProfilePage(),
@@ -248,7 +249,6 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         Icons.restaurant_rounded,
         _openFood,
       ),
-      const SizedBox(height: 8),
       _quickAction(
         context,
         'home-quick-water',
@@ -270,7 +270,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     return Semantics(
       identifier: id,
       child: SizedBox.square(
-        dimension: 48,
+        dimension: _quickActionSize,
         child: IconButton(
           tooltip: tooltip,
           onPressed: onPressed,

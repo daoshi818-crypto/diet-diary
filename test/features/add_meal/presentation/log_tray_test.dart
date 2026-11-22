@@ -535,6 +535,13 @@ void main() {
     final pushed = <RouteSettings>[];
     await _openAddMeal(tester, pushed, library: true);
     expect(find.bySemanticsIdentifier('add-meal-type'), findsNothing);
+    await tester.tap(_card('Oats'));
+    await tester.pumpAndSettle();
+    expect(pushed.last.name, NavigationOptions.mealDetailRoute);
+    expect(find.byType(FoodQuantityDialog), findsNothing);
+    expect(_logButton(), findsNothing);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
     await tester.tap(_detailsOn('Oats'));
     await tester.pumpAndSettle();
     final detail = pushed.last.arguments as MealDetailScreenArguments;

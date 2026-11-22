@@ -245,8 +245,22 @@ class _NutritionLabelScreenState extends State<NutritionLabelScreen> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final busy = _reading || _saving;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(s.labelScanTitle)),
+      appBar: AppBar(
+        title: Text(s.labelScanTitle),
+        actions: [
+          Semantics(
+            identifier: 'nutrition-label-configure',
+            child: IconButton(
+              onPressed: busy ? null : _configure,
+              tooltip: s.labelScanAiSettings,
+              icon: const Icon(Icons.settings_outlined),
+            ),
+          ),
+        ],
+      ),
       bottomNavigationBar: _hasDraft
           ? Padding(
               padding: EdgeInsets.only(
@@ -283,8 +297,25 @@ class _NutritionLabelScreenState extends State<NutritionLabelScreen> {
               padding: const EdgeInsets.all(16),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               children: [
-                Text(s.labelScanIntro),
-                const SizedBox(height: 12),
+                if (_image == null && !_hasDraft) ...[
+                  Container(
+                    height: 136,
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: colors.outlineVariant),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      Icons.document_scanner_outlined,
+                      size: 40,
+                      color: colors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(s.labelScanIntro, style: theme.textTheme.bodyMedium),
+                  const SizedBox(height: 12),
+                ],
                 if (_image != null) ...[
                   Semantics(
                     identifier: 'nutrition-label-original',
@@ -317,41 +348,44 @@ class _NutritionLabelScreenState extends State<NutritionLabelScreen> {
                           ),
                         ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.memory(
-                          _image!,
-                          height: 150,
-                          fit: BoxFit.contain,
-                        ),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Column(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.memory(
+                              _image!,
+                              height: 150,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            s.labelScanViewOriginal,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 12),
                 ],
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    Semantics(
-                      identifier: 'nutrition-label-pick',
-                      child: FilledButton.tonalIcon(
-                        onPressed: _pick,
-                        icon: const Icon(Icons.document_scanner_outlined),
-                        label: Text(
-                          _hasDraft ? s.labelScanAgain : s.labelScanPick,
+                Semantics(
+                  identifier: 'nutrition-label-pick',
+                  child: _hasDraft
+                      ? OutlinedButton.icon(
+                          onPressed: _pick,
+                          icon: const Icon(Icons.document_scanner_outlined),
+                          label: Text(s.labelScanAgain),
+                        )
+                      : FilledButton.icon(
+                          onPressed: _pick,
+                          icon: const Icon(Icons.document_scanner_outlined),
+                          label: Text(s.labelScanPick),
                         ),
-                      ),
-                    ),
-                    Semantics(
-                      identifier: 'nutrition-label-configure',
-                      child: TextButton.icon(
-                        onPressed: _configure,
-                        icon: const Icon(Icons.settings_outlined),
-                        label: Text(s.labelScanAiSettings),
-                      ),
-                    ),
-                  ],
                 ),
                 if (_reading) ...[
                   const SizedBox(height: 16),
@@ -381,7 +415,7 @@ class _NutritionLabelScreenState extends State<NutritionLabelScreen> {
                       children: [
                         Text(
                           s.labelScanReview,
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: theme.textTheme.titleLarge,
                         ),
                         if (_notes.isNotEmpty)
                           Padding(

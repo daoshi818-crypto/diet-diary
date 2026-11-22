@@ -55,7 +55,7 @@ class MealItemCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: AppCard(
-        onTap: onQuickAdd ?? () => _onItemPressed(context),
+        onTap: () => _onItemPressed(context),
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

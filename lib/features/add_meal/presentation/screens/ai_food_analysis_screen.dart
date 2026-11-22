@@ -47,6 +47,7 @@ class AiFoodAnalysisScreen extends StatefulWidget {
 
 class _AiFoodAnalysisScreenState extends State<AiFoodAnalysisScreen> {
   final _text = TextEditingController();
+  final _scroll = ScrollController();
   final _rows = <_FoodRow>[];
   late BulkAddScreenArguments _args;
   bool _initialized = false;
@@ -81,6 +82,7 @@ class _AiFoodAnalysisScreenState extends State<AiFoodAnalysisScreen> {
 
   @override
   void dispose() {
+    _scroll.dispose();
     _text.dispose();
     for (final row in _rows) {
       row.amount.dispose();
@@ -142,7 +144,7 @@ class _AiFoodAnalysisScreenState extends State<AiFoodAnalysisScreen> {
               identifier: 'ai-food-gallery',
               child: ListTile(
                 leading: const Icon(Icons.photo_library_outlined),
-                title: Text(s.labelScanGallery),
+                title: Text(s.mealImagePickFromGallery),
                 onTap: () => Navigator.pop(context, ImageSource.gallery),
               ),
             ),
@@ -460,43 +462,46 @@ class _AiFoodAnalysisScreenState extends State<AiFoodAnalysisScreen> {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final connected = _summary?.enabled == true;
+    final hasPhoto = _image != null;
     return Scaffold(
       appBar: AppBar(
         title: Text(_photoMode ? s.aiFoodPhotoTitle : s.aiFoodTextTitle),
+        actions: [
+          Semantics(
+            identifier: 'ai-food-configure',
+            child: IconButton(
+              onPressed: _busy ? null : _configure,
+              tooltip: s.labelScanAiSettings,
+              icon: const Icon(Icons.settings_outlined),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: ListView(
+          controller: _scroll,
           padding: const EdgeInsets.all(16),
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           children: [
-            AppCard(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    _summary?.enabled == true
-                        ? '${s.aiFoodConnected} · ${_summary?.endpoint == null ? _summary?.provider?.name ?? '' : AiCredentialStorage.displayHost(_summary!.endpoint!)}${_model == null ? '' : ' · $_model'}'
-                        : _summary?.configured == true
-                        ? s.aiFoodPaused
-                        : s.labelScanConfigureFirst,
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Semantics(
-                      identifier: 'ai-food-configure',
-                      child: TextButton.icon(
-                        onPressed: _busy ? null : _configure,
-                        icon: const Icon(Icons.settings_outlined),
-                        label: Text(s.labelScanAiSettings),
-                      ),
-                    ),
-                  ),
-                ],
+            if (_photoMode && !hasPhoto)
+              Container(
+                height: 136,
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: colors.outlineVariant),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.photo_camera_outlined,
+                  size: 40,
+                  color: colors.primary,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            if (_image != null)
+            if (hasPhoto)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: Column(
@@ -517,11 +522,14 @@ class _AiFoodAnalysisScreenState extends State<AiFoodAnalysisScreen> {
                         child: TextButton.icon(
                           onPressed: _busy
                               ? null
-                              : () => setState(() {
-                                  _image = null;
-                                  _photo = null;
-                                  _photoMode = false;
-                                }),
+                              : () {
+                                  setState(() {
+                                    _image = null;
+                                    _photo = null;
+                                    _photoMode = false;
+                                  });
+                                  _scroll.jumpTo(0);
+                                },
                           icon: const Icon(Icons.close_rounded),
                           label: Text(s.mealImageRemove),
                         ),
@@ -530,54 +538,80 @@ class _AiFoodAnalysisScreenState extends State<AiFoodAnalysisScreen> {
                   ],
                 ),
               ),
-            Semantics(
-              identifier: 'ai-food-description',
-              child: TextField(
-                controller: _text,
-                minLines: 3,
-                maxLines: null,
-                enabled: !_busy,
-                decoration: InputDecoration(
-                  labelText: s.aiFoodDescriptionLabel,
-                  hintText: s.aiFoodDescriptionHint,
-                  border: const OutlineInputBorder(),
-                  alignLabelWithHint: true,
+            if (!_photoMode || hasPhoto)
+              Semantics(
+                identifier: 'ai-food-description',
+                child: TextField(
+                  controller: _text,
+                  minLines: _photoMode ? 1 : 4,
+                  maxLines: _photoMode ? 2 : 4,
+                  enabled: !_busy,
+                  decoration: InputDecoration(
+                    labelText: _photoMode
+                        ? s.aiFoodPhotoNote
+                        : s.aiFoodDescriptionLabel,
+                    hintText: s.aiFoodDescriptionHint,
+                    filled: true,
+                    fillColor: colors.surfaceContainerLow,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    alignLabelWithHint: true,
+                  ),
                 ),
               ),
-            ),
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                Semantics(
-                  identifier: 'ai-food-match-ingredients',
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : _openIngredientMatches,
-                    icon: const Icon(Icons.manage_search_rounded),
-                    label: Text(s.aiFoodMatchIngredients),
-                  ),
+            if (_photoMode && !hasPhoto)
+              Semantics(
+                identifier: 'ai-food-pick-photo',
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _pickPhoto,
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: Text(s.labelScanPick),
                 ),
-                Semantics(
-                  identifier: 'ai-food-analyze',
-                  child: FilledButton.icon(
-                    onPressed: _busy || _summary?.enabled != true
-                        ? null
-                        : () => _analyze(),
-                    icon: const Icon(Icons.auto_awesome_outlined),
-                    label: Text(s.aiFoodAnalyze),
-                  ),
+              )
+            else
+              Semantics(
+                identifier: 'ai-food-analyze',
+                child: FilledButton.icon(
+                  onPressed: _busy || !connected ? null : () => _analyze(),
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: Text(s.aiFoodAnalyze),
                 ),
-                Semantics(
-                  identifier: 'ai-food-pick-photo',
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : _pickPhoto,
-                    icon: const Icon(Icons.photo_camera_outlined),
-                    label: Text(s.aiFoodPhotoTitle),
-                  ),
-                ),
-              ],
+              ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: _photoMode
+                  ? (!hasPhoto
+                        ? const SizedBox.shrink()
+                        : Semantics(
+                            identifier: 'ai-food-pick-photo',
+                            child: TextButton.icon(
+                              onPressed: _busy ? null : _pickPhoto,
+                              icon: const Icon(Icons.photo_camera_outlined),
+                              label: Text(s.aiFoodReplacePhoto),
+                            ),
+                          ))
+                  : Semantics(
+                      identifier: 'ai-food-match-ingredients',
+                      child: TextButton.icon(
+                        onPressed: _busy ? null : _openIngredientMatches,
+                        icon: const Icon(Icons.manage_search_rounded),
+                        label: Text(s.aiFoodMatchIngredients),
+                      ),
+                    ),
             ),
+            if (_summary != null)
+              Text(
+                connected
+                    ? [s.aiFoodConnected, ?_model].join(' · ')
+                    : _summary?.configured == true
+                    ? s.aiFoodPaused
+                    : s.aiFoodConfigureHint,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
             if (_busy) ...[
               const SizedBox(height: 16),
               const LinearProgressIndicator(),
@@ -599,7 +633,9 @@ class _AiFoodAnalysisScreenState extends State<AiFoodAnalysisScreen> {
               ),
             if (_rows.isNotEmpty) ...[
               const SizedBox(height: 20),
-              Text(s.aiFoodReviewHint),
+              Text(s.labelScanReview, style: theme.textTheme.titleLarge),
+              const SizedBox(height: 4),
+              Text(s.aiFoodReviewHint, style: theme.textTheme.bodyMedium),
               const SizedBox(height: 12),
               Semantics(
                 identifier: 'ai-food-results',

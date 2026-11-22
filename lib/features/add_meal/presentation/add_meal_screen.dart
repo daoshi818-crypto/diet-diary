@@ -251,6 +251,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
                         describeOpen: false,
                         showAi: !_aiHidden,
                         compact: compact,
+                        singleRow: constraints.maxHeight < 250,
                         onNutritionLabelPressed: _openNutritionLabel,
                       ),
                       SizedBox(height: compact ? 4 : 8),

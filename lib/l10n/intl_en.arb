@@ -1,4 +1,11 @@
 {
+  "homeGoalMaintenance": "Maintenance",
+  "homeGoalSurplus": "Surplus",
+  "homeGoalDeficit": "Deficit",
+  "aiFoodPhotoNote": "Food or portion details (optional)",
+  "aiFoodReplacePhoto": "Replace photo",
+  "aiFoodConfigureHint": "Set up an AI provider to use analysis.",
+  "labelScanViewOriginal": "View original",
   "@PHYSICAL_ACTIVITIES": {},
   "@clearOffCacheSubtitle": {
     "placeholders": {

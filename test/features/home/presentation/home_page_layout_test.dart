@@ -40,48 +40,50 @@ import 'package:opennutritracker/generated/l10n.dart';
 final _capture = GlobalKey();
 final _day = DateTime(2026, 11, 22);
 
-HomeLoadedState _state(int water) => HomeLoadedState(
-  showDisclaimerDialog: false,
-  totalKcalDaily: 2088,
-  tdeeKcal: 2488,
-  totalKcalLeft: 2088,
-  totalKcalSupplied: 0,
-  totalKcalBurned: 0,
-  totalCarbsIntake: 0,
-  totalFatsIntake: 0,
-  totalProteinsIntake: 0,
-  totalCarbsGoal: 250,
-  totalFatsGoal: 60,
-  totalProteinsGoal: 120,
-  userActivityList: const [],
-  breakfastIntakeList: const [],
-  lunchIntakeList: const [],
-  dinnerIntakeList: const [],
-  snackIntakeList: const [],
-  usesImperialUnits: false,
-  bodyWeightUnit: BodyWeightUnit.kg,
-  userWeightKg: 68,
-  breakfastKcalTarget: 500,
-  lunchKcalTarget: 800,
-  dinnerKcalTarget: 788,
-  snackKcalTarget: 0,
-  breakfastSharePct: 25,
-  lunchSharePct: 40,
-  dinnerSharePct: 35,
-  snackSharePct: 0,
-  userGender: UserGenderEntity.male,
-  userCaloriesProfile: null,
-  waterMlToday: water,
-  waterGoalMl: 2000,
-  waterIntakes: const [],
-  showActivityTracking: false,
-);
+HomeLoadedState _state(int water, {bool showActivity = false}) =>
+    HomeLoadedState(
+      showDisclaimerDialog: false,
+      totalKcalDaily: 2088,
+      tdeeKcal: 2488,
+      totalKcalLeft: 2088,
+      totalKcalSupplied: 0,
+      totalKcalBurned: 0,
+      totalCarbsIntake: 0,
+      totalFatsIntake: 0,
+      totalProteinsIntake: 0,
+      totalCarbsGoal: 250,
+      totalFatsGoal: 60,
+      totalProteinsGoal: 120,
+      userActivityList: const [],
+      breakfastIntakeList: const [],
+      lunchIntakeList: const [],
+      dinnerIntakeList: const [],
+      snackIntakeList: const [],
+      usesImperialUnits: false,
+      bodyWeightUnit: BodyWeightUnit.kg,
+      userWeightKg: 68,
+      breakfastKcalTarget: 500,
+      lunchKcalTarget: 800,
+      dinnerKcalTarget: 788,
+      snackKcalTarget: 0,
+      breakfastSharePct: 25,
+      lunchSharePct: 40,
+      dinnerSharePct: 35,
+      snackSharePct: 0,
+      userGender: UserGenderEntity.male,
+      userCaloriesProfile: null,
+      waterMlToday: water,
+      waterGoalMl: 2000,
+      waterIntakes: const [],
+      showActivityTracking: showActivity,
+    );
 
 class _Home extends Fake implements HomeBloc {
   final _changes = StreamController<HomeState>.broadcast();
   int water = 500;
+  bool showActivity = false;
   @override
-  HomeState get state => _state(water);
+  HomeState get state => _state(water, showActivity: showActivity);
   @override
   Stream<HomeState> get stream => _changes.stream;
   @override
@@ -186,6 +188,7 @@ void main() {
         testWidgets(
           'main shell $size dark=$dark keeps controls clear at $scale',
           (tester) async {
+            home.showActivity = true;
             tester.view.physicalSize = size;
             tester.view.devicePixelRatio = 1;
             tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
@@ -245,7 +248,7 @@ void main() {
               tester.getRect(water).center.dx,
             );
             expect(
-              tester.getRect(food).bottom + 8,
+              tester.getRect(food).bottom,
               lessThanOrEqualTo(tester.getRect(water).top),
             );
             final navBar = find.byType(BottomAppBar);
@@ -325,6 +328,23 @@ void main() {
             );
             expect(
               tester.getRect(lastMenu).overlaps(tester.getRect(water)),
+              isFalse,
+            );
+            final mealMenuX = tester.getCenter(lastMenu).dx;
+            final position = tester.state<ScrollableState>(scrollable).position;
+            position.jumpTo(position.maxScrollExtent);
+            await tester.pump();
+            final activityMenu = find.bySemanticsIdentifier(
+              'activity-section-menu',
+            );
+            expect(activityMenu.hitTestable(), findsOneWidget);
+            expect(tester.getCenter(activityMenu).dx, closeTo(mealMenuX, .01));
+            expect(
+              tester.getRect(activityMenu).overlaps(tester.getRect(food)),
+              isFalse,
+            );
+            expect(
+              tester.getRect(activityMenu).overlaps(tester.getRect(water)),
               isFalse,
             );
             await tester.tap(add);
