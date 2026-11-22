@@ -20,6 +20,7 @@ import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dar
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_type.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/add_meal_bloc.dart';
 import 'package:opennutritracker/features/add_meal/presentation/screens/bulk_add_screen.dart';
+import 'package:opennutritracker/features/add_meal/presentation/screens/local_batch_screen.dart';
 import 'package:opennutritracker/features/add_meal/presentation/screens/nutrition_label_screen.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/favourite_meal_bloc.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/food_bloc.dart';
@@ -248,6 +249,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
                         onSnapMealPressed: () =>
                             _openBulkAdd(startWithPhoto: true),
                         onDescribePressed: () => _openBulkAdd(),
+                        onLocalBatchPressed: _openLocalBatch,
                         describeOpen: false,
                         showAi: !_aiHidden,
                         compact: compact,
@@ -1222,6 +1224,20 @@ class _AddMealScreenState extends State<AddMealScreen> {
     if (discard != true || !mounted) return;
     _logTray.clear();
     Navigator.of(context).pop();
+  }
+
+  Future<void> _openLocalBatch() async {
+    final state = _addMealBloc.state;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => LocalBatchScreen(
+          day: _day,
+          type: _mealType.getIntakeType(),
+          usesImperialUnits:
+              state is AddMealLoadedState && state.usesImperialUnits,
+        ),
+      ),
+    );
   }
 
   /// Snap meal and Describe both end on the review screen: a photo or a

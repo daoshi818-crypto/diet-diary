@@ -9,6 +9,7 @@ class AddFoodMethodTiles extends StatelessWidget {
   final VoidCallback onBarcodePressed;
   final VoidCallback onSnapMealPressed;
   final VoidCallback onDescribePressed;
+  final VoidCallback? onLocalBatchPressed;
 
   final bool describeOpen;
   final bool compact;
@@ -30,6 +31,7 @@ class AddFoodMethodTiles extends StatelessWidget {
     this.compact = false,
     this.singleRow = false,
     this.onNutritionLabelPressed,
+    this.onLocalBatchPressed,
   });
 
   @override
@@ -68,28 +70,46 @@ class AddFoodMethodTiles extends StatelessWidget {
             onPressed: onSnapMealPressed,
           ),
         ),
-      Semantics(
-        identifier: 'add-meal-method-describe',
-        container: true,
-        selected: describeOpen,
-        child: _MethodTile(
-          compact: compact,
-          singleRow: singleRow,
-          icon: Icons.edit_note_rounded,
-          label: s.addMealDescribeLabel,
-          background: describeOpen
-              ? Color.alphaBlend(
-                  scheme.primary.withValues(alpha: 0.16),
-                  palette.surfaceMuted,
-                )
-              : palette.surfaceMuted,
-          foreground: palette.textStrong,
-          border: describeOpen
-              ? scheme.primary
-              : scheme.primary.withValues(alpha: 0.35),
-          onPressed: onDescribePressed,
+      if (showAi || onLocalBatchPressed == null)
+        Semantics(
+          identifier: 'add-meal-method-describe',
+          container: true,
+          selected: describeOpen,
+          child: _MethodTile(
+            compact: compact,
+            singleRow: singleRow,
+            icon: Icons.edit_note_rounded,
+            label: onLocalBatchPressed == null
+                ? s.addMealDescribeLabel
+                : s.localBatchAiLabel,
+            background: describeOpen
+                ? Color.alphaBlend(
+                    scheme.primary.withValues(alpha: 0.16),
+                    palette.surfaceMuted,
+                  )
+                : palette.surfaceMuted,
+            foreground: palette.textStrong,
+            border: describeOpen
+                ? scheme.primary
+                : scheme.primary.withValues(alpha: 0.35),
+            onPressed: onDescribePressed,
+          ),
         ),
-      ),
+      if (onLocalBatchPressed != null)
+        Semantics(
+          identifier: 'add-meal-method-local-batch',
+          container: true,
+          child: _MethodTile(
+            compact: compact,
+            singleRow: singleRow,
+            icon: Icons.playlist_add_rounded,
+            label: s.localBatchTitle,
+            background: palette.surface,
+            foreground: palette.textStrong,
+            border: palette.border,
+            onPressed: onLocalBatchPressed!,
+          ),
+        ),
       if (showAi && onNutritionLabelPressed != null)
         Semantics(
           identifier: 'add-meal-nutrition-label',
@@ -113,10 +133,10 @@ class AddFoodMethodTiles extends StatelessWidget {
           1,
           tiles.length,
         );
-        final columns = singleRow
+        final columns = singleRow && maxColumns == tiles.length
             ? tiles.length
             : maxColumns < tiles.length && maxColumns >= 2
-            ? 2
+            ? (maxColumns >= 3 && tiles.length == 5 ? 3 : 2)
             : maxColumns;
         final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
         return Wrap(

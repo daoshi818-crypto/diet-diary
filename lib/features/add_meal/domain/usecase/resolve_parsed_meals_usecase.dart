@@ -81,8 +81,12 @@ class ResolveParsedMealsUseCase {
   final _log = Logger('ResolveParsedMealsUseCase');
 
   final SearchProductsUseCase _searchProductsUseCase;
+  final MealEntity Function(MealEntity)? withCustomPortions;
 
-  ResolveParsedMealsUseCase(this._searchProductsUseCase);
+  ResolveParsedMealsUseCase(
+    this._searchProductsUseCase, {
+    this.withCustomPortions,
+  });
 
   /// Resolves every item concurrently. The two sources are independent and
   /// each already degrades to local-only results on failure inside
@@ -181,7 +185,13 @@ class ResolveParsedMealsUseCase {
     // this class auto-selects the top candidate, so its ordering alone is
     // not safe to log from. See resolver_relevance.dart.
     final counted = _isCounted(item);
-    var ranked = rankForResolution(merged, query, counted: counted);
+    var ranked = rankForResolution(
+      withCustomPortions == null
+          ? merged
+          : merged.map(withCustomPortions!).toList(),
+      query,
+      counted: counted,
+    );
     if (counted) {
       ranked = rankForResolution(
         await _withFullOffRecords(ranked, query),

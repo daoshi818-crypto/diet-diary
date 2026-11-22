@@ -1,7 +1,9 @@
 import 'package:opennutritracker/features/add_meal/domain/usecase/resolve_parsed_meals_usecase.dart';
+import 'package:opennutritracker/features/add_meal/domain/usecase/local_batch_matcher.dart';
 import 'package:opennutritracker/features/add_meal/util/meal_text_parser.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_preferences.dart';
 import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
 import 'package:opennutritracker/features/meal_detail/util/quick_serving_option.dart';
 
@@ -121,18 +123,144 @@ class _Cache extends Fake implements RemoteSearchCacheDataSource {
 
 class _Favourites extends Fake implements ToggleFavouriteMealUsecase {}
 
+class _BatchPreferences extends Fake implements FoodEntryPreferences {
+  final _matches = <String, String>{};
+
+  @override
+  String? batchMatch(String query) => _matches[query];
+
+  @override
+  Future<void> rememberBatchMatch(String query, String identity) async {
+    _matches[query] = identity;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  test('real bundled catalogue resolves the mixed cola corn potato description', () async {
-    final source = ChineseFoodDataSource(read: () => File('assets/foods/catalog.json').readAsString());
-    final search = SearchProductsUseCase(ProductsRepository.local(source),
-      _Intakes(), _Custom(), _Cache(), _Recipes(), _Config());
-    final resolved = await ResolveParsedMealsUseCase(search).resolve(
-      parseMealText('无糖可乐 玉米100g 土豆50g').items);
-    expect(resolved.map((row) => row.parsed.query), ['无糖可乐', '玉米', '土豆']);
-    expect(resolved.every((row) => row.isResolved), isTrue);
-    expect(resolved.map((row) => row.parsed.quantity), [null, 100, 50]);
+  test('a confirmed local ID wins for the same name only', () async {
+    final catalog = ChineseFoodDataSource(
+      read: () async => jsonEncode({
+        'schema_version': 1,
+        'foods': [
+          _food('unsweet-a', '无糖可乐', kcal: 0),
+          _food('unsweet-b', '无糖可乐', kcal: 2),
+          _food('sweet', '加糖可乐', kcal: 42),
+        ],
+      }),
+    );
+    final preferences = _BatchPreferences();
+    final matcher = LocalBatchMatcher(
+      catalog,
+      _Custom(),
+      _Intakes(),
+      preferences,
+    );
+    final rows = parseLocalMealBatch('无糖可乐50ml 加糖可乐50ml');
+    final first = await matcher.match(rows);
+    expect(first.first.selected, isNull);
+    expect(
+      first.first.choices.map((food) => food.code),
+      unorderedEquals(['unsweet-a', 'unsweet-b']),
+    );
+    await matcher.remember(
+      '无糖可乐',
+      first.first.choices.firstWhere((food) => food.code == 'unsweet-b'),
+    );
+    final next = await LocalBatchMatcher(
+      catalog,
+      _Custom(),
+      _Intakes(),
+      preferences,
+    ).match(rows);
+    expect(next.map((match) => match.selected?.code), ['unsweet-b', 'sweet']);
   });
+  test(
+    'batch entry keeps amounts and finds each food in the bundled library',
+    () async {
+      final catalog = ChineseFoodDataSource(
+        read: () => File('assets/foods/catalog.json').readAsString(),
+      );
+      final matcher = LocalBatchMatcher(catalog, _Custom(), _Intakes(), null);
+      final rows = parseLocalMealBatch('西麦麦片75g 鸡蛋3个 生可可粉5g 德运脱脂奶粉25g');
+      expect(rows.map((row) => row.query), ['西麦麦片', '鸡蛋', '生可可粉', '德运脱脂奶粉']);
+      expect(rows.map((row) => row.quantity), [75, 3, 5, 25]);
+      final matches = await matcher.match(rows);
+      for (final match in matches) {
+        expect(match.choices, isNotEmpty);
+      }
+      final egg = matches[1].choices.firstWhere(
+        (food) => localBatchInitialQuantity(rows[1], food) != null,
+      );
+      final (count, unit) = localBatchInitialQuantity(rows[1], egg)!;
+      expect(convertQuantityToBaseUnit(count, unit, egg), 150);
+      expect(
+        localBatchInitialQuantity(parseLocalMealBatch('鸡蛋50ml').single, egg),
+        isNull,
+      );
+      expect(parseLocalMealBatch('玉米50xx 土豆50g').map((row) => row.query), [
+        '玉米',
+        '土豆',
+      ]);
+      expect(parseLocalMealBatch('鸡蛋 0g 玉米 100 g').map((row) => row.quantity), [
+        null,
+        100,
+      ]);
+    },
+  );
+  test(
+    'real catalogue reviews all four foods in a breakfast description',
+    () async {
+      final source = ChineseFoodDataSource(
+        read: () => File('assets/foods/catalog.json').readAsString(),
+      );
+      final search = SearchProductsUseCase(
+        ProductsRepository.local(source),
+        _Intakes(),
+        _Custom(),
+        _Cache(),
+        _Recipes(),
+        _Config(),
+      );
+      final resolved = await ResolveParsedMealsUseCase(
+        search,
+      ).resolve(parseMealText('西麦麦片75g 鸡蛋3个 生可可粉5g 德运脱脂奶粉25g').items);
+      expect(resolved.map((row) => row.parsed.query), [
+        '西麦麦片',
+        '鸡蛋',
+        '生可可粉',
+        '德运脱脂奶粉',
+      ]);
+      expect(resolved.map((row) => row.parsed.quantity), [75, 3, 5, 25]);
+      expect(
+        resolved[1].candidates.first.portions.map(
+          (portion) => portion.gramWeight,
+        ),
+        contains(50),
+      );
+    },
+  );
+  test(
+    'real bundled catalogue resolves the mixed cola corn potato description',
+    () async {
+      final source = ChineseFoodDataSource(
+        read: () => File('assets/foods/catalog.json').readAsString(),
+      );
+      final search = SearchProductsUseCase(
+        ProductsRepository.local(source),
+        _Intakes(),
+        _Custom(),
+        _Cache(),
+        _Recipes(),
+        _Config(),
+      );
+      final resolved = await ResolveParsedMealsUseCase(
+        search,
+      ).resolve(parseMealText('无糖可乐 玉米100g 土豆50g').items);
+      expect(resolved.map((row) => row.parsed.query), ['无糖可乐', '玉米', '土豆']);
+      expect(resolved.every((row) => row.isResolved), isTrue);
+      expect(resolved.map((row) => row.parsed.quantity), [null, 100, 50]);
+    },
+  );
   late ChineseFoodDataSource source;
   late ProductsRepository repository;
   late _Cache cache;

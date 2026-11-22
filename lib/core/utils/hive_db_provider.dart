@@ -104,6 +104,7 @@ class HiveDBProvider extends ChangeNotifier {
   // every profile draws from the same set.
   late final Box<MealDBO> customMealBox;
   late final Box<RecipeDBO> recipeBox;
+  late final Box<String> foodEntryBox;
   late final Box<CustomActivityTemplateDBO> customActivityTemplateBox;
 
   // Per-profile boxes. Nullable rather than `late` so that a read during
@@ -187,6 +188,7 @@ class HiveDBProvider extends ChangeNotifier {
     _appConfigBox = await _openEncryptedBox(appConfigBoxName);
     customMealBox = await _openEncryptedBox(customMealBoxName);
     recipeBox = await _openEncryptedBox(recipeBoxName);
+    foodEntryBox = await _openEncryptedBox('FoodEntryBox');
     customActivityTemplateBox = await _openEncryptedBox(
       customActivityTemplateBoxName,
     );

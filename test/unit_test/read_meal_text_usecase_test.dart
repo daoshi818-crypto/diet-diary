@@ -268,7 +268,7 @@ void main() {
       }
     });
 
-    test('says nothing when the model answered', () async {
+    test('keeps the model response when it finds no food', () async {
       final reading = await useCaseWith(
         _FakeInterpreter(
           result: const MealTextParseResult(items: [], errors: []),
@@ -276,6 +276,7 @@ void main() {
       ).read('100g toast');
 
       expect(reading.usedModel, isTrue);
+      expect(reading.result.items, isEmpty);
       expect(reading.modelFailure, isNull);
     });
 
@@ -323,10 +324,7 @@ void main() {
       expect(reading.result.items.single.query, 'toast');
     });
 
-    test('reads text the parser cannot segment at all', () async {
-      // #623: a language with no spaces between words. The deterministic
-      // parser cannot express a count here without per-locale word lists,
-      // which #600 refused; a model needs none.
+    test('AI description still sends explicit Chinese amounts to AI', () async {
       final interpreter = _FakeInterpreter(
         result: const MealTextParseResult(
           items: [
@@ -341,6 +339,7 @@ void main() {
         interpreter,
       ).read('2个鸡蛋，200ml牛奶', localeCode: 'zh');
 
+      expect(interpreter.calls, 1);
       expect(reading.usedModel, isTrue);
       expect(reading.result.items, hasLength(2));
       expect(reading.result.items[0].quantity, 2);

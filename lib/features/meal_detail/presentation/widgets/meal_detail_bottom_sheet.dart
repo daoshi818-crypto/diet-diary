@@ -1,5 +1,4 @@
 import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
-import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
@@ -17,9 +16,8 @@ import 'package:opennutritracker/features/diary/presentation/bloc/calendar_day_b
 import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dart';
 import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
-import 'package:opennutritracker/features/meal_detail/util/quick_serving_option.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_preferences.dart';
 import 'package:opennutritracker/features/meal_detail/util/portion_display.dart';
-import 'package:opennutritracker/features/meal_detail/util/food_entry_policy.dart';
 import 'package:opennutritracker/features/meal_detail/util/food_weight_basis.dart';
 import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
 import 'package:opennutritracker/generated/l10n.dart';
@@ -49,6 +47,8 @@ class MealDetailBottomSheet extends StatefulWidget {
   final String? confirmLabel;
   final bool allowMealTypeChange;
   final bool submissionEnabled;
+  final MealEntity Function()? onCustomPortionsChanged;
+  final bool rememberSelection;
   final Widget Function(BuildContext, Widget editor, Widget actions)?
   layoutBuilder;
 
@@ -67,6 +67,8 @@ class MealDetailBottomSheet extends StatefulWidget {
     this.confirmLabel,
     this.allowMealTypeChange = true,
     this.submissionEnabled = true,
+    this.onCustomPortionsChanged,
+    this.rememberSelection = true,
     this.layoutBuilder,
   });
 
@@ -137,83 +139,154 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     );
   }
 
-  void _onQuickServingSelected(QuickServingOption option) {
-    final quantityText = _formatQuantity(option.quantity);
-    // Detach the change listener before the programmatic write, otherwise
-    // setting the controller's text fires _onQuantityChanged with the OLD
-    // unit before the callback below applies option.unit — so every chip
-    // tap emitted a stale-unit UpdateKcalEvent (100 g briefly computed as
-    // 100 servings) before landing on the right one.
+  void _applyQuantity(double quantity, String unit) {
+    final text = _formatQuantity(double.parse(quantity.toStringAsFixed(2)));
     widget.quantityTextController.removeListener(_onQuantityChanged);
-    widget.quantityTextController.text = quantityText;
+    widget.quantityTextController.text = text;
     widget.quantityTextController.addListener(_onQuantityChanged);
-    widget.onQuantityOrUnitChanged(quantityText, option.unit);
+    widget.onQuantityOrUnitChanged(text, unit);
   }
 
-  void _onUnitSelected(String? unit) {
-    if (unit == null || unit == widget.selectedUnit) return;
-    final entered = double.tryParse(
+  String get _mode => isPortionUnit(widget.selectedUnit)
+      ? 'serving'
+      : ['ml', 'fl.oz'].contains(widget.selectedUnit)
+      ? 'ml'
+      : 'g';
+
+  Iterable<int> get _portionIndices => visiblePortionIndices(widget.product);
+
+  bool get _hasLegacyPortion =>
+      widget.product.portions.isEmpty &&
+      (widget.product.scalableServingQuantity ?? 0) > 0;
+
+  void _changeMode(String mode) {
+    if (mode == _mode) return;
+    if (mode == 'serving') {
+      final index = defaultPortionIndex(widget.product);
+      if (index != null || _hasLegacyPortion) {
+        _applyQuantity(1, index == null ? 'serving' : portionUnit(index));
+      } else {
+        _addCustomPortion();
+      }
+      return;
+    }
+    final unit = widget.usesImperialUnits
+        ? (mode == 'ml' ? 'fl.oz' : 'oz')
+        : mode;
+    final oldQuantity = double.tryParse(
       widget.quantityTextController.text.replaceAll(',', '.'),
     );
-    final base = entered != null && entered.isFinite
+    final sameBasis = _mode == 'serving' || _mode == mode;
+    final base = oldQuantity != null && oldQuantity.isFinite && sameBasis
         ? convertQuantityToBaseUnit(
-            entered,
+            oldQuantity,
             widget.selectedUnit,
             widget.product,
           )
-        : 100.0;
-    final quantity = isPortionUnit(unit)
-        ? 1.0
-        : base / convertQuantityToBaseUnit(1, unit, widget.product);
-    widget.quantityTextController.removeListener(_onQuantityChanged);
-    widget.quantityTextController.text = _formatQuantity(
-      double.parse(quantity.toStringAsFixed(2)),
+        : null;
+    _applyQuantity(
+      base == null
+          ? (widget.usesImperialUnits ? 1 : 100)
+          : base / convertQuantityToBaseUnit(1, unit, widget.product),
+      unit,
     );
-    widget.quantityTextController.addListener(_onQuantityChanged);
-    widget.onQuantityOrUnitChanged(widget.quantityTextController.text, unit);
   }
 
-  Future<void> _choosePortion(List<QuickServingOption> options) async {
+  Future<void> _addCustomPortion() async {
+    final prefs = FoodEntryPreferences.current;
+    if (prefs == null || widget.onCustomPortionsChanged == null) return;
     _quantityFocusNode.unfocus();
-    final selection = await showModalBottomSheet<QuickServingOption>(
+    final food = widget.product;
+    final s = S.of(context);
+    var name = s.servingLabel;
+    double? size;
+    final unit = food.isLiquid ? s.milliliterUnit : s.gramUnit;
+    final custom = await showDialog<(String, double)>(
       context: context,
-      useSafeArea: true,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => AppModalSheet(
-        identifier: 'meal-detail-portions',
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              S.of(context).foodChoosePortion,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            Semantics(
-              identifier: 'meal-detail-portion-options',
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (final option in options)
-                    Semantics(
-                      identifier: 'meal-detail-portion-${option.id}',
-                      child: ListTile(
-                        key: ValueKey('portion-option-${option.id}'),
-                        leading: const Icon(Icons.straighten_rounded),
-                        title: Text(option.label),
-                        onTap: () => Navigator.pop(context, option),
-                      ),
-                    ),
-                ],
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          scrollable: true,
+          title: Text(s.foodCustomPortion),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Semantics(
+                identifier: 'food-custom-portion-name',
+                child: TextFormField(
+                  initialValue: name,
+                  maxLength: 40,
+                  textInputAction: TextInputAction.next,
+                  decoration: InputDecoration(labelText: s.foodPortionName),
+                  onChanged: (text) => update(() => name = text),
+                ),
               ),
+              Semantics(
+                identifier: 'food-custom-portion-size',
+                child: TextFormField(
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: s.foodPortionBaseAmount,
+                    suffixText: unit,
+                  ),
+                  onChanged: (text) => update(
+                    () => size = double.tryParse(
+                      text.trim().replaceAll(',', '.'),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(s.dialogCancelLabel),
+            ),
+            FilledButton(
+              onPressed:
+                  name.trim().isEmpty ||
+                      food.portions.any(
+                        (portion) =>
+                            portion.label.trim().toLowerCase() ==
+                                name.trim().toLowerCase() &&
+                            !prefs
+                                .customPortions(food)
+                                .containsKey(portion.label),
+                      ) ||
+                      size == null ||
+                      !size!.isFinite ||
+                      size! <= 0 ||
+                      size! > 10000
+                  ? null
+                  : () => Navigator.pop(context, (name.trim(), size!)),
+              child: Text(s.buttonSaveLabel),
             ),
           ],
         ),
       ),
     );
-    if (mounted && selection != null) _onQuickServingSelected(selection);
+    if (!mounted || custom == null) return;
+    await prefs.savePortion(food, custom.$1, custom.$2);
+    if (!mounted) return;
+    final updated = widget.onCustomPortionsChanged!();
+    final index = updated.portions.lastIndexWhere(
+      (p) => p.label == custom.$1 && p.gramWeight == custom.$2,
+    );
+    if (index >= 0) _applyQuantity(1, portionUnit(index));
+  }
+
+  String _baseUnitLabel(S s) =>
+      widget.product.isLiquid ? s.milliliterUnit : s.gramUnit;
+
+  Future<void> _rememberSelection(MealEntity product, String unit) async {
+    if (!widget.rememberSelection) return;
+    try {
+      await FoodEntryPreferences.current?.remember(product, unit);
+    } catch (_) {
+      // A preference write must not prevent logging food.
+    }
   }
 
   String _formatQuantity(double value) {
@@ -227,7 +300,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
   Widget build(BuildContext context) {
     final s = S.of(context);
     final missing = _hasRequiredProductInfoMissing();
-    final counted = offersCountedServings(widget.product);
+    final portionItems = _portionItems(s);
     final quantity = double.tryParse(
       widget.quantityTextController.text.replaceAll(',', '.'),
     );
@@ -239,13 +312,6 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
         quantity.isFinite &&
         quantity > 0 &&
         quantity <= 10000;
-    final options = missing
-        ? const <QuickServingOption>[]
-        : quickServingOptionsFor(
-            widget.product,
-            s.gramUnit,
-            includeWeightPresets: true,
-          );
     final editor = Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -260,134 +326,117 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
           ),
           const SizedBox(height: 12),
         ],
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final quantityField = Semantics(
-              identifier: 'meal-detail-quantity',
-              container: true,
-              child: TextFormField(
-                enabled: !missing,
-                controller: widget.quantityTextController,
-                focusNode: _quantityFocusNode,
-                onTap: _selectAllQuantityText,
-                textInputAction: TextInputAction.done,
-                onFieldSubmitted: (_) => _quantityFocusNode.unfocus(),
-                keyboardType: const TextInputType.numberWithOptions(
-                  decimal: true,
+        if (!missing) ...[
+          Semantics(
+            identifier: 'meal-detail-unit',
+            child: SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: 'serving',
+                  label: Text(s.foodPortionMode, maxLines: 2),
+                  enabled:
+                      _portionIndices.isNotEmpty ||
+                      _hasLegacyPortion ||
+                      widget.onCustomPortionsChanged != null,
                 ),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(
-                    RegExp(r'^\d+([.,]\d{0,2})?$'),
-                  ),
-                ],
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(
-                    borderRadius: Dimens.borderRadiusM,
-                  ),
-                  labelText: counted ? s.quantityLabel : s.foodWeightLabel,
-                  helperText: foodWeightBasisLabel(s, widget.product.name),
-                  labelStyle: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                ButtonSegment(
+                  value: 'g',
+                  label: Text(s.foodMassMode, maxLines: 2),
+                  enabled: !widget.product.isLiquid,
                 ),
-              ),
-            );
-            final unitField = Semantics(
-              identifier: 'meal-detail-unit',
-              container: true,
-              child: DropdownButtonFormField<String>(
-                isExpanded: true,
-                itemHeight: null,
-                menuMaxHeight: MediaQuery.sizeOf(context).height * .5,
-                isDense: false,
-                initialValue: widget.selectedUnit,
-                key: ValueKey(widget.selectedUnit),
-                decoration: InputDecoration(
-                  border: const OutlineInputBorder(
-                    borderRadius: Dimens.borderRadiusM,
-                  ),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
-                  ),
-                  labelText: s.unitLabel,
-                  labelStyle: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                ButtonSegment(
+                  value: 'ml',
+                  label: Text(s.foodVolumeMode, maxLines: 2),
+                  enabled: widget.product.isLiquid,
                 ),
-                items: [
-                  if (widget.product.isSolid || !widget.product.isLiquid)
-                    ..._getSolidUnitDropdownItems(context),
-                  if (widget.product.isLiquid || !widget.product.isSolid)
-                    ..._getLiquidUnitDropdownItems(context),
-                  if (widget.product.portions.isNotEmpty) ...[
-                    for (final i in visiblePortionIndices(
-                      widget.product,
-                      selectedUnit: widget.selectedUnit,
-                    ))
-                      if (portionUnit(i) == widget.selectedUnit)
-                        DropdownMenuItem<String>(
-                          value: portionUnit(i),
-                          child: Text(
-                            portionDisplayLabel(
-                              widget.product.portions[i],
-                              widget.product.isLiquid ? 'ml' : s.gramUnit,
-                              localizedLabel: localizeServingLabel(
-                                s,
-                                widget.product.portions[i].label,
-                              ),
-                            ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                  ] else if (widget.product.scalableServingQuantity != null &&
-                      (counted ||
-                          widget.selectedUnit ==
-                              UnitDropdownItem.serving.toString()))
-                    _getServingDropdownItem(context),
-                  if (widget.selectedUnit == UnitDropdownItem.gml.toString())
-                    ..._getOtherDropdownItems(context),
-                ],
-                onChanged: missing ? null : _onUnitSelected,
-              ),
-            );
-            if (constraints.maxWidth < 280 ||
-                MediaQuery.textScalerOf(context).scale(16) > 22) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  quantityField,
-                  const SizedBox(height: 16),
-                  unitField,
-                ],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(child: quantityField),
-                const SizedBox(width: 16),
-                Expanded(child: unitField),
               ],
-            );
-          },
-        ),
-        if (options.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 12),
-            child: Semantics(
-              identifier: 'meal-detail-more-portions',
-              child: OutlinedButton.icon(
-                onPressed: () => _choosePortion(options),
-                icon: const Icon(Icons.straighten_rounded),
-                label: Text(s.foodChoosePortion),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
+              selected: {_mode},
+              onSelectionChanged: _submitting
+                  ? null
+                  : (selection) => _changeMode(selection.single),
+            ),
+          ),
+          if (_mode == 'serving') ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    identifier: 'meal-detail-portion',
+                    container: true,
+                    child: DropdownButtonFormField<String>(
+                      key: ValueKey(widget.selectedUnit),
+                      isExpanded: true,
+                      itemHeight: null,
+                      initialValue:
+                          portionItems.any(
+                            (item) => item.value == widget.selectedUnit,
+                          )
+                          ? widget.selectedUnit
+                          : null,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: s.foodPortionSpec,
+                      ),
+                      items: portionItems,
+                      onChanged: (unit) {
+                        if (unit != null) _applyQuantity(quantity ?? 1, unit);
+                      },
+                    ),
+                  ),
                 ),
+                if (widget.onCustomPortionsChanged != null)
+                  Semantics(
+                    identifier: 'food-add-custom-portion',
+                    child: IconButton(
+                      onPressed: _addCustomPortion,
+                      icon: const Icon(Icons.add_rounded),
+                      tooltip: s.foodCustomPortion,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 12),
+          Semantics(
+            identifier: 'meal-detail-quantity',
+            child: TextFormField(
+              controller: widget.quantityTextController,
+              focusNode: _quantityFocusNode,
+              onTap: _selectAllQuantityText,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _quantityFocusNode.unfocus(),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                  RegExp(r'^\d+([.,]\d{0,2})?$'),
+                ),
+              ],
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(
+                  borderRadius: Dimens.borderRadiusM,
+                ),
+                labelText: _mode == 'serving'
+                    ? s.quantityLabel
+                    : _mode == 'ml'
+                    ? s.foodVolumeMode
+                    : s.foodMassMode,
+                suffixText: switch (widget.selectedUnit) {
+                  'oz' => s.ozUnit,
+                  'fl.oz' => s.flOzUnit,
+                  _ => _mode == 'serving' ? null : _baseUnitLabel(s),
+                },
+                helperText:
+                    _mode == 'serving' && quantity != null && quantity.isFinite
+                    ? '= ${_formatQuantity(double.parse(convertQuantityToBaseUnit(quantity, widget.selectedUnit, widget.product).toStringAsFixed(2)))} ${_baseUnitLabel(s)}'
+                    : foodWeightBasisLabel(s, widget.product.name),
               ),
             ),
           ),
+        ],
         if (missing)
           Padding(
             padding: const EdgeInsets.only(top: 12),
@@ -523,17 +572,23 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
       return;
     }
 
+    final product = widget.product;
+    final unit = widget.selectedUnit;
+    final amount = convertQuantityToBaseUnit(quantity, unit, product);
+    final intakeType = _intakeType;
+    if (!amount.isFinite || amount <= 0) return;
+
     // A confirmed choice is returned to the caller; no duplicate check or
     // diary write belongs to the quick picker or an existing-entry edit.
     if (widget.onSelectionConfirmed != null) {
-      final unit = widget.selectedUnit;
-      final amount = convertQuantityToBaseUnit(quantity, unit, widget.product);
-      if (!amount.isFinite || amount <= 0) return;
+      await _rememberSelection(product, unit);
+      if (!context.mounted) return;
       await widget.onSelectionConfirmed!(
         LogTrayItem(
           meal: widget.product,
           intakeType: _intakeType,
           unit: storedUnit(unit),
+          selectionUnit: unit,
           amount: amount,
           amountLabel: logTrayAmountLabel(
             context,
@@ -559,23 +614,18 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     // Asked again rather than taken from the press: a food can reach the
     // list during the checks above, and logging on its own would leave it.
     if (logTray != null && (toList || logTray.collects)) {
+      await _rememberSelection(product, unit);
+      if (!context.mounted) return;
       // Onto the list, with exactly what `addIntake` below would have been
       // given; the add-food screen writes it when the list is logged.
-      final state = widget.mealDetailBloc!.state;
       logTray.add(
         LogTrayItem(
-          meal: widget.product,
-          intakeType: _intakeType,
-          unit: storedUnit(state.selectedUnit),
-          amount: double.parse(
-            state.totalQuantityConverted.replaceAll(',', '.'),
-          ),
-          amountLabel: logTrayAmountLabel(
-            context,
-            quantity,
-            state.selectedUnit,
-            widget.product,
-          ),
+          meal: product,
+          intakeType: intakeType,
+          unit: storedUnit(unit),
+          selectionUnit: unit,
+          amount: amount,
+          amountLabel: logTrayAmountLabel(context, quantity, unit, product),
         ),
       );
       ScaffoldMessenger.of(
@@ -593,12 +643,13 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     // can wait for the tracked-day lock (#1317).
     await widget.mealDetailBloc!.addIntake(
       context,
-      widget.mealDetailBloc!.state.selectedUnit,
-      widget.mealDetailBloc!.state.totalQuantityConverted,
-      _intakeType,
-      widget.product,
+      unit,
+      amount.toString(),
+      intakeType,
+      product,
       widget.day,
     );
+    await _rememberSelection(product, unit);
 
     // Refresh Home Page
     locator<HomeBloc>().add(const LoadItemsEvent());
@@ -672,85 +723,33 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     );
   }
 
-  DropdownMenuItem<String> _getServingDropdownItem(BuildContext context) {
-    // Custom meals are seeded from MealEntity.empty(), which carries an empty
-    // servingSize string rather than null. An empty (or whitespace-only)
-    // description should fall through to the constructed label so the option
-    // doesn't render blank — otherwise '' wins over the ?? fallback (#495).
-    final servingSize = widget.product.servingSize;
-    // Serving labels are stored in English (see MealEntity._spServingLabel);
-    // translate the common household units at display time.
-    final servingLabel = (servingSize != null && servingSize.trim().isNotEmpty)
-        ? localizeServingLabel(S.of(context), servingSize)
-        : '${S.of(context).servingLabel} (${widget.product.servingQuantity} ${widget.product.servingUnit})';
-    // The label is the food's own text, in grams or millilitres (#1368).
-    final servingText = widget.usesImperialUnits
-        ? imperialServingLabel(S.of(context), servingLabel)
-        : servingLabel;
-    return DropdownMenuItem(
-      value: UnitDropdownItem.serving.toString(),
-      // The serving's weight ends the text; at a large font it wraps
-      // rather than being cut off.
-      child: Text(servingText, overflow: TextOverflow.ellipsis, maxLines: 3),
-    );
-  }
-
-  List<DropdownMenuItem<String>> _getSolidUnitDropdownItems(
-    BuildContext context,
-  ) {
-    return [
+  List<DropdownMenuItem<String>> _portionItems(S s) => [
+    for (final index in _portionIndices)
       DropdownMenuItem(
-        value: UnitDropdownItem.g.toString(),
+        value: portionUnit(index),
         child: Text(
-          S.of(context).gramUnit,
+          portionDisplayLabel(
+            widget.product.portions[index],
+            _baseUnitLabel(s),
+            localizedLabel: localizeServingLabel(
+              s,
+              widget.product.portions[index].label,
+            ),
+          ),
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          maxLines: 1,
         ),
       ),
+    if (_hasLegacyPortion)
       DropdownMenuItem(
-        value: UnitDropdownItem.oz.toString(),
+        value: 'serving',
         child: Text(
-          S.of(context).ozUnit,
+          widget.product.servingSize?.trim().isNotEmpty == true
+              ? localizeServingLabel(s, widget.product.servingSize!)
+              : '${s.servingLabel} · ${widget.product.scalableServingQuantity} ${_baseUnitLabel(s)}',
+          maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          maxLines: 1,
         ),
       ),
-    ];
-  }
-
-  List<DropdownMenuItem<String>> _getLiquidUnitDropdownItems(
-    BuildContext context,
-  ) {
-    return [
-      DropdownMenuItem(
-        value: UnitDropdownItem.ml.toString(),
-        child: Text(
-          S.of(context).milliliterUnit,
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-      ),
-      DropdownMenuItem(
-        value: UnitDropdownItem.flOz.toString(),
-        child: Text(
-          S.of(context).flOzUnit,
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-      ),
-    ];
-  }
-
-  List<DropdownMenuItem<String>> _getOtherDropdownItems(BuildContext context) {
-    return [
-      DropdownMenuItem(
-        value: UnitDropdownItem.gml.toString(),
-        child: Text(
-          "${S.of(context).notAvailableLabel} (${S.of(context).gramMilliliterUnit})",
-          overflow: TextOverflow.ellipsis,
-          maxLines: 1,
-        ),
-      ),
-    ];
-  }
+  ];
 }

@@ -373,7 +373,7 @@ void main() {
     for (final scale in [1.0, 2.0]) {
       for (final dark in [false, true]) {
         testWidgets(
-          'household picker fills grams: $size scale=$scale dark=$dark',
+          'household picker converts servings: $size scale=$scale dark=$dark',
           (tester) async {
             final source = ChineseFoodDataSource(
               read: () => File('assets/foods/catalog.json').readAsString(),
@@ -388,66 +388,27 @@ void main() {
               scale: scale,
               dark: dark,
             );
-            final more = find.bySemanticsIdentifier(
-              'meal-detail-more-portions',
-            );
-            await tester.scrollUntilVisible(
-              more,
-              160,
-              maxScrolls: 80,
-              scrollable: find
-                  .descendant(
-                    of: find.byKey(const ValueKey('meal-detail-content')),
-                    matching: find.byType(Scrollable),
-                  )
-                  .first,
-            );
+            final mode = find.text('分量');
+            final scrollable = find
+                .descendant(
+                  of: find.byKey(const ValueKey('meal-detail-content')),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            await tester.scrollUntilVisible(mode, 160, scrollable: scrollable);
+            await tester.ensureVisible(mode);
+            await tester.tap(mode);
             await tester.pumpAndSettle();
-            await tester.ensureVisible(more);
+            final menu = find.byType(DropdownButtonFormField<String>);
+            await tester.scrollUntilVisible(menu, 90, scrollable: scrollable);
+            await tester.ensureVisible(menu);
+            await tester.tap(menu);
             await tester.pumpAndSettle();
-            expect(more.hitTestable(), findsOneWidget);
-            await tester.tap(more);
-            await tester.pumpAndSettle();
-            final list = find.bySemanticsIdentifier(
-              'meal-detail-portion-options',
-            );
-            expect(list, findsOneWidget);
-            expect(tester.takeException(), isNull);
-            if (const bool.fromEnvironment('FOOD_UI_CAPTURE') &&
-                size.width == 375 &&
-                scale == 1) {
-              final boundary = tester.renderObject<RenderRepaintBoundary>(
-                find.byKey(const ValueKey('detail-capture')),
-              );
-              await tester.runAsync(() async {
-                final picture = await boundary.toImage(pixelRatio: 2);
-                final bytes = await picture.toByteData(
-                  format: ui.ImageByteFormat.png,
-                );
-                const folder = String.fromEnvironment(
-                  'FOOD_UI_CAPTURE_DIR',
-                  defaultValue: 'build/food-ui-checks',
-                );
-                await Directory(folder).create(recursive: true);
-                await File(
-                  '$folder/portions-${dark ? 'dark' : 'light'}.png',
-                ).writeAsBytes(bytes!.buffer.asUint8List());
-                picture.dispose();
-              });
-            }
-            final portion = find.textContaining('一份外卖米饭');
-            await tester.scrollUntilVisible(
-              portion,
-              90,
-              scrollable: find
-                  .ancestor(of: list, matching: find.byType(Scrollable))
-                  .first,
-            );
-            await tester.pumpAndSettle();
+            final portion = find.textContaining('一份外卖米饭').last;
+            await tester.ensureVisible(portion);
             await tester.tap(portion);
             await tester.pumpAndSettle();
-            expect(list, findsNothing);
-            expect(bloc!.state.selectedUnit, 'g');
+            expect(bloc!.state.selectedUnit, startsWith('serving'));
             expect(bloc!.state.totalQuantityConverted, '250.0');
             expect(bloc!.state.totalKcal, closeTo(325, .001));
             expect(tester.takeException(), isNull);
@@ -538,14 +499,14 @@ void main() {
 
   testWidgets(
     'off: thin OFF liquid hydrates to a serving-carrying full product '
-    'and lands on serving',
+    'and still lands on volume',
     (tester) async {
       defaultToRawFoodUnits = false;
       hydratedFor = _liquidHydratedOff();
       await pumpMealDetail(tester, _liquidThinOff());
 
-      expect(bloc!.state.selectedUnit, 'serving');
-      expect(bloc!.state.totalQuantityConverted, '250.0');
+      expect(bloc!.state.selectedUnit, 'ml');
+      expect(bloc!.state.totalQuantityConverted, '100.0');
       expect(_maxScrollOffset(tester), 0.0);
     },
   );

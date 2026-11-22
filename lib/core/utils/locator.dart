@@ -81,6 +81,7 @@ import 'package:opennutritracker/core/utils/off_micronutrient_repair.dart';
 import 'package:opennutritracker/core/utils/tracked_day_reconciler.dart';
 import 'package:http/http.dart' as http;
 import 'package:opennutritracker/core/utils/ai_credential_storage.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_preferences.dart';
 import 'package:opennutritracker/features/add_meal/data/meal_items_api_factory.dart';
 import 'package:opennutritracker/features/add_meal/data/model_meal_photo_interpreter.dart';
 import 'package:opennutritracker/features/add_meal/data/model_meal_text_interpreter.dart';
@@ -161,6 +162,7 @@ Future<void> initLocator() async {
     () => secureAppStorageProvider,
   );
   locator.registerLazySingleton<HiveDBProvider>(() => hiveDBProvider);
+  locator.registerLazySingleton(() => FoodEntryPreferences(hiveDBProvider));
   locator.registerLazySingleton<AiCredentialStorage>(
     () => AiCredentialStorage(),
   );
@@ -323,15 +325,14 @@ Future<void> initLocator() async {
   // create-from-popup flow on the same tab — both must mutate / observe the
   // same instance so the list refreshes after a new entry is created.
   locator.registerLazySingleton<CustomMealsBloc>(
-    () =>
-        CustomMealsBloc(
-          locator(),
-          locator(),
-          locator(),
-          locator(),
-          locator(),
-          locator(),
-        ),
+    () => CustomMealsBloc(
+      locator(),
+      locator(),
+      locator(),
+      locator(),
+      locator(),
+      locator(),
+    ),
   );
 
   locator.registerFactory<ActivitiesBloc>(() => ActivitiesBloc(locator()));
@@ -455,7 +456,10 @@ Future<void> initLocator() async {
   // drive the same screens are registered — it holds no state worth reusing
   // between one bulk-add session and the next.
   locator.registerFactory<ResolveParsedMealsUseCase>(
-    () => ResolveParsedMealsUseCase(locator()),
+    () => ResolveParsedMealsUseCase(
+      locator(),
+      withCustomPortions: locator<FoodEntryPreferences>().withCustomPortions,
+    ),
   );
   locator.registerLazySingleton<SearchProductByBarcodeUseCase>(
     () => SearchProductByBarcodeUseCase(

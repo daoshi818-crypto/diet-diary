@@ -170,8 +170,23 @@ class MealDetailBloc extends Bloc<MealDetailEvent, MealDetailState> {
     MealEntity meal,
     DateTime day,
   ) async {
-    final quantity = double.parse(amountText.replaceAll(',', '.'));
+    await addLocalIntake(
+      unit,
+      double.parse(amountText.replaceAll(',', '.')),
+      type,
+      meal,
+      day,
+    );
+    unawaited(_refreshCacheForSelectedMeal(meal));
+  }
 
+  Future<void> addLocalIntake(
+    String unit,
+    double quantity,
+    IntakeTypeEntity type,
+    MealEntity meal,
+    DateTime day,
+  ) async {
     final intakeEntity = IntakeEntity(
       id: IdGenerator.getUniqueID(),
       unit: unit,
@@ -207,7 +222,6 @@ class MealDetailBloc extends Bloc<MealDetailEvent, MealDetailState> {
         rethrow;
       }
     });
-    unawaited(_refreshCacheForSelectedMeal(meal));
   }
 
   /// Best-effort cache refresh after the user logs a meal. For OFF items

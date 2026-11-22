@@ -232,89 +232,28 @@ void main() {
       .widget<MealDetailBottomSheet>(find.byType(MealDetailBottomSheet))
       .product;
 
-  Future<void> pickUnit(WidgetTester tester, String label) async {
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+  testWidgets('hydration keeps grams and unlocks the package serving', (
+    tester,
+  ) async {
+    final thin = _thin(_seabrookCrispsSearchHit);
+    await pumpMealDetail(tester, thin);
+    expect(bloc!.state.selectedUnit, 'g');
+    expect(quantityField(tester).text, '100');
+
+    hydration.complete(_full(_seabrookCrispsProduct));
     await tester.pumpAndSettle();
-    // The open menu lists the entry once; a selected button shows it too,
-    // and the menu route sits above the screen in the overlay.
-    await tester.tap(find.text(label).last);
+    expect(bloc!.state.selectedUnit, 'g');
+    expect(sheetProduct(tester).detailed, isTrue);
+    expect(sheetProduct(tester).scalableServingQuantity, 31.8);
+
+    await tester.tap(find.text(l10nEn.foodPortionMode));
     await tester.pumpAndSettle();
-  }
-
-  String naLabel() =>
-      '${l10nEn.notAvailableLabel} (${l10nEn.gramMilliliterUnit})';
-
-  testWidgets(
-    'Seabrook crisps: the 31.8 g serving is selected once hydration lands',
-    (tester) async {
-      final thin = _thin(_seabrookCrispsSearchHit);
-      expect(thin.detailed, isFalse);
-      expect(thin.mealUnit, isNull);
-      expect(thin.scalableServingQuantity, isNull);
-
-      await pumpMealDetail(tester, thin);
-
-      // Before hydration the thin record has no unit at all, which is the
-      // "N/A" the reporter saw.
-      expect(bloc!.state.selectedUnit, UnitDropdownItem.gml.toString());
-      expect(find.text(naLabel()), findsOneWidget);
-      expect(find.text('31.8g'), findsNothing);
-
-      hydration.complete(_full(_seabrookCrispsProduct));
-      await tester.pumpAndSettle();
-
-      // The hydrated record carries a scalable 31.8 g serving, so the
-      // default the reporter expected is "1 serving". Before the fix the
-      // re-pick ended on "N/A" beside a quantity of 1: the sheet's
-      // controller listener echoed the quantity write back with the unit
-      // it had last rendered, and that echo was the last event on the
-      // wire.
-      expect(bloc!.state.selectedUnit, UnitDropdownItem.serving.toString());
-      expect(quantityField(tester).text, '1');
-      expect(bloc!.state.totalQuantityConverted, '31.8');
-      // 514 kcal/100 g x 31.8 g; OFF's own energy-kcal_serving is 163.
-      expect(bloc!.state.totalKcal, closeTo(163, 1));
-      expect(find.text('31.8g'), findsOneWidget);
-      expect(find.text(naLabel()), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'Seabrook crisps: picking the 31.8 g entry after hydration keeps it',
-    (tester) async {
-      await pumpMealDetail(tester, _thin(_seabrookCrispsSearchHit));
-      hydration.complete(_full(_seabrookCrispsProduct));
-      await tester.pumpAndSettle();
-      expect(sheetProduct(tester).detailed, isTrue);
-
-      // Opening the menu pushes a route over the screen, which re-runs its
-      // didChangeDependencies. That alone used to hand the thin search hit
-      // back to the sheet — no serving entry, nothing to scale by.
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      expect(sheetProduct(tester).detailed, isTrue);
-      expect(sheetProduct(tester).scalableServingQuantity, 31.8);
-      await tester.tap(find.text(l10nEn.gramUnit).last);
-      await tester.pumpAndSettle();
-
-      // The explicit N/A pick above stands in for the state the stale echo
-      // used to leave behind (first test): "N/A" showing, quantity 1. The
-      // `detailed` check right after the menu opened is what turns red
-      // without the read-once guard; the pick below then walks the fixed
-      // path end to end — the serving entry stays selected and scales the
-      // amount, instead of vanishing from the button and logging 1 g.
-      expect(bloc!.state.selectedUnit, UnitDropdownItem.g.toString());
-      expect(find.text(l10nEn.gramUnit), findsOneWidget);
-      await pickUnit(tester, '31.8g');
-
-      expect(bloc!.state.selectedUnit, UnitDropdownItem.serving.toString());
-      expect(bloc!.state.totalQuantityConverted, '31.8');
-      expect(sheetProduct(tester).detailed, isTrue);
-      // The closed button still reads "31.8g".
-      expect(find.text('31.8g'), findsOneWidget);
-      expect(find.text(naLabel()), findsNothing);
-    },
-  );
+    expect(bloc!.state.selectedUnit, 'serving');
+    expect(quantityField(tester).text, '1');
+    expect(bloc!.state.totalQuantityConverted, '31.8');
+    expect(bloc!.state.totalKcal, closeTo(163, 1));
+    expect(sheetProduct(tester).detailed, isTrue);
+  });
 
   testWidgets(
     'Seabrook multipack: a package quantity but no serving stays on grams',

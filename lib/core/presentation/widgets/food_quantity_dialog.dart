@@ -6,9 +6,11 @@ import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/core/utils/calc/unit_calc.dart';
 import 'package:opennutritracker/core/utils/energy_display.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
+import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/widgets/meal_detail_bottom_sheet.dart';
 import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_preferences.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
 /// The recording screen's own quantity controls, reused for quick add and edit.
@@ -21,6 +23,8 @@ class FoodQuantityDialog extends StatefulWidget {
   final IntakeEntity? editingIntake;
   final bool asBottomSheet;
   final LogTrayItem? initialItem;
+  final (double, String)? initialQuantity;
+  final bool requireQuantity;
 
   const FoodQuantityDialog({
     super.key,
@@ -31,6 +35,8 @@ class FoodQuantityDialog extends StatefulWidget {
     this.editingIntake,
     this.asBottomSheet = false,
     this.initialItem,
+    this.initialQuantity,
+    this.requireQuantity = false,
   });
 
   @override
@@ -40,6 +46,7 @@ class FoodQuantityDialog extends StatefulWidget {
 class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
   late final TextEditingController _quantity;
   late String _unit;
+  late MealEntity _food;
   bool _nutritionOpen = false;
   bool _nutritionEdited = false;
   late final List<TextEditingController> _nutrition;
@@ -47,7 +54,8 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
   @override
   void initState() {
     super.initState();
-    final meal = widget.meal;
+    final prefs = FoodEntryPreferences.current;
+    final meal = _food = prefs?.withCustomPortions(widget.meal) ?? widget.meal;
     final edit = widget.editingIntake;
     final initialAmount = edit?.amount ?? widget.initialItem?.amount;
     final rawUnit = meal.isLiquid ? UnitDropdownItem.ml : UnitDropdownItem.g;
@@ -73,7 +81,27 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
         quantity = 1;
       }
     }
-    _quantity = TextEditingController(text: _number(quantity));
+    if (edit == null) {
+      final pendingUnit = widget.initialItem?.selectionUnit;
+      final remembered =
+          pendingUnit ?? (initialAmount == null ? prefs?.lastUnit(meal) : null);
+      if (remembered != null) {
+        _unit = remembered;
+        quantity = initialAmount == null
+            ? (isPortionUnit(_unit) || ['oz', 'fl.oz'].contains(_unit)
+                  ? 1
+                  : 100)
+            : initialAmount / convertQuantityToBaseUnit(1, _unit, meal);
+      }
+    }
+    final prefill = widget.initialQuantity;
+    if (prefill != null) {
+      quantity = prefill.$1;
+      _unit = prefill.$2;
+    }
+    _quantity = TextEditingController(
+      text: widget.requireQuantity && prefill == null ? '' : _number(quantity),
+    );
     final n = meal.nutriments;
     _nutrition =
         [
@@ -129,9 +157,9 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
 
   MealEntity get _meal {
     if (widget.editingIntake == null || !_nutritionEdited || !_nutritionValid) {
-      return widget.meal;
+      return _food;
     }
-    return widget.meal.withNutriments(
+    return _food.withNutriments(
       widget.meal.nutriments.withEditedValues(
         energyKcal100: _value(0),
         carbohydrates100: _value(1),
@@ -214,7 +242,7 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
     final s = S.of(context);
     final amount = double.tryParse(_quantity.text.replaceAll(',', '.'));
     final base = amount != null && amount.isFinite && amount > 0
-        ? convertQuantityToBaseUnit(amount, _unit, widget.meal)
+        ? convertQuantityToBaseUnit(amount, _unit, _food)
         : 0.0;
     final meal = _meal;
     final content = MealDetailBottomSheet(
@@ -224,6 +252,17 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
       intakeTypeEntity: widget.type,
       allowMealTypeChange: widget.editingIntake == null,
       quantityTextController: _quantity,
+      rememberSelection: widget.editingIntake == null,
+      onCustomPortionsChanged: FoodEntryPreferences.current == null
+          ? null
+          : () {
+              setState(
+                () => _food = FoodEntryPreferences.current!.withCustomPortions(
+                  widget.meal,
+                ),
+              );
+              return _food;
+            },
       selectedUnit: _unit,
       usesImperialUnits: widget.usesImperialUnits,
       onQuantityOrUnitChanged: _update,
@@ -278,6 +317,8 @@ Future<LogTrayItem?> showFoodQuantitySheet({
   required bool usesImperialUnits,
   IntakeEntity? editingIntake,
   LogTrayItem? initialItem,
+  (double, String)? initialQuantity,
+  bool requireQuantity = false,
 }) => showModalBottomSheet<LogTrayItem>(
   context: context,
   useSafeArea: true,
@@ -290,6 +331,8 @@ Future<LogTrayItem?> showFoodQuantitySheet({
     usesImperialUnits: usesImperialUnits,
     editingIntake: editingIntake,
     initialItem: initialItem,
+    initialQuantity: initialQuantity,
+    requireQuantity: requireQuantity,
     asBottomSheet: true,
   ),
 );

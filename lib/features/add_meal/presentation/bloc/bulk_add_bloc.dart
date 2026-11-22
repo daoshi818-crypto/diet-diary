@@ -9,6 +9,7 @@ import 'package:opennutritracker/features/add_meal/domain/usecase/resolve_parsed
 import 'package:opennutritracker/features/add_meal/util/meal_text_parser.dart';
 import 'package:opennutritracker/features/add_meal/util/portion_match.dart';
 import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
+import 'package:opennutritracker/features/meal_detail/util/portion_display.dart';
 import 'package:opennutritracker/features/add_meal/util/recipe_count.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
@@ -179,7 +180,18 @@ class BulkAddRow extends Equatable {
           // record with no scalable serving that becomes 3 g/ml with no
           // warning, because the old condition only looked at a *missing*
           // unit. A substituted one is just as wrong and less visible.
-          : effectiveUnit != unit);
+          : effectiveUnit != unit || _explicitCountMissing);
+
+  bool get _explicitCountMissing {
+    final countUnit = resolved.parsed.portion;
+    final food = meal;
+    return food != null &&
+        countedFoodUnits.contains(countUnit) &&
+        defaultPortionIndex(food, countUnit: countUnit) == null &&
+        !(countUnit == '份' &&
+            food.portions.isEmpty &&
+            (food.scalableServingQuantity ?? 0) > 0);
+  }
 
   /// The count [countExceedsRecipe] checks: the amount the user typed once
   /// they edited it (half-typed text falls back), else the parsed count.
@@ -266,14 +278,15 @@ class BulkAddRow extends Equatable {
     // anything is written, so the published unit vocabulary is unchanged.
     // #864.
     if (meal?.portions.isNotEmpty ?? false)
-      for (var i = 0; i < meal!.portions.length; i++) portionUnit(i)
+      for (final i in visiblePortionIndices(meal!, selectedUnit: unit))
+        portionUnit(i)
     // Only when the serving can actually be scaled. `hasServingValues` is
     // also true for a record carrying nothing but `servingSize` text, and
     // `convertQuantityToBaseUnit` leaves those unscaled — so offering
     // `serving` there is a no-op dressed as a fix. Worse, it is the option
     // a user reaches for after reading `amountNeedsCheck`: picking it
     // relabels the row, clears the warning and logs the same wrong number.
-    else if (meal?.servingQuantity != null)
+    else if ((meal?.scalableServingQuantity ?? 0) > 0)
       UnitDropdownItem.serving.toString(),
     if (meal?.isSolid ?? false) ...[
       UnitDropdownItem.g.toString(),
@@ -322,6 +335,13 @@ class BulkAddRow extends Equatable {
   ///   cannot honour ounces being the plain case.
   bool get amountWouldBeWrong {
     if (!amountNeedsCheck) return false;
+    if (_explicitCountMissing) return true;
+    final food = meal;
+    if (food != null &&
+        ((food.isSolid && (unit == 'ml' || unit == 'fl.oz')) ||
+            (food.isLiquid && (unit == 'g' || unit == 'oz')))) {
+      return true;
+    }
     // Nothing to compare against: the count has no unit and no serving to
     // land on.
     if (resolved.parsed.unit == null) return true;
@@ -329,7 +349,6 @@ class BulkAddRow extends Equatable {
     // by it — see above.
     if (isPortionUnit(unit)) return true;
     final quantity = resolved.parsed.quantity;
-    final food = meal;
     if (quantity == null || food == null) return true;
     return convertQuantityToBaseUnit(quantity, unit, food) !=
         convertQuantityToBaseUnit(quantity, effectiveUnit, food);
@@ -615,6 +634,14 @@ class BulkAddBloc extends Bloc<BulkAddEvent, BulkAddState> {
     bool usesImperialUnits,
   ) {
     final parsedUnit = parsed.unit;
+    final countUnit = parsed.portion;
+    if (meal != null && countedFoodUnits.contains(countUnit)) {
+      final index = defaultPortionIndex(meal, countUnit: countUnit);
+      if (index != null) return portionUnit(index);
+      if (countUnit != '份' || meal.portions.isNotEmpty) {
+        return UnitDropdownItem.gml.toString();
+      }
+    }
     if (parsedUnit != null) return parsedUnit;
 
     final fallback = usesImperialUnits

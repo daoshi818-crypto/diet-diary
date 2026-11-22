@@ -1,5 +1,25 @@
 import 'package:opennutritracker/core/utils/food_name_validator.dart';
 
+const countedFoodUnits = {
+  '个',
+  '根',
+  '份',
+  '片',
+  '块',
+  '只',
+  '枚',
+  '颗',
+  '杯',
+  '勺',
+  '袋',
+  '包',
+  '瓶',
+  '盒',
+  '罐',
+  '碗',
+  '条',
+};
+
 /// Upper bound for a parsed quantity, matching the manual-entry check in
 /// meal_detail_bottom_sheet.dart.
 const _maxQuantity = 10000;
@@ -16,16 +36,14 @@ const _validUnits = {'g', 'ml', 'g/ml', 'oz', 'fl.oz', 'serving'};
 /// ._applyInitialSelection` already uses.
 class ParsedMealItem {
   final String query;
+  final String? rawInput;
   final double? quantity;
   final String? unit;
 
   /// What the model called the portion — "slice", "cup" — as a **lookup key**
   /// into the food's own portions, never a value.
   ///
-  /// The deterministic parser never sets it: it keys off unit symbols and
-  /// leaves any household word in [query], where `matchPortionToQuery` finds
-  /// it. This is for the paths that have no typed text to search — a
-  /// photograph above all, where nobody wrote "slices" for anything to match.
+  /// May be an explicit count unit in manual text, such as "个" or "根".
   ///
   /// Nothing numeric arrives with it. The grams still come from the portion
   /// the key resolves to, which came from the food database, so "every number
@@ -37,6 +55,7 @@ class ParsedMealItem {
 
   const ParsedMealItem({
     required this.query,
+    this.rawInput,
     this.quantity,
     this.unit,
     this.portion,
@@ -140,6 +159,66 @@ class MealTextParseResult {
   const MealTextParseResult({required this.items, required this.errors});
 
   bool get hasErrors => errors.isNotEmpty;
+}
+
+List<ParsedMealItem> parseLocalMealBatch(String input) {
+  final tokens = input.split(_separator).expand((line) {
+    final pieces = line.trim().split(RegExp(r'\s+'));
+    final rows = <String>[];
+    final amount = RegExp('^$_number(?:$_unitSymbol)?\$', caseSensitive: false);
+    final unit = RegExp('^$_unitSymbol\$', caseSensitive: false);
+    for (var i = 0; i < pieces.length; i++) {
+      final piece = pieces[i];
+      if (piece.isEmpty) continue;
+      if (rows.isNotEmpty &&
+          amount.hasMatch(rows.last) &&
+          !amount.hasMatch(piece)) {
+        rows[rows.length - 1] += ' $piece';
+      } else if (rows.isNotEmpty &&
+          amount.hasMatch(piece) &&
+          _extractQuantityAndUnit(rows.last).quantity == null) {
+        rows[rows.length - 1] += ' $piece';
+        if (i + 1 < pieces.length && unit.hasMatch(pieces[i + 1])) {
+          rows[rows.length - 1] += ' ${pieces[++i]}';
+        }
+      } else {
+        rows.add(piece);
+      }
+    }
+    return rows;
+  });
+  final items = <ParsedMealItem>[];
+  for (final token in tokens) {
+    final extracted = _extractQuantityAndUnit(token);
+    final unknownUnit = extracted.quantity == null
+        ? RegExp(
+            r'^(.+?[\p{Script=Han}])\s*-?\d+(?:[.,]\d+)?[a-z]+$',
+            unicode: true,
+            caseSensitive: false,
+          ).firstMatch(token)
+        : null;
+    final name = (unknownUnit?[1] ?? extracted.query).trim();
+    if (!FoodNameValidator.isValid(name)) continue;
+    if (RegExp(
+      '^$_number\\s*(?:$_unitSymbol)?\$',
+      caseSensitive: false,
+    ).hasMatch(token)) {
+      continue;
+    }
+    final parsed = unknownUnit == null
+        ? parseMealText(token).items.firstOrNull
+        : null;
+    items.add(
+      ParsedMealItem(
+        query: name,
+        rawInput: token,
+        quantity: parsed?.quantity,
+        unit: parsed?.unit,
+        portion: parsed?.portion,
+      ),
+    );
+  }
+  return items;
 }
 
 /// Applies the bounds [parseMealText] enforces to items that were extracted
@@ -330,7 +409,8 @@ final _separator = RegExp(r'[;+\n、，；]|(?<!\d),|,(?!\d)');
 List<String> _segment(String input) => input
     .replaceAllMapped(
       RegExp(
-        r'(?<=[\p{L}])(\s*-?\d+(?:[.,]\d+)?\s*(?:kg|lb|ml|oz|g|l|毫升|千克|克|升))\s+(?=[\p{L}][^,;+\n、，；]*\d\s*(?:kg|lb|ml|oz|g|l|毫升|千克|克|升))',
+        '(?<=[\\p{L}%])(\\s*$_number\\s*$_unitSymbol)'
+        r'\s+(?=[\p{L}])',
         unicode: true,
         caseSensitive: false,
       ),
@@ -347,7 +427,8 @@ List<String> _segment(String input) => input
 /// matching any run of letters) is what lets
 /// the regex engine backtrack to the no-unit reading when the word after
 /// the number simply belongs to the food name — see [_leadingQuantity].
-const _unitSymbol = r'(?:kg|lb|ml|oz|g|l|毫升|千克|克|升)';
+final _unitSymbol =
+    '(?:fl\\.oz|kg|lb|ml|oz|g|l|毫升|千克|克|升|${countedFoodUnits.join('|')})';
 
 /// Scripts that do not put spaces between words. A number and the food it
 /// counts sit flush against each other in all of them, so the whitespace
@@ -390,7 +471,7 @@ final _leadingQuantity = RegExp(
   unicode: true,
 );
 final _trailingQuantity = RegExp(
-  '^(.+?)(?:\\s+|(?<=$_unspacedScript))($_number)\\s*($_unitSymbol)?\\s*\$',
+  '^(.+?)(?:\\s+|(?<=$_unspacedScript)|(?<=[\\p{L}%])(?=$_number\\s*$_unitSymbol\\s*\$))($_number)\\s*($_unitSymbol)?\\s*\$',
   caseSensitive: false,
   unicode: true,
 );
@@ -465,7 +546,7 @@ _Extracted _extractQuantityAndUnit(String segment) {
     case '毫升':
       return (quantity, 'ml');
     default:
-      return (quantity, unit);
+      return (quantity, countedFoodUnits.contains(unit) ? 'serving' : unit);
   }
 }
 
@@ -546,7 +627,16 @@ MealTextParseResult parseMealText(String input) {
       'parseMealText emitted unrecognized unit "$unit"',
     );
 
-    items.add(ParsedMealItem(query: query, quantity: quantity, unit: unit));
+    items.add(
+      ParsedMealItem(
+        query: query,
+        quantity: quantity,
+        unit: unit,
+        portion: countedFoodUnits.contains(extracted.unit)
+            ? extracted.unit
+            : null,
+      ),
+    );
   }
 
   return MealTextParseResult(items: items, errors: errors);

@@ -138,66 +138,27 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> selectPortion(WidgetTester tester, String id) async {
-    await tester.tap(find.bySemanticsIdentifier('meal-detail-more-portions'));
-    await tester.pumpAndSettle();
-    final item = find.byKey(ValueKey('portion-option-$id'));
-    await tester.ensureVisible(item);
-    await tester.tap(item);
-    await tester.pumpAndSettle();
-  }
-
-  testWidgets(
-    '0.5x on a 30 g serving lands 15 g in state.totalQuantityConverted',
-    (tester) async {
-      await pumpMealDetail(tester, _solidThirtyGramServing());
-
-      // Baseline from _applyInitialSelection: quantity 1, unit 'serving'
-      // -> 1 x 30 g = 30 g.
-      expect(bloc!.state.selectedUnit, 'serving');
-      expect(bloc!.state.totalQuantityConverted, '30.0');
-
-      await selectPortion(tester, 'half-serving');
-      await tester.pumpAndSettle();
-
-      expect(bloc!.state.selectedUnit, 'serving');
-      expect(bloc!.state.totalQuantityConverted, '15.0');
-    },
-  );
-
-  testWidgets('typing after tapping the half-serving chip keeps the chip unit '
-      'and recomputes against it', (tester) async {
+  testWidgets('a food defaults to grams, then supports fractional portions', (
+    tester,
+  ) async {
     await pumpMealDetail(tester, _solidThirtyGramServing());
+    expect(bloc!.state.selectedUnit, 'g');
+    expect(bloc!.state.totalQuantityConverted, '100.0');
 
-    await selectPortion(tester, 'half-serving');
+    await tester.tap(find.text('Portion'));
+    await tester.pumpAndSettle();
+    expect(bloc!.state.selectedUnit, 'serving');
+    expect(bloc!.state.totalQuantityConverted, '30.0');
+
+    await tester.enterText(find.byType(TextFormField).first, '0.5');
     await tester.pumpAndSettle();
     expect(bloc!.state.totalQuantityConverted, '15.0');
 
-    // The bottom-sheet quantity field is the enabled TextFormField; typing
-    // '3' replaces the chip's 0.5 and recomputes 3 x 30 g = 90 g while the
-    // unit stays 'serving'.
-    final field = find.byType(TextFormField).first;
-    await tester.enterText(field, '3');
+    await tester.tap(find.text('Weight').first);
     await tester.pumpAndSettle();
-
-    expect(bloc!.state.selectedUnit, 'serving');
-    expect(bloc!.state.totalQuantityConverted, '90.0');
+    expect(bloc!.state.selectedUnit, 'g');
+    expect(bloc!.state.totalQuantityConverted, '15.0');
   });
-
-  testWidgets(
-    '100 g chip from a serving unit switches state.selectedUnit to g',
-    (tester) async {
-      await pumpMealDetail(tester, _solidThirtyGramServing());
-
-      expect(bloc!.state.selectedUnit, 'serving');
-
-      await selectPortion(tester, '100g');
-      await tester.pumpAndSettle();
-
-      expect(bloc!.state.selectedUnit, 'g');
-      expect(bloc!.state.totalQuantityConverted, '100.0');
-    },
-  );
 
   testWidgets('the app bar star favourites the food and unstars it', (
     tester,

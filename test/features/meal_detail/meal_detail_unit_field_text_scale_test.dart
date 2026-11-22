@@ -130,7 +130,7 @@ void main() {
     );
   });
 
-  testWidgets('at 100% the unit field is as tall as the quantity field', (
+  testWidgets('the unit field and quantity field do not overlap', (
     tester,
   ) async {
     await _pumpSheet(tester, 1.0);
@@ -140,8 +140,8 @@ void main() {
       matching: find.byType(InputDecorator),
     );
     expect(
-      tester.getSize(_unitField().first).height,
-      tester.getSize(quantity.first).height,
+      tester.getBottomLeft(_unitField().first).dy,
+      lessThan(tester.getTopLeft(quantity.first).dy),
     );
   });
 }

@@ -37,6 +37,44 @@ class ChineseFoodDataSource {
 
   Future<int> count() async => (await _foods()).length;
 
+  Future<MealEntity?> byCatalogId(String id) async =>
+      (await _foods()).where((row) => row.meal.code == id).firstOrNull?.meal;
+
+  Future<List<({MealEntity food, int rank})>> matchBatchName(
+    String query,
+  ) async {
+    final q = batchFoodKey(query);
+    if (q.isEmpty) return [];
+    final rows = <({MealEntity food, int rank})>[];
+    for (final row in await _foods()) {
+      final food = row.meal;
+      final name = batchFoodKey(food.name ?? '');
+      final brand = batchFoodKey(food.brands ?? '');
+      final rank = name == q
+          ? 0
+          : row.aliases.contains(q)
+          ? 1
+          : brand.isNotEmpty &&
+                ('$brand$name' == q ||
+                    '$name$brand' == q ||
+                    row.aliases.any((alias) => '$brand$alias' == q))
+          ? 2
+          : row.searchText.contains(q) ||
+                (brand.isNotEmpty &&
+                    q.startsWith(brand) &&
+                    q.length > brand.length &&
+                    (name.contains(q.substring(brand.length)) ||
+                        row.aliases.any(
+                          (alias) => alias.contains(q.substring(brand.length)),
+                        )))
+          ? 3
+          : null;
+      if (rank != null) rows.add((food: food, rank: rank));
+    }
+    rows.sort((a, b) => a.rank.compareTo(b.rank));
+    return rows.take(60).toList();
+  }
+
   /// Demo content refers to an explicit original record, never a fuzzy hit.
   /// If an upstream ID has conflicting records, require an explicit choice.
   Future<MealEntity> bySourceId(String source, String id) async {
@@ -80,8 +118,18 @@ class _LocalFood {
   final String searchText;
   final String? barcode;
   final Set<String> sourceKeys;
-  const _LocalFood(this.meal, this.searchText, this.barcode, this.sourceKeys);
+  final Set<String> aliases;
+  const _LocalFood(
+    this.meal,
+    this.searchText,
+    this.barcode,
+    this.sourceKeys,
+    this.aliases,
+  );
 }
+
+String batchFoodKey(String value) =>
+    value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
 List<_LocalFood> _decodeFoods(String text) {
   final decoded = jsonDecode(text) as Map<String, dynamic>;
@@ -179,6 +227,10 @@ List<_LocalFood> _decodeFoods(String text) {
       {
         for (final source in row['sources'] as List)
           '${source['source']}:${source['id']}',
+      },
+      {
+        for (final alias in row['aliases'] as List)
+          batchFoodKey(alias.toString()),
       },
     );
   }).toList();

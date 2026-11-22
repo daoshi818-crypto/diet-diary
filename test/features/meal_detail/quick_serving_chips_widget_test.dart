@@ -83,17 +83,22 @@ Future<void> _pumpSheet(
       localizationsDelegates: const [S.delegate],
       supportedLocales: S.supportedLocales,
       home: Scaffold(
-        body: MealDetailBottomSheet(
-          product: product,
-          day: DateTime(2026, 9, 13),
-          intakeTypeEntity: IntakeTypeEntity.breakfast,
-          quantityTextController: quantityController,
-          mealDetailBloc: _buildBloc(),
-          selectedUnit: initialUnit,
-          usesImperialUnits: usesImperialUnits,
-          onQuantityOrUnitChanged: onChanged,
-          onSelectionConfirmed: onConfirm,
-          confirmLabel: onConfirm == null ? null : 'Confirm amount',
+        body: StatefulBuilder(
+          builder: (context, refresh) => MealDetailBottomSheet(
+            product: product,
+            day: DateTime(2026, 9, 13),
+            intakeTypeEntity: IntakeTypeEntity.breakfast,
+            quantityTextController: quantityController,
+            mealDetailBloc: _buildBloc(),
+            selectedUnit: initialUnit,
+            usesImperialUnits: usesImperialUnits,
+            onQuantityOrUnitChanged: (q, u) {
+              if (u != null) refresh(() => initialUnit = u);
+              onChanged(q, u);
+            },
+            onSelectionConfirmed: onConfirm,
+            confirmLabel: onConfirm == null ? null : 'Confirm amount',
+          ),
         ),
       ),
     ),
@@ -122,184 +127,58 @@ MealEntity _riceWithPortions() => MealEntity(
   ],
 );
 
-Future<void> choosePortion(WidgetTester tester, String id) async {
-  await tester.tap(find.bySemanticsIdentifier('meal-detail-more-portions'));
+Future<void> choosePortion(WidgetTester tester, String label) async {
+  await tester.tap(find.byType(DropdownButtonFormField<String>));
   await tester.pumpAndSettle();
-  final option = find.byKey(ValueKey('portion-option-$id'));
-  await tester.ensureVisible(option);
-  await tester.tap(option);
+  await tester.tap(find.textContaining(label).last);
   await tester.pumpAndSettle();
 }
 
 void main() {
-  testWidgets('a household portion fills grams and confirms that weight', (
+  testWidgets('pick a fifth specification and enter a fractional count', (
     tester,
   ) async {
     final controller = TextEditingController(text: '100');
-    final changes = <(String?, String?)>[];
-    LogTrayItem? selected;
+    LogTrayItem? result;
     await _pumpSheet(
       tester,
       product: _riceWithPortions(),
       quantityController: controller,
       initialUnit: 'g',
-      onChanged: (q, u) => changes.add((q, u)),
-      onConfirm: (item) async => selected = item,
+      onChanged: (_, _) {},
+      onConfirm: (item) async => result = item,
     );
-    final menu = tester.widget<DropdownButton<String>>(
-      find.byType(DropdownButton<String>),
+    expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+    await tester.tap(find.text('Portion'));
+    await tester.pumpAndSettle();
+    expect(controller.text, '1');
+    await tester.enterText(
+      find.widgetWithText(TextFormField, 'Quantity'),
+      '1.5',
     );
-    expect(menu.items!.map((i) => i.value), ['g', 'oz']);
-    await choosePortion(tester, 'portion-0');
-    expect(controller.text, '150');
-    expect(changes, [('150', 'g')]);
+    await tester.pumpAndSettle();
+    await choosePortion(tester, '外卖盒');
+    expect(controller.text, '1.5');
     await tester.tap(find.text('Confirm amount'));
     await tester.pumpAndSettle();
-    expect(selected!.amount, 150);
-    expect(selected!.unit, 'g');
+    expect(result!.amount, 375);
+    expect(result!.selectionUnit, 'serving#4');
   });
 
-  testWidgets('the portion picker reaches presets beyond the first four', (
+  testWidgets('a solid food cannot switch to volume without a conversion', (
     tester,
   ) async {
-    final controller = TextEditingController(text: '100');
-    final changes = <(String?, String?)>[];
-    await _pumpSheet(
-      tester,
-      product: _riceWithPortions(),
-      quantityController: controller,
-      initialUnit: 'g',
-      onChanged: (q, u) => changes.add((q, u)),
-    );
-    await tester.tap(find.bySemanticsIdentifier('meal-detail-more-portions'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('外卖盒 · 250 g'));
-    await tester.pumpAndSettle();
-    expect(controller.text, '250');
-    expect(changes, [('250', 'g')]);
-    expect(
-      find.bySemanticsIdentifier('meal-detail-portion-options'),
-      findsNothing,
-    );
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets(
-    'one portion button opens all presets without duplicate presets',
-    (tester) async {
-      await _pumpSheet(
-        tester,
-        product: _solidWithServing(),
-        quantityController: TextEditingController(text: '1'),
-        onChanged: (_, _) {},
-      );
-      expect(find.byType(ChoiceChip), findsNothing);
-      expect(
-        find.bySemanticsIdentifier('meal-detail-more-portions'),
-        findsOneWidget,
-      );
-      await tester.tap(find.bySemanticsIdentifier('meal-detail-more-portions'));
-      await tester.pumpAndSettle();
-      for (final id in [
-        'half-serving',
-        'one-serving',
-        'double-serving',
-        '100g',
-      ]) {
-        expect(find.byKey(ValueKey('portion-option-$id')), findsOneWidget);
-      }
-    },
-  );
-
-  testWidgets(
-    'tapping the 100 g preset writes 100 into the quantity field and fires the '
-    'callback with unit=g',
-    (tester) async {
-      final quantityController = TextEditingController(text: '1');
-      String? cbQuantity;
-      String? cbUnit;
-
-      await _pumpSheet(
-        tester,
-        product: _solidWithServing(),
-        quantityController: quantityController,
-        onChanged: (q, u) {
-          cbQuantity = q;
-          cbUnit = u;
-        },
-      );
-
-      await choosePortion(tester, '100g');
-
-      expect(quantityController.text, '100');
-      expect(cbQuantity, '100');
-      expect(cbUnit, 'g');
-    },
-  );
-
-  testWidgets(
-    'tapping the 1× preset writes 1 into the quantity field and fires the '
-    'callback with unit=serving',
-    (tester) async {
-      final quantityController = TextEditingController(text: '30');
-      String? cbQuantity;
-      String? cbUnit;
-
-      await _pumpSheet(
-        tester,
-        product: _solidWithServing(),
-        quantityController: quantityController,
-        onChanged: (q, u) {
-          cbQuantity = q;
-          cbUnit = u;
-        },
-        initialUnit: 'g',
-      );
-
-      await choosePortion(tester, 'one-serving');
-
-      expect(quantityController.text, '1');
-      expect(cbQuantity, '1');
-      expect(cbUnit, 'serving');
-    },
-  );
-
-  testWidgets(
-    'tapping the 0.5× preset writes 0.5 (not 1 or 0) into the quantity field',
-    (tester) async {
-      final quantityController = TextEditingController(text: '1');
-      String? cbQuantity;
-      String? cbUnit;
-
-      await _pumpSheet(
-        tester,
-        product: _solidWithServing(),
-        quantityController: quantityController,
-        onChanged: (q, u) {
-          cbQuantity = q;
-          cbUnit = u;
-        },
-      );
-
-      await choosePortion(tester, 'half-serving');
-
-      expect(quantityController.text, '0.5');
-      expect(cbQuantity, '0.5');
-      expect(cbUnit, 'serving');
-    },
-  );
-  testWidgets('with imperial food units the serving entry reads in oz '
-      '(#1368)', (tester) async {
+    final changes = <String?>[];
     await _pumpSheet(
       tester,
       product: _solidWithServing(),
-      quantityController: TextEditingController(text: '1'),
-      onChanged: (_, _) {},
-      usesImperialUnits: true,
+      quantityController: TextEditingController(text: '100'),
+      initialUnit: 'g',
+      onChanged: (_, unit) => changes.add(unit),
     );
-
-    expect(find.text('1.06 oz'), findsOneWidget);
-    expect(find.text('30 g'), findsNothing);
+    await tester.tap(find.text('Volume'));
+    await tester.pumpAndSettle();
+    expect(changes, isEmpty);
   });
   testWidgets('confirming two servings returns 60g without writing an intake', (
     tester,
@@ -380,7 +259,7 @@ void main() {
           ],
         ),
         quantityController: TextEditingController(text: '2'),
-        initialUnit: 'serving#1',
+        initialUnit: 'serving',
         onChanged: (_, _) {},
         onConfirm: (item) async => result = item,
       );
@@ -395,10 +274,13 @@ void main() {
       final dropdown = tester.widget<DropdownButton<String>>(
         find.byType(DropdownButton<String>),
       );
-      expect(dropdown.items!.where((item) => item.value == 'serving'), isEmpty);
+      expect(
+        dropdown.items!.where((item) => item.value == 'serving'),
+        hasLength(1),
+      );
       expect(
         dropdown.items!.where((item) => item.value == 'serving#1'),
-        hasLength(1),
+        isEmpty,
       );
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('Confirm amount'));
@@ -418,11 +300,7 @@ void main() {
         initialUnit: 'g',
         onChanged: (q, u) => changes.add((q, u)),
       );
-      tester
-          .widget<DropdownButtonFormField<String>>(
-            find.byType(DropdownButtonFormField<String>),
-          )
-          .onChanged!('serving');
+      await tester.tap(find.text('Portion'));
       await tester.pumpAndSettle();
       expect(controller.text, '1');
       expect(changes, [('1', 'serving')]);
@@ -440,17 +318,13 @@ void main() {
       quantityController: controller,
       onChanged: (q, u) => changes.add((q, u)),
     );
-    tester
-        .widget<DropdownButtonFormField<String>>(
-          find.byType(DropdownButtonFormField<String>),
-        )
-        .onChanged!('g');
+    await tester.tap(find.text('Weight'));
     await tester.pumpAndSettle();
     expect(controller.text, '60');
     expect(changes, [('60', 'g')]);
   });
 
-  testWidgets('plain weights are presets rather than serving units', (
+  testWidgets('plain weights do not appear in the portion menu', (
     tester,
   ) async {
     await _pumpSheet(
@@ -465,11 +339,11 @@ void main() {
       initialUnit: 'g',
       onChanged: (_, _) {},
     );
+    await tester.tap(find.text('Portion'));
+    await tester.pumpAndSettle();
     final menu = tester.widget<DropdownButton<String>>(
       find.byType(DropdownButton<String>),
     );
-    expect(menu.items!.where((item) => item.value == 'serving'), isEmpty);
-    expect(menu.items!.where((item) => item.value == 'serving#1'), isEmpty);
-    await choosePortion(tester, 'portion-1');
+    expect(menu.items!.map((item) => item.value), ['serving#1']);
   });
 }

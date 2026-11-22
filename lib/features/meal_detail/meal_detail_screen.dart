@@ -1,4 +1,5 @@
-import 'package:opennutritracker/features/meal_detail/util/food_entry_policy.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_preferences.dart';
+import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -45,6 +46,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   final _scrollController = ScrollController();
 
   late MealEntity meal;
+  late MealEntity _sourceMeal;
   late DateTime _day;
   late IntakeTypeEntity intakeTypeEntity;
 
@@ -52,7 +54,6 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   late bool _usesImperialUnits;
   LogTray? _logTray;
   bool _showMicronutrients = false;
-  bool _defaultToRawFoodUnits = true;
 
   String _initialUnit = "";
   String _initialQuantity = "";
@@ -81,20 +82,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   Future<void> _loadDetailPreferences() async {
     final config = await locator<GetConfigUsecase>().getConfig();
     if (!mounted) return;
-    final wasSelectionInitialised = _initialUnit != "";
-    final preferenceChanged =
-        _defaultToRawFoodUnits != config.defaultToRawFoodUnits;
-    setState(() {
-      _showMicronutrients = config.showMicronutrients;
-      _defaultToRawFoodUnits = config.defaultToRawFoodUnits;
-    });
-    if (wasSelectionInitialised &&
-        preferenceChanged &&
-        !_userChangedSelection) {
-      _initialUnit = "";
-      _initialQuantity = "";
-      _applyInitialSelection();
-    }
+    setState(() => _showMicronutrients = config.showMicronutrients);
   }
 
   @override
@@ -104,7 +92,10 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       final args =
           ModalRoute.of(context)?.settings.arguments
               as MealDetailScreenArguments;
-      meal = args.mealEntity;
+      _sourceMeal = args.mealEntity;
+      meal =
+          FoodEntryPreferences.current?.withCustomPortions(_sourceMeal) ??
+          _sourceMeal;
       _day = args.day;
       intakeTypeEntity = args.intakeTypeEntity;
       _usesImperialUnits = args.usesImperialUnits;
@@ -125,11 +116,7 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   }
 
   void _applyInitialSelection() {
-    final preferServing =
-        meal.scalableServingQuantity != null &&
-        !_defaultToRawFoodUnits &&
-        offersCountedServings(meal) &&
-        !(meal.backendSource?.startsWith('local_') ?? false);
+    final remembered = FoodEntryPreferences.current?.lastUnit(meal);
 
     _applyingInitialSelection = true;
     try {
@@ -137,18 +124,16 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
         // `scalableServingQuantity`, not `hasServingValues` (#629): the latter
         // is true for a record whose serving is unparseable text, and nothing
         // can scale those — they defaulted to "1 serving" and logged 1 g.
-        if (preferServing) {
-          _initialUnit = UnitDropdownItem.serving.toString();
+        if (remembered != null) {
+          _initialUnit = remembered;
         } else if (meal.isLiquid) {
           _initialUnit = _usesImperialUnits
               ? UnitDropdownItem.flOz.toString()
               : UnitDropdownItem.ml.toString();
-        } else if (meal.isSolid) {
+        } else {
           _initialUnit = _usesImperialUnits
               ? UnitDropdownItem.oz.toString()
               : UnitDropdownItem.g.toString();
-        } else {
-          _initialUnit = UnitDropdownItem.gml.toString();
         }
         _mealDetailBloc.add(
           UpdateKcalEvent(meal: meal, selectedUnit: _initialUnit),
@@ -158,10 +143,10 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       if (_initialQuantity == "") {
         // Gated the same way as the unit above, so a bare "1" can never end
         // up beside a weight unit.
-        if (preferServing) {
+        if (isPortionUnit(_initialUnit)) {
           _initialQuantity = "1";
           quantityTextController.text = "1";
-        } else if (_usesImperialUnits) {
+        } else if (['oz', 'fl.oz'].contains(_initialUnit)) {
           _initialQuantity = _initialQuantityImperial;
           quantityTextController.text = _initialQuantityImperial;
         } else {
@@ -186,7 +171,10 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
   /// default now that serving data exists); otherwise just recompute totals
   /// against the fuller nutriments while keeping the user's selection.
   void _onMealHydrated(MealEntity full) {
-    setState(() => meal = full);
+    setState(() {
+      _sourceMeal = full;
+      meal = FoodEntryPreferences.current?.withCustomPortions(full) ?? full;
+    });
     if (_userChangedSelection) {
       _mealDetailBloc.add(
         UpdateKcalEvent(
@@ -254,6 +242,15 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
             usesImperialUnits: _usesImperialUnits,
             mealDetailBloc: _mealDetailBloc,
             quantityTextController: quantityTextController,
+            onCustomPortionsChanged: FoodEntryPreferences.current == null
+                ? null
+                : () {
+                    setState(
+                      () => meal = FoodEntryPreferences.current!
+                          .withCustomPortions(_sourceMeal),
+                    );
+                    return meal;
+                  },
             onQuantityOrUnitChanged: onQuantityOrUnitChanged,
             logTray: _logTray,
             layoutBuilder: (context, editor, actions) => LayoutBuilder(

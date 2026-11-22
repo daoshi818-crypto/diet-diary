@@ -6,9 +6,11 @@ import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.
 import 'package:opennutritracker/core/data/data_source/remote_search_cache_data_source.dart';
 import 'package:opennutritracker/core/data/dbo/meal_dbo.dart';
 import 'package:opennutritracker/features/add_meal/data/repository/products_repository.dart';
+import 'package:opennutritracker/features/add_meal/data/data_sources/chinese_food_data_source.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:opennutritracker/core/utils/energy_unit_provider.dart';
 import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
@@ -20,6 +22,7 @@ import 'package:opennutritracker/core/domain/usecase/add_tracked_day_usecase.dar
 import 'package:opennutritracker/core/domain/usecase/get_config_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/get_intake_usecase.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
+import 'package:opennutritracker/core/utils/hive_db_provider.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/usecase/search_products_usecase.dart';
@@ -41,6 +44,7 @@ import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dar
 import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
 import 'package:opennutritracker/features/meal_detail/meal_detail_screen.dart';
 import 'package:opennutritracker/features/meal_detail/presentation/bloc/meal_detail_bloc.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_preferences.dart';
 import 'package:opennutritracker/features/scanner/scanner_screen.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
@@ -170,6 +174,25 @@ class _FakeMealDetailBloc extends Fake implements MealDetailBloc {
   Completer<void>? gate;
 
   @override
+  Future<void> close() async {}
+
+  @override
+  Future<void> addLocalIntake(
+    String unit,
+    double quantity,
+    IntakeTypeEntity type,
+    MealEntity meal,
+    DateTime day,
+  ) async {
+    writes.add((
+      unit: unit,
+      amount: quantity.toString(),
+      name: meal.name,
+      type: type,
+    ));
+  }
+
+  @override
   Future<void> addIntake(
     BuildContext context,
     String unit,
@@ -242,6 +265,25 @@ late _FakeMealDetailBloc _mealDetailBloc;
 late _FakeHomeBloc _homeBloc;
 late _FakeProducts _products;
 late _FakeCustomFoods _customFoods;
+
+class _FoodEntryDB extends Fake implements HiveDBProvider {
+  @override
+  final Box<String> foodEntryBox = _FoodEntryBox();
+
+  @override
+  String get activeProfileId => 'test';
+}
+
+class _FoodEntryBox extends Fake implements Box<String> {
+  final _values = <dynamic, String>{};
+
+  @override
+  String? get(dynamic key, {String? defaultValue}) =>
+      _values[key] ?? defaultValue;
+
+  @override
+  Future<void> put(dynamic key, String value) async => _values[key] = value;
+}
 
 class _FakeCustomFoods extends Fake implements CustomMealDataSource {
   final entries = <MealDBO>[];
@@ -396,6 +438,67 @@ Future<void> _confirmAmount(WidgetTester tester) async {
 Finder _logButton() => find.bySemanticsIdentifier('add-meal-tray-log');
 
 void main() {
+  testWidgets('local batch and AI are separate, and cancel does not log', (
+    tester,
+  ) async {
+    final food = _meal('Corn');
+    await _register([food]);
+    getIt.registerSingleton<GetIntakeUsecase>(
+      _FakeGetIntakeUsecase([_intake(food)]),
+    );
+    getIt.registerSingleton(
+      ChineseFoodDataSource(
+        read: () async => throw StateError('should use confirmed history'),
+      ),
+    );
+    getIt.registerSingleton(FoodEntryPreferences(_FoodEntryDB()));
+    final pushed = <RouteSettings>[];
+    await _openAddMeal(tester, pushed);
+    expect(
+      find.bySemanticsIdentifier('add-meal-method-describe'),
+      findsOneWidget,
+    );
+    await tester.tap(find.bySemanticsIdentifier('add-meal-method-local-batch'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Corn 50g');
+    await tester.tap(find.text(l10nEn.localBatchMatch));
+    await tester.pumpAndSettle();
+    final cornRow = find.widgetWithText(ListTile, 'Corn 50g');
+    await tester.tap(cornRow);
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
+    await tester.pumpAndSettle();
+    expect(_mealDetailBloc.writes, isEmpty);
+    expect(getIt<FoodEntryPreferences>().batchMatch('corn'), isNull);
+
+    await tester.tap(cornRow);
+    await tester.pumpAndSettle();
+    await _confirmAmount(tester);
+    expect(_mealDetailBloc.writes.single.amount, '50.0');
+    expect(find.textContaining(l10nEn.localBatchAdded), findsOneWidget);
+    expect(getIt<FoodEntryPreferences>().batchMatch('corn'), isNotNull);
+    await tester.tap(cornRow);
+    await tester.pumpAndSettle();
+    expect(_mealDetailBloc.writes, hasLength(1));
+    expect(
+      pushed.where((route) => route.name == NavigationOptions.bulkAddRoute),
+      isEmpty,
+    );
+  });
+
+  testWidgets('AI description opens the existing description screen', (
+    tester,
+  ) async {
+    await _register([]);
+    final pushed = <RouteSettings>[];
+    await _openAddMeal(tester, pushed);
+    await tester.tap(find.bySemanticsIdentifier('add-meal-method-describe'));
+    await tester.pumpAndSettle();
+    expect(
+      pushed.where((route) => route.name == NavigationOptions.bulkAddRoute),
+      hasLength(1),
+    );
+  });
   testWidgets(
     'quantity picker can change the meal independently of the library default',
     (tester) async {
@@ -769,16 +872,69 @@ void main() {
         await _register([_meal('Oats', kcal100: 380)]);
         await _openAddMeal(tester, []);
         await _tapPlus(tester, 'Oats', confirm: false);
-        await tester.tap(
-          find.bySemanticsIdentifier('meal-detail-more-portions'),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.byKey(const ValueKey('portion-option-150g')));
+        await tester.enterText(find.byType(TextFormField).last, '150');
         await tester.pumpAndSettle();
         await _confirmAmount(tester);
         await tester.tap(_logButton());
         await tester.pumpAndSettle();
         expect(_mealDetailBloc.writes.single.amount, '150.0');
+      },
+    );
+
+    testWidgets(
+      'custom portions remember the specification and reset the count',
+      (tester) async {
+        final oats = _meal('Oats');
+        await _register([oats]);
+        getIt.registerSingleton(FoodEntryPreferences(_FoodEntryDB()));
+        await _openAddMeal(tester, []);
+        await _tapPlus(tester, 'Oats', confirm: false);
+        await tester.tap(find.text(l10nEn.foodPortionMode));
+        await tester.pumpAndSettle();
+        Finder field(String id) => find.descendant(
+          of: find.bySemanticsIdentifier(id),
+          matching: find.byType(TextFormField),
+        );
+        await tester.enterText(field('food-custom-portion-name'), 'My bowl');
+        await tester.enterText(field('food-custom-portion-size'), '120');
+        final save = find.widgetWithText(FilledButton, l10nEn.buttonSaveLabel);
+        await tester.pumpAndSettle();
+        expect(tester.widget<FilledButton>(save).onPressed, isNotNull);
+        await tester.ensureVisible(save);
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(getIt<FoodEntryPreferences>().customPortions(oats), {
+          'My bowl': 120.0,
+        });
+        expect(find.textContaining('My bowl'), findsOneWidget);
+        final quantity = find.descendant(
+          of: find.bySemanticsIdentifier('meal-detail-quantity'),
+          matching: find.byType(TextFormField),
+        );
+        await tester.enterText(quantity, '2');
+        await tester.pumpAndSettle();
+        final input = find.descendant(
+          of: quantity,
+          matching: find.byType(TextField),
+        );
+        expect(
+          tester.widget<TextField>(input).decoration?.helperText,
+          '= 240 g',
+        );
+        await _confirmAmount(tester);
+
+        await _tapPlus(tester, 'Oats', confirm: false);
+        expect(find.textContaining('My bowl'), findsOneWidget);
+        expect(tester.widget<TextFormField>(quantity).controller!.text, '1');
+        expect(
+          tester.widget<TextField>(input).decoration?.helperText,
+          '= 120 g',
+        );
+        await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
+        await tester.pumpAndSettle();
+        await tester.tap(_logButton());
+        await tester.pumpAndSettle();
+        expect(_mealDetailBloc.writes.single.amount, '240.0');
       },
     );
 

@@ -19,6 +19,7 @@ import 'package:opennutritracker/generated/l10n.dart';
 class LogTrayItem {
   final MealEntity meal;
   final String unit;
+  final String? selectionUnit;
   final double amount;
   final IntakeTypeEntity? intakeType;
 
@@ -30,6 +31,7 @@ class LogTrayItem {
   const LogTrayItem({
     required this.meal,
     required this.unit,
+    this.selectionUnit,
     required this.amount,
     required this.amountLabel,
     this.intakeType,
@@ -38,6 +40,7 @@ class LogTrayItem {
   LogTrayItem withIntakeType(IntakeTypeEntity type) => LogTrayItem(
     meal: meal,
     unit: unit,
+    selectionUnit: selectionUnit,
     amount: amount,
     amountLabel: amountLabel,
     intakeType: type,

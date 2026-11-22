@@ -14,6 +14,7 @@ import 'package:opennutritracker/features/add_meal/domain/usecase/resolve_parsed
 import 'package:opennutritracker/features/add_meal/domain/usecase/search_products_usecase.dart';
 import 'package:opennutritracker/features/add_meal/presentation/bloc/bulk_add_bloc.dart';
 import 'package:opennutritracker/features/add_meal/util/meal_text_parser.dart';
+import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
 
 MealEntity meal(
   String name, {
@@ -132,8 +133,10 @@ class _FixedInterpreter implements MealTextInterpreter {
   _FixedInterpreter(this.items);
 
   @override
-  Future<MealTextParseResult> interpret(String input, {String? localeCode}) async =>
-      MealTextParseResult(items: items, errors: const []);
+  Future<MealTextParseResult> interpret(
+    String input, {
+    String? localeCode,
+  }) async => MealTextParseResult(items: items, errors: const []);
 }
 
 BulkAddBloc blocWithModelReply(
@@ -326,7 +329,8 @@ void main() {
       expect(
         fieldPattern.hasMatch(row.amountText),
         isTrue,
-        reason: '${row.meal?.name}: "${row.amountText}" fails the submit '
+        reason:
+            '${row.meal?.name}: "${row.amountText}" fails the submit '
             'check, and that check refuses the entire batch',
       );
     }
@@ -409,42 +413,46 @@ void main() {
       expect(state.loggableCount, 1);
     });
 
-    test('a corrected recipe count clears the flag, a still-too-big one not',
-        () async {
-      // The flag asks the user to settle the count, and typing a count the
-      // batch makes is the answer: "14 pelmeni" corrected to 5 servings of a
-      // 6-serving batch is logged. 9 servings would still be past the batch.
-      final pelmeni = MealEntity(
-        code: 'pelmeni',
-        name: 'Pelmeni',
-        url: null,
-        mealQuantity: '1200.0',
-        mealUnit: 'g',
-        servingQuantity: 200,
-        servingUnit: 'g',
-        servingSize: '6 servings',
-        source: MealSourceEntity.recipe,
-        nutriments: MealNutrimentsEntity.empty(),
-      );
-      final bloc = blocWith({
-        'pelmeni': [pelmeni],
-      });
-      expect((await parse(bloc, '14 pelmeni')).rows.single.amountNeedsCheck,
-          isTrue);
+    test(
+      'a corrected recipe count clears the flag, a still-too-big one not',
+      () async {
+        // The flag asks the user to settle the count, and typing a count the
+        // batch makes is the answer: "14 pelmeni" corrected to 5 servings of a
+        // 6-serving batch is logged. 9 servings would still be past the batch.
+        final pelmeni = MealEntity(
+          code: 'pelmeni',
+          name: 'Pelmeni',
+          url: null,
+          mealQuantity: '1200.0',
+          mealUnit: 'g',
+          servingQuantity: 200,
+          servingUnit: 'g',
+          servingSize: '6 servings',
+          source: MealSourceEntity.recipe,
+          nutriments: MealNutrimentsEntity.empty(),
+        );
+        final bloc = blocWith({
+          'pelmeni': [pelmeni],
+        });
+        expect(
+          (await parse(bloc, '14 pelmeni')).rows.single.amountNeedsCheck,
+          isTrue,
+        );
 
-      bloc.add(const ChangeRowAmountEvent(0, '9'));
-      final tooMany =
-          (await bloc.stream.first as BulkAddLoadedState).rows.single;
-      expect(tooMany.amountNeedsCheck, isTrue);
-      expect(tooMany.willBeLogged, isFalse);
+        bloc.add(const ChangeRowAmountEvent(0, '9'));
+        final tooMany =
+            (await bloc.stream.first as BulkAddLoadedState).rows.single;
+        expect(tooMany.amountNeedsCheck, isTrue);
+        expect(tooMany.willBeLogged, isFalse);
 
-      bloc.add(const ChangeRowAmountEvent(0, '5'));
-      final corrected =
-          (await bloc.stream.first as BulkAddLoadedState).rows.single;
-      expect(corrected.unit, 'serving');
-      expect(corrected.amountNeedsCheck, isFalse);
-      expect(corrected.willBeLogged, isTrue);
-    });
+        bloc.add(const ChangeRowAmountEvent(0, '5'));
+        final corrected =
+            (await bloc.stream.first as BulkAddLoadedState).rows.single;
+        expect(corrected.unit, 'serving');
+        expect(corrected.amountNeedsCheck, isFalse);
+        expect(corrected.willBeLogged, isTrue);
+      },
+    );
 
     test('counts a food that has serving data as servings', () async {
       // "2 eggs" means two of them. When the record carries serving data
@@ -475,32 +483,54 @@ void main() {
       expect(row.willBeLogged, isFalse);
     });
 
-    test('a harmless substitution still logs', () async {
-      // A record measured in grams offers no `ml`, so a typed `200ml`
-      // becomes `200 g/ml` — same number, same base quantity, same energy.
-      // The #973 guard (#975) held these back too, refusing an amount the
-      // user had typed correctly and the app had understood correctly.
+    test('volume cannot be used as mass without a conversion', () async {
       final bloc = blocWith({
         'milk': [meal('Milk', mealUnit: 'g')],
       });
-
       final state = await parse(bloc, '200ml milk');
-
-      final row = state.rows.single;
-      expect(row.effectiveUnit, 'g/ml');
-      expect(row.amountText, '200');
-      expect(
-        row.amountNeedsCheck,
-        isTrue,
-        reason: 'the swap is still worth pointing at',
-      );
-      expect(
-        row.amountWouldBeWrong,
-        isFalse,
-        reason: 'but it does not move the number',
-      );
-      expect(state.loggableCount, 1);
+      expect(state.rows.single.amountWouldBeWrong, isTrue);
+      expect(state.loggableCount, 0);
     });
+
+    test(
+      'space separated foods keep all four rows and count medium eggs',
+      () async {
+        final bloc = blocWith({
+          '西麦麦片': [meal('燕麦片', mealUnit: 'g')],
+          '鸡蛋': [
+            meal(
+              '鸡蛋',
+              mealUnit: 'g',
+              portions: const [
+                MealPortionEntity(label: '半个', gramWeight: 25, localized: true),
+                MealPortionEntity(
+                  label: '2个中等鸡蛋',
+                  gramWeight: 100,
+                  localized: true,
+                ),
+                MealPortionEntity(label: '小个', gramWeight: 40, localized: true),
+                MealPortionEntity(label: '中个', gramWeight: 50, localized: true),
+                MealPortionEntity(label: '大个', gramWeight: 60, localized: true),
+              ],
+            ),
+          ],
+          '生可可粉': [meal('生可可粉', mealUnit: 'g')],
+        });
+        final state = await parse(bloc, '西麦麦片75g 鸡蛋3个 生可可粉5g 德运脱脂奶粉25g');
+        expect(state.rows.map((row) => row.resolved.parsed.query), [
+          '西麦麦片',
+          '鸡蛋',
+          '生可可粉',
+          '德运脱脂奶粉',
+        ]);
+        final egg = state.rows[1];
+        expect(egg.effectiveUnit, 'serving#3');
+        expect(egg.amountText, '3');
+        expect(egg.amountWouldBeWrong, isFalse);
+        expect(convertQuantityToBaseUnit(3, egg.effectiveUnit, egg.meal!), 150);
+        expect(state.rows.last.isResolved, isFalse);
+      },
+    );
 
     test('a substitution that moves the number is kept out', () async {
       // `4oz` against a record that cannot honour ounces becomes `4 g/ml`:
@@ -976,13 +1006,16 @@ void main() {
       // Before this, a wrong key produced a screen indistinguishable from a
       // working one. The rows are still the parser's — what changes is that
       // the user is told the better reader never ran.
-      final bloc = blocWithFailingReader({
-        'toast': [meal('Toast')],
-      }, const MealInterpreterException(
-        'unauthorized',
-        failure: MealInterpreterFailure.auth,
-        statusCode: 401,
-      ));
+      final bloc = blocWithFailingReader(
+        {
+          'toast': [meal('Toast')],
+        },
+        const MealInterpreterException(
+          'unauthorized',
+          failure: MealInterpreterFailure.auth,
+          statusCode: 401,
+        ),
+      );
       addTearDown(bloc.close);
 
       final state = await parse(bloc, '100g toast');
@@ -997,13 +1030,16 @@ void main() {
     });
 
     test('a model nothing can serve reaches the state', () async {
-      final bloc = blocWithFailingReader({
-        'toast': [meal('Toast')],
-      }, const MealInterpreterException(
-        'no endpoints',
-        failure: MealInterpreterFailure.unsupported,
-        statusCode: 404,
-      ));
+      final bloc = blocWithFailingReader(
+        {
+          'toast': [meal('Toast')],
+        },
+        const MealInterpreterException(
+          'no endpoints',
+          failure: MealInterpreterFailure.unsupported,
+          statusCode: 404,
+        ),
+      );
       addTearDown(bloc.close);
 
       final state = await parse(bloc, '100g toast');
@@ -1016,13 +1052,16 @@ void main() {
       // Deliberate. A banner that fires on a dropped connection is one
       // people learn to scroll past, and it would cost the notice the value
       // it has for the failures that never fix themselves.
-      final bloc = blocWithFailingReader({
-        'toast': [meal('Toast')],
-      }, const MealInterpreterException(
-        'rate limited',
-        failure: MealInterpreterFailure.transient,
-        statusCode: 429,
-      ));
+      final bloc = blocWithFailingReader(
+        {
+          'toast': [meal('Toast')],
+        },
+        const MealInterpreterException(
+          'rate limited',
+          failure: MealInterpreterFailure.transient,
+          statusCode: 429,
+        ),
+      );
       addTearDown(bloc.close);
 
       final state = await parse(bloc, '100g toast');
@@ -1066,17 +1105,20 @@ void main() {
       expect((state as BulkAddPhotoErrorState).error, BulkAddPhotoError.auth);
     });
 
-    test('exhausted credit is not offered as retryable or an auth fix', () async {
-      final state = await readPhoto(
-        {},
-        const MealPhotoFailed(MealPhotoFailure.billing),
-      );
+    test(
+      'exhausted credit is not offered as retryable or an auth fix',
+      () async {
+        final state = await readPhoto(
+          {},
+          const MealPhotoFailed(MealPhotoFailure.billing),
+        );
 
-      expect(
-        (state as BulkAddPhotoErrorState).error,
-        BulkAddPhotoError.billing,
-      );
-    });
+        expect(
+          (state as BulkAddPhotoErrorState).error,
+          BulkAddPhotoError.billing,
+        );
+      },
+    );
 
     test('a transient failure is offered as retryable', () async {
       final state = await readPhoto(
@@ -1090,17 +1132,20 @@ void main() {
       );
     });
 
-    test('a refused plaintext photo points at the address, not the model', () async {
-      final state = await readPhoto(
-        {},
-        const MealPhotoFailed(MealPhotoFailure.insecureDestination),
-      );
+    test(
+      'a refused plaintext photo points at the address, not the model',
+      () async {
+        final state = await readPhoto(
+          {},
+          const MealPhotoFailed(MealPhotoFailure.insecureDestination),
+        );
 
-      expect(
-        (state as BulkAddPhotoErrorState).error,
-        BulkAddPhotoError.insecureDestination,
-      );
-    });
+        expect(
+          (state as BulkAddPhotoErrorState).error,
+          BulkAddPhotoError.insecureDestination,
+        );
+      },
+    );
 
     test('a photo that never encoded reaches the same error surface', () async {
       final bloc = blocWith({});
@@ -1211,12 +1256,17 @@ void main() {
     });
   });
 
-
   group('the typed word picks the portion (#864)', () {
     const cup = MealPortionEntity(
-        label: '1 cup', gramWeight: 244, localized: false);
+      label: '1 cup',
+      gramWeight: 244,
+      localized: false,
+    );
     const slice = MealPortionEntity(
-        label: '1 slice', gramWeight: 38, localized: false);
+      label: '1 slice',
+      gramWeight: 38,
+      localized: false,
+    );
 
     test('"3 slices of bread" preselects the slice, not the cup', () async {
       // The whole point. Without this the row takes the first portion and
@@ -1233,18 +1283,22 @@ void main() {
       expect(row.amountText, '3');
     });
 
-    test('naming no portion leaves the preselection exactly as it was',
-        () async {
-      // Decision 7: this only ever narrows. A bare count with no word still
-      // means the default portion, which is what the row did before.
-      final bloc = blocWith({
-        'bread': [meal('Bread', servingQuantity: 244, portions: [cup, slice])],
-      });
+    test(
+      'naming no portion leaves the preselection exactly as it was',
+      () async {
+        // Decision 7: this only ever narrows. A bare count with no word still
+        // means the default portion, which is what the row did before.
+        final bloc = blocWith({
+          'bread': [
+            meal('Bread', servingQuantity: 244, portions: [cup, slice]),
+          ],
+        });
 
-      final row = (await parse(bloc, '3 bread')).rows.single;
+        final row = (await parse(bloc, '3 bread')).rows.single;
 
-      expect(row.unit, 'serving');
-    });
+        expect(row.unit, 'serving');
+      },
+    );
 
     test('a stated unit still wins over a named portion', () async {
       // "100g toast" is grams whatever else the text says: the parser
@@ -1283,7 +1337,11 @@ void main() {
       // thing that can name a slice on that path. Driven here through the
       // text interpreter, which is the same ParsedMealItem either way.
       final bloc = blocWithModelReply(
-        {'bread': [meal('Bread', servingQuantity: 244, portions: [cup, slice])]},
+        {
+          'bread': [
+            meal('Bread', servingQuantity: 244, portions: [cup, slice]),
+          ],
+        },
         const [ParsedMealItem(query: 'bread', quantity: 3, portion: 'slice')],
       );
 
@@ -1296,7 +1354,11 @@ void main() {
       // The weak failure this design chose: an unusable key is ignored, and
       // the row keeps the preselection it would have had.
       final bloc = blocWithModelReply(
-        {'bread': [meal('Bread', servingQuantity: 244, portions: [cup, slice])]},
+        {
+          'bread': [
+            meal('Bread', servingQuantity: 244, portions: [cup, slice]),
+          ],
+        },
         const [ParsedMealItem(query: 'bread', quantity: 3, portion: 'thimble')],
       );
 
