@@ -95,6 +95,7 @@ class IntakeDataSource {
     for (final copy in copies) {
       copy.value.amount = fields['amount'] ?? copy.value.amount;
       copy.value.unit = fields['unit'] ?? copy.value.unit;
+      copy.value.meal = fields['meal'] ?? copy.value.meal;
       copy.value.type = fields['type'] ?? copy.value.type;
     }
     await _intakeBox.putAll({for (final copy in copies) copy.key: copy.value});

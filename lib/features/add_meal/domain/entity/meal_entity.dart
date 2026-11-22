@@ -1,4 +1,3 @@
-
 import 'package:equatable/equatable.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 import 'package:opennutritracker/core/data/dbo/meal_dbo.dart';
@@ -342,6 +341,29 @@ class MealEntity extends Equatable {
     servingUnit: servingUnit,
     servingSize: servingSize,
     nutriments: nutriments,
+    source: source,
+    backendSource: backendSource,
+    machineTranslatedName: machineTranslatedName,
+    servingSizeIsLocalized: servingSizeIsLocalized,
+    portions: portions,
+    portionsUnavailable: portionsUnavailable,
+    localImagePath: localImagePath,
+    detailed: detailed,
+  );
+
+  MealEntity withNutriments(MealNutrimentsEntity values) => MealEntity(
+    code: code,
+    name: name,
+    brands: brands,
+    thumbnailImageUrl: thumbnailImageUrl,
+    mainImageUrl: mainImageUrl,
+    url: url,
+    mealQuantity: mealQuantity,
+    mealUnit: mealUnit,
+    servingQuantity: servingQuantity,
+    servingUnit: servingUnit,
+    servingSize: servingSize,
+    nutriments: values,
     source: source,
     backendSource: backendSource,
     machineTranslatedName: machineTranslatedName,

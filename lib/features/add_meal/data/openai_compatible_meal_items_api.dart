@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/utils/ai_model_catalogue.dart';
+import 'package:opennutritracker/core/utils/deepseek_endpoint.dart';
 import 'package:opennutritracker/core/utils/plaintext_destination_guard.dart';
 import 'package:opennutritracker/features/add_meal/domain/meal_items_api.dart';
 import 'package:opennutritracker/features/add_meal/util/meal_text_parser.dart';
@@ -194,6 +195,7 @@ class OpenAiCompatibleMealItemsApi implements MealItemsApi {
           ? 4 * _maxTokens
           : _maxTokens,
       if (reasoningOff) 'reasoning': {'enabled': false},
+      if (isDeepSeekEndpoint(endpoint)) 'thinking': {'type': 'disabled'},
       // No top-level `system` field here: the OpenAI-compatible shape wants
       // it as the first message.
       'messages': [
@@ -343,7 +345,7 @@ class OpenAiCompatibleMealItemsApi implements MealItemsApi {
 
     final Map<String, dynamic> decoded;
     try {
-      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      decoded = jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
     } catch (_) {
       throw const MealInterpreterException('malformed response');
     }

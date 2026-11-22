@@ -1865,5 +1865,16 @@
   "appUpdateInstallerOpened": "Continue in the Android installer. If cancelled, you can tap Install again.",
   "appUpdateDownload": "Download update",
   "appUpdateInstall": "Install update",
-  "appUpdateCheck": "Check for updates"
+  "appUpdateCheck": "Check for updates",
+  "loggingEditFood": "Edit food",
+  "loggingEditNutrition": "Edit nutrition",
+  "loggingNutritionPer100": "Nutrition per 100 {unit}",
+  "@loggingNutritionPer100": {
+    "placeholders": {
+      "unit": {
+        "type": "String"
+      }
+    }
+  },
+  "loggingNutrientInvalid": "Enter a valid number greater than or equal to 0"
 }

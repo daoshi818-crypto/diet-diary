@@ -156,7 +156,7 @@ class IntakeCard extends StatelessWidget {
                     identifier: 'intake-item-menu',
                     container: true,
                     child: PopupMenuButton<String>(
-                      tooltip: s.loggingEditAmount,
+                      tooltip: s.loggingEditFood,
                       icon: Icon(
                         Icons.more_vert_rounded,
                         color: palette.textMuted,
@@ -191,7 +191,7 @@ class IntakeCard extends StatelessWidget {
                             child: ListTile(
                               contentPadding: EdgeInsets.zero,
                               leading: const Icon(Icons.scale_outlined),
-                              title: Text(s.loggingEditAmount),
+                              title: Text(s.loggingEditFood),
                             ),
                           ),
                         if (onShare != null)

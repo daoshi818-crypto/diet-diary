@@ -179,7 +179,7 @@ class _NutritionLabelScreenState extends State<NutritionLabelScreen> {
           ? await widget.reader!(photo, selection)
           : await NutritionLabelApi(
               locator<http.Client>(),
-            ).read(photo, selection);
+            ).read(photo, selection, forceRefresh: _hasDraft);
       if (mounted) {
         setState(() {
           _image = photo.bytes;
@@ -248,8 +248,7 @@ class _NutritionLabelScreenState extends State<NutritionLabelScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(s.labelScanTitle)),
       bottomNavigationBar: _hasDraft
-          ? AnimatedPadding(
-              duration: const Duration(milliseconds: 180),
+          ? Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.viewInsetsOf(context).bottom,
               ),

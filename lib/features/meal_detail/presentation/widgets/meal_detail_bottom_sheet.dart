@@ -48,6 +48,7 @@ class MealDetailBottomSheet extends StatefulWidget {
   final Future<void> Function(LogTrayItem)? onSelectionConfirmed;
   final String? confirmLabel;
   final bool allowMealTypeChange;
+  final bool submissionEnabled;
   final Widget Function(BuildContext, Widget editor, Widget actions)?
   layoutBuilder;
 
@@ -65,6 +66,7 @@ class MealDetailBottomSheet extends StatefulWidget {
     this.onSelectionConfirmed,
     this.confirmLabel,
     this.allowMealTypeChange = true,
+    this.submissionEnabled = true,
     this.layoutBuilder,
   });
 
@@ -231,6 +233,7 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     );
     final canSubmit =
         !missing &&
+        widget.submissionEnabled &&
         !_submitting &&
         quantity != null &&
         quantity.isFinite &&

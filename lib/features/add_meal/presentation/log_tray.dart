@@ -110,6 +110,13 @@ class LogTray extends ChangeNotifier {
     notifyListeners();
   }
 
+  void replace(LogTrayItem previous, LogTrayItem next) {
+    final index = _items.indexWhere((item) => identical(item, previous));
+    if (index < 0) return;
+    _items[index] = _snapshot(next);
+    notifyListeners();
+  }
+
   void removeAt(int index) {
     _items.removeAt(index);
     notifyListeners();

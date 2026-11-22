@@ -21,7 +21,7 @@ void main() {
     'sha256': sha256.convert(bytes).toString(),
   };
   final apkUrl = Uri.parse(
-    'https://github.com/daoshi818-crypto/diet-diary/releases/download/apk-13/diet-diary.apk',
+    'https://github.com/daoshi818-crypto/chiyoushu-food-data/releases/download/apk-13/diet-diary.apk',
   );
   PackageInfo installed(String version, int build) => PackageInfo(
     appName: 'Diary',

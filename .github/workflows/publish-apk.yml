@@ -33,6 +33,7 @@ jobs:
       GH_REPO: ${{ github.repository }}
       RUN_ID: ${{ github.event.workflow_run.id || inputs.run_id }}
     steps:
+      - uses: actions/checkout@v7
       - name: Download and verify signed APK
         id: apk
         shell: bash
@@ -80,3 +81,10 @@ jobs:
           gh release edit "$tag" --repo "$GH_REPO" --draft=false --latest
           gh release view "$tag" --repo "$GH_REPO" --json url --jq '.url' \
             >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Queue public APK distribution
+        env:
+          PUBLIC_APK_DEPLOY_KEY: ${{ secrets.PUBLIC_APK_DEPLOY_KEY }}
+          RUN_NUMBER: ${{ steps.apk.outputs.number }}
+          HEAD_SHA: ${{ steps.apk.outputs.sha }}
+        run: python3 tool/queue_public_apk.py

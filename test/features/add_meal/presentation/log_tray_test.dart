@@ -396,19 +396,22 @@ Future<void> _confirmAmount(WidgetTester tester) async {
 Finder _logButton() => find.bySemanticsIdentifier('add-meal-tray-log');
 
 void main() {
-  testWidgets('quantity picker can change the meal independently of the library default', (tester) async {
-    await _register([_meal('Oats')]);
-    await _openAddMeal(tester, []);
-    await _tapPlus(tester, 'Oats', confirm: false);
-    await tester.tap(find.bySemanticsIdentifier('food-detail-meal-type'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text(l10nEn.lunchLabel).last);
-    await tester.pumpAndSettle();
-    await _confirmAmount(tester);
-    await tester.tap(_logButton());
-    await tester.pumpAndSettle();
-    expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.lunch);
-  });
+  testWidgets(
+    'quantity picker can change the meal independently of the library default',
+    (tester) async {
+      await _register([_meal('Oats')]);
+      await _openAddMeal(tester, []);
+      await _tapPlus(tester, 'Oats', confirm: false);
+      await tester.tap(find.bySemanticsIdentifier('food-detail-meal-type'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10nEn.lunchLabel).last);
+      await tester.pumpAndSettle();
+      await _confirmAmount(tester);
+      await tester.tap(_logButton());
+      await tester.pumpAndSettle();
+      expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.lunch);
+    },
+  );
   testWidgets(
     'one pending list records independently selected lunch and dinner',
     (tester) async {
@@ -421,11 +424,16 @@ void main() {
         await tester.pumpAndSettle();
       }
 
-      await selectMeal('add-meal-type', l10nEn.lunchLabel);
-      await _tapPlus(tester, 'Oats');
-      await selectMeal('add-meal-type', l10nEn.dinnerLabel);
-      await _tapPlus(tester, 'Milk');
-      final list = tester.widget<LogTrayLogButton>(find.byType(LogTrayLogButton));
+      expect(find.bySemanticsIdentifier('add-meal-type'), findsNothing);
+      await _tapPlus(tester, 'Oats', confirm: false);
+      await selectMeal('food-detail-meal-type', l10nEn.lunchLabel);
+      await _confirmAmount(tester);
+      await _tapPlus(tester, 'Milk', confirm: false);
+      await selectMeal('food-detail-meal-type', l10nEn.dinnerLabel);
+      await _confirmAmount(tester);
+      final list = tester.widget<LogTrayLogButton>(
+        find.byType(LogTrayLogButton),
+      );
       expect(list.tray.items.map((item) => item.intakeType), [
         IntakeTypeEntity.lunch,
         IntakeTypeEntity.dinner,
@@ -520,35 +528,29 @@ void main() {
     },
   );
 
-  testWidgets(
-    'food library meal selection controls both detail navigation and logging',
-    (tester) async {
-      await _register([_meal('Oats')]);
-      final pushed = <RouteSettings>[];
-      await _openAddMeal(tester, pushed, library: true);
-      await tester.ensureVisible(
-        find.bySemanticsIdentifier('add-meal-type'),
-      );
-      await tester.tap(
-        find.bySemanticsIdentifier('add-meal-type'),
-      );
-      await tester.pumpAndSettle();
-      final snack = find.text(l10nEn.snackLabel).last;
-      await tester.ensureVisible(snack);
-      await tester.tap(snack);
-      await tester.pumpAndSettle();
-      await tester.tap(_detailsOn('Oats'));
-      await tester.pumpAndSettle();
-      final detail = pushed.last.arguments as MealDetailScreenArguments;
-      expect(detail.intakeTypeEntity, IntakeTypeEntity.snack);
-      tester.state<NavigatorState>(find.byType(Navigator)).pop();
-      await tester.pumpAndSettle();
-      await _tapPlus(tester, 'Oats');
-      await tester.tap(_logButton());
-      await tester.pumpAndSettle();
-      expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.snack);
-    },
-  );
+  testWidgets('food library keeps only the food-level meal selection', (
+    tester,
+  ) async {
+    await _register([_meal('Oats')]);
+    final pushed = <RouteSettings>[];
+    await _openAddMeal(tester, pushed, library: true);
+    expect(find.bySemanticsIdentifier('add-meal-type'), findsNothing);
+    await tester.tap(_detailsOn('Oats'));
+    await tester.pumpAndSettle();
+    final detail = pushed.last.arguments as MealDetailScreenArguments;
+    expect(detail.intakeTypeEntity, IntakeTypeEntity.breakfast);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    await _tapPlus(tester, 'Oats', confirm: false);
+    await tester.tap(find.bySemanticsIdentifier('food-detail-meal-type'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(l10nEn.snackLabel).last);
+    await tester.pumpAndSettle();
+    await _confirmAmount(tester);
+    await tester.tap(_logButton());
+    await tester.pumpAndSettle();
+    expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.snack);
+  });
 
   group('LogTray', () {
     test('sums energy and keeps order through removals', () {

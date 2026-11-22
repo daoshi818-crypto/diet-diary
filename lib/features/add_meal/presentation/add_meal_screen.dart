@@ -1,4 +1,3 @@
-import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
@@ -186,20 +185,10 @@ class _AddMealScreenState extends State<AddMealScreen> {
   }
 
   Widget _buildScaffold(BuildContext context, AppPalette palette) {
-    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: MealTypeSelector(
-          identifier: 'add-meal-type',
-          value: _mealType.getIntakeType(),
-          onChanged: (type) => setState(() {
-            _mealType = AddMealType.values.firstWhere(
-              (meal) => meal.getIntakeType() == type,
-            );
-            _logTray.defaultIntakeType = type;
-          }),
-        ),
+        title: Text(S.of(context).loggingFoodLibrary),
         actions: [
           Semantics(
             identifier: 'add-meal-quick-add',
@@ -230,12 +219,15 @@ class _AddMealScreenState extends State<AddMealScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _logTray.isEmpty || keyboardVisible
+      bottomNavigationBar: _logTray.isEmpty
           ? null
-          : SafeArea(
-              top: false,
-              child: _buildTrayFooter(
-                compact: MediaQuery.sizeOf(context).height < 500,
+          : Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.viewInsetsOf(context).bottom,
+              ),
+              child: SafeArea(
+                top: false,
+                child: _buildTrayFooter(compact: true),
               ),
             ),
       body: SafeArea(
@@ -247,10 +239,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final compact =
-                      constraints.maxHeight <
-                      300 +
-                          (MediaQuery.textScalerOf(context).scale(14) - 14) * 4;
+                  final compact = MediaQuery.sizeOf(context).width < 600;
                   return Column(
                     children: [
                       const SizedBox(height: 4),
@@ -261,24 +250,20 @@ class _AddMealScreenState extends State<AddMealScreen> {
                         onDescribePressed: () => _openBulkAdd(),
                         describeOpen: false,
                         showAi: !_aiHidden,
-                        compact: compact || keyboardVisible,
+                        compact: compact,
                         onNutritionLabelPressed: _openNutritionLabel,
                       ),
-                      SizedBox(height: compact || keyboardVisible ? 4 : 8),
+                      SizedBox(height: compact ? 4 : 8),
                       MealSearchBar(
                         searchStringListener: _searchStringListener,
                         onSearchSubmit: _onSearchSubmit,
                         onSearchChanged: _onSearchChanged,
                         onBarcodePressed: null,
-                        compact: compact || keyboardVisible,
+                        compact: compact,
                       ),
-                      SizedBox(height: compact || keyboardVisible ? 4 : 8),
-                      _buildSourceChips(
-                        context,
-                        palette,
-                        compact: compact || keyboardVisible,
-                      ),
-                      SizedBox(height: compact || keyboardVisible ? 4 : 8),
+                      SizedBox(height: compact ? 4 : 8),
+                      _buildSourceChips(context, palette, compact: compact),
+                      SizedBox(height: compact ? 4 : 8),
                       Expanded(
                         child: ValueListenableBuilder<String>(
                           valueListenable: _searchStringListener,
@@ -286,8 +271,6 @@ class _AddMealScreenState extends State<AddMealScreen> {
                               _buildResults(context, palette, query),
                         ),
                       ),
-                      if (!_logTray.isEmpty && keyboardVisible)
-                        _buildTrayFooter(compact: compact),
                     ],
                   );
                 },
@@ -375,7 +358,13 @@ class _AddMealScreenState extends State<AddMealScreen> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 12),
-            LogTrayList(tray: _logTray),
+            LogTrayList(
+              tray: _logTray,
+              day: _day,
+              usesImperialUnits: _addMealBloc.state is AddMealLoadedState
+                  ? (_addMealBloc.state as AddMealLoadedState).usesImperialUnits
+                  : false,
+            ),
             const SizedBox(height: 12),
             Semantics(
               identifier: 'food-tray-save-recipe',

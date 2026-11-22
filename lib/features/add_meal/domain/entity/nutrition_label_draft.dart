@@ -56,7 +56,7 @@ class NutritionLabelDraft {
     return NutritionLabelDraft(
       name: text('name'),
       brand: text('brand'),
-      basisQuantity: number('basisQuantity'),
+      basisQuantity: _verifiedBasis(json, number('basisQuantity'), unit),
       basisUnit: unit,
       energy: number('energy'),
       energyUnit: energyUnit,
@@ -67,6 +67,41 @@ class NutritionLabelDraft {
       sodiumMg: number('sodiumMg'),
       notes: text('notes'),
     );
+  }
+
+  static double? _verifiedBasis(
+    Map<String, dynamic> json,
+    double? quantity,
+    String unit,
+  ) {
+    if (!json.containsKey('basisText')) return quantity;
+    final text = json['basisText'];
+    if (text is! String ||
+        RegExp(
+          r'净含量|net\s*(?:weight|content)',
+          caseSensitive: false,
+        ).hasMatch(text) ||
+        !RegExp(r'每|per|serving', caseSensitive: false).hasMatch(text)) {
+      return null;
+    }
+    final matches = RegExp(
+      r'(?<![\d.<>=≤≥])([0-9]+(?:\.[0-9]+)?)\s*(毫升|millilit(?:er|re)s?|ml|克|grams?|g)(?![a-z])',
+      caseSensitive: false,
+    ).allMatches(text);
+    final bases = matches
+        .map(
+          (m) => (
+            double.parse(m[1]!),
+            RegExp(r'^(?:毫升|ml|millilit)', caseSensitive: false).hasMatch(m[2]!)
+                ? 'ml'
+                : 'g',
+          ),
+        )
+        .toSet();
+    if (bases.length != 1) return null;
+    final printed = bases.single;
+    if (printed.$2 != unit || quantity != printed.$1) return null;
+    return quantity;
   }
 
   bool get canSave {
@@ -86,7 +121,8 @@ class NutritionLabelDraft {
       return false;
     }
     final scale = 100 / basis;
-    return energy! * scale / (energyUnit == 'kJ' ? 4.184 : 1) <= 1000 &&
+    return (protein! + fat! + carbs!) * scale <= 105 &&
+        energy! * scale / (energyUnit == 'kJ' ? 4.184 : 1) <= 1000 &&
         [protein!, fat!, carbs!, ?fiber].every((n) => n * scale <= 100) &&
         (sodiumMg == null || sodiumMg! * scale <= 100000);
   }

@@ -117,7 +117,7 @@ class IntakeDetailsDialog extends StatelessWidget {
                   onEditAmount();
                 },
                 icon: const Icon(Icons.scale_outlined),
-                label: Text(s.loggingEditAmount),
+                label: Text(s.loggingEditFood),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                 ),

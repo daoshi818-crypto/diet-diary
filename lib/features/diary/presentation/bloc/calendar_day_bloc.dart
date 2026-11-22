@@ -217,7 +217,7 @@ class CalendarDayBloc extends Bloc<CalendarDayEvent, CalendarDayState> {
         fields,
       );
       assert(newIntake != null);
-      if (oldIntake!.amount > newIntake!.amount) {
+      if (oldIntake!.totalKcal > newIntake!.totalKcal) {
         await _addTrackedDayUsecase.removeDayCaloriesTracked(
           day,
           oldIntake.totalKcal - newIntake.totalKcal,
@@ -229,7 +229,7 @@ class CalendarDayBloc extends Bloc<CalendarDayEvent, CalendarDayState> {
           proteinTracked:
               oldIntake.totalProteinsGram - newIntake.totalProteinsGram,
         );
-      } else if (newIntake.amount > oldIntake.amount) {
+      } else {
         await _addTrackedDayUsecase.addDayCaloriesTracked(
           day,
           newIntake.totalKcal - oldIntake.totalKcal,

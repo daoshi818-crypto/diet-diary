@@ -72,7 +72,7 @@ class AppUpdateRelease {
 
 class AppUpdateService {
   static const maxApkBytes = 160 * 1024 * 1024;
-  static const _repository = 'daoshi818-crypto/diet-diary';
+  static const _repository = 'daoshi818-crypto/chiyoushu-food-data';
   static const _channel = MethodChannel('diet-diary/app-update');
   final http.Client _client;
   final Future<Directory> Function() _directory;

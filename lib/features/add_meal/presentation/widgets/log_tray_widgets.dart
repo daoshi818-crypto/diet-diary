@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
 import 'package:opennutritracker/core/presentation/widgets/meal_type_selector.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
@@ -12,8 +13,15 @@ import 'package:opennutritracker/generated/l10n.dart';
 /// each with a way to take it off again.
 class LogTrayList extends StatelessWidget {
   final LogTray tray;
+  final DateTime? day;
+  final bool usesImperialUnits;
 
-  const LogTrayList({super.key, required this.tray});
+  const LogTrayList({
+    super.key,
+    required this.tray,
+    this.day,
+    this.usesImperialUnits = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +81,23 @@ class LogTrayList extends StatelessWidget {
                   padding: const EdgeInsets.only(top: Dimens.spacing8),
                   child: _LogTrayRow(
                     item: items[i],
+                    onEdit: () async {
+                      final item = items[i];
+                      final selection = await showFoodQuantitySheet(
+                        context: context,
+                        meal: item.meal,
+                        day: day ?? DateTime.now(),
+                        type:
+                            item.intakeType ??
+                            tray.defaultIntakeType ??
+                            IntakeTypeEntity.lunch,
+                        usesImperialUnits: usesImperialUnits,
+                        initialItem: item,
+                      );
+                      if (context.mounted && selection != null) {
+                        tray.replace(item, selection);
+                      }
+                    },
                     onRemove: () => tray.removeAt(i),
                     onMealChanged: (type) => tray.changeIntakeType(i, type),
                   ),
@@ -88,11 +113,13 @@ class LogTrayList extends StatelessWidget {
 class _LogTrayRow extends StatelessWidget {
   final LogTrayItem item;
   final VoidCallback onRemove;
+  final VoidCallback onEdit;
   final ValueChanged<IntakeTypeEntity> onMealChanged;
 
   const _LogTrayRow({
     required this.item,
     required this.onRemove,
+    required this.onEdit,
     required this.onMealChanged,
   });
 
@@ -156,6 +183,14 @@ class _LogTrayRow extends StatelessWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+          Semantics(
+            identifier: 'add-meal-tray-edit',
+            child: IconButton(
+              onPressed: onEdit,
+              tooltip: S.of(context).loggingEditAmount,
+              icon: Icon(Icons.edit_outlined, color: accent),
             ),
           ),
           // One identifier for every row's control: the rows are found by

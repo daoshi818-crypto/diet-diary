@@ -352,7 +352,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     IntakeEntity oldIntakeObject,
     IntakeEntity newIntakeObject,
   ) async {
-    if (oldIntakeObject.amount > newIntakeObject.amount) {
+    if (oldIntakeObject.totalKcal > newIntakeObject.totalKcal) {
       // Amounts shrunk
       await _addTrackedDayUseCase.removeDayCaloriesTracked(
         dateTime,
@@ -368,7 +368,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
             oldIntakeObject.totalProteinsGram -
             newIntakeObject.totalProteinsGram,
       );
-    } else if (newIntakeObject.amount > oldIntakeObject.amount) {
+    } else {
       // Amounts gained
       await _addTrackedDayUseCase.addDayCaloriesTracked(
         dateTime,

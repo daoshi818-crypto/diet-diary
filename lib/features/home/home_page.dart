@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/data/dbo/meal_dbo.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -468,6 +469,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       await _homeBloc.updateIntakeItem(intakeEntity.id, {
         'amount': changeIntakeAmount.amount,
         'unit': changeIntakeAmount.unit,
+        'meal': MealDBO.fromMealEntity(changeIntakeAmount.meal),
       });
       _homeBloc.add(const LoadItemsEvent());
       if (context.mounted) {

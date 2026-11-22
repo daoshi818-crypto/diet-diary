@@ -20,6 +20,7 @@ class FoodQuantityDialog extends StatefulWidget {
   final bool usesImperialUnits;
   final IntakeEntity? editingIntake;
   final bool asBottomSheet;
+  final LogTrayItem? initialItem;
 
   const FoodQuantityDialog({
     super.key,
@@ -29,6 +30,7 @@ class FoodQuantityDialog extends StatefulWidget {
     required this.usesImperialUnits,
     this.editingIntake,
     this.asBottomSheet = false,
+    this.initialItem,
   });
 
   @override
@@ -38,17 +40,21 @@ class FoodQuantityDialog extends StatefulWidget {
 class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
   late final TextEditingController _quantity;
   late String _unit;
+  bool _nutritionOpen = false;
+  bool _nutritionEdited = false;
+  late final List<TextEditingController> _nutrition;
 
   @override
   void initState() {
     super.initState();
     final meal = widget.meal;
     final edit = widget.editingIntake;
+    final initialAmount = edit?.amount ?? widget.initialItem?.amount;
     final rawUnit = meal.isLiquid ? UnitDropdownItem.ml : UnitDropdownItem.g;
     double quantity;
-    if (edit != null) {
+    if (initialAmount != null) {
       _unit = rawUnit.toString();
-      quantity = edit.amount;
+      quantity = initialAmount;
       if (widget.usesImperialUnits) {
         _unit = meal.isLiquid
             ? UnitDropdownItem.flOz.toString()
@@ -68,12 +74,35 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
       }
     }
     _quantity = TextEditingController(text: _number(quantity));
+    final n = meal.nutriments;
+    _nutrition =
+        [
+              n.energyKcal100,
+              n.carbohydrates100,
+              n.fat100,
+              n.proteins100,
+              n.fiber100,
+              n.sugars100,
+              n.saturatedFat100,
+              n.sodium100,
+            ]
+            .map(
+              (v) => TextEditingController(text: v == null ? '' : v.toString()),
+            )
+            .toList();
+    for (final c in _nutrition) {
+      c.addListener(_nutritionChanged);
+    }
     _update(_quantity.text, _unit);
   }
 
   @override
   void dispose() {
     _quantity.dispose();
+    for (final c in _nutrition) {
+      c.removeListener(_nutritionChanged);
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -85,6 +114,101 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
     if (mounted) setState(() {});
   }
 
+  void _nutritionChanged() => setState(() => _nutritionEdited = true);
+
+  double? _value(int index) =>
+      double.tryParse(_nutrition[index].text.trim().replaceAll(',', '.'));
+
+  bool _validNutrient(int index) {
+    if (index >= 4 && _nutrition[index].text.trim().isEmpty) return true;
+    final value = _value(index);
+    return value != null && value.isFinite && value >= 0;
+  }
+
+  bool get _nutritionValid => List.generate(8, (i) => i).every(_validNutrient);
+
+  MealEntity get _meal {
+    if (widget.editingIntake == null || !_nutritionEdited || !_nutritionValid) {
+      return widget.meal;
+    }
+    return widget.meal.withNutriments(
+      widget.meal.nutriments.withEditedValues(
+        energyKcal100: _value(0),
+        carbohydrates100: _value(1),
+        fat100: _value(2),
+        proteins100: _value(3),
+        fiber100: _value(4),
+        sugars100: _value(5),
+        saturatedFat100: _value(6),
+        sodium100: _value(7),
+      ),
+    );
+  }
+
+  Widget _nutritionEditor(BuildContext context) {
+    final s = S.of(context);
+    final labels = [
+      s.quickAddEnergyLabelKcal,
+      s.carbsLabel,
+      s.fatLabel,
+      s.proteinLabel,
+      s.fiberLabel,
+      s.sugarLabel,
+      s.saturatedFatLabel,
+      s.sodiumLabel,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          identifier: 'food-edit-nutrition',
+          child: TextButton.icon(
+            onPressed: () => setState(() => _nutritionOpen = !_nutritionOpen),
+            icon: Icon(_nutritionOpen ? Icons.expand_less : Icons.tune_rounded),
+            label: Text(s.loggingEditNutrition),
+          ),
+        ),
+        if (_nutritionOpen) ...[
+          Text(
+            s.loggingNutritionPer100(
+              widget.meal.isLiquid ? s.milliliterUnit : s.gramUnit,
+            ),
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 12),
+          for (var i = 0; i < _nutrition.length; i++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Semantics(
+                identifier: 'food-nutrient-$i',
+                child: TextFormField(
+                  controller: _nutrition[i],
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  textInputAction: i == _nutrition.length - 1
+                      ? TextInputAction.done
+                      : TextInputAction.next,
+                  decoration: InputDecoration(
+                    labelText: labels[i],
+                    suffixText: i == 0
+                        ? 'kcal'
+                        : i == 7
+                        ? 'mg'
+                        : s.gramUnit,
+                    errorText: _validNutrient(i)
+                        ? null
+                        : s.loggingNutrientInvalid,
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
@@ -92,8 +216,10 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
     final base = amount != null && amount.isFinite && amount > 0
         ? convertQuantityToBaseUnit(amount, _unit, widget.meal)
         : 0.0;
+    final meal = _meal;
     final content = MealDetailBottomSheet(
-      product: widget.meal,
+      product: meal,
+      submissionEnabled: widget.editingIntake == null || _nutritionValid,
       day: widget.day,
       intakeTypeEntity: widget.type,
       allowMealTypeChange: widget.editingIntake == null,
@@ -101,9 +227,9 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
       selectedUnit: _unit,
       usesImperialUnits: widget.usesImperialUnits,
       onQuantityOrUnitChanged: _update,
-      confirmLabel: widget.editingIntake == null
-          ? s.loggingConfirmAmount
-          : s.loggingSaveAmount,
+      confirmLabel: widget.editingIntake != null || widget.initialItem != null
+          ? s.buttonSaveLabel
+          : s.loggingConfirmAmount,
       onSelectionConfirmed: (item) async => Navigator.of(context).pop(item),
       layoutBuilder: (context, editor, actions) => Column(
         mainAxisSize: MainAxisSize.min,
@@ -115,11 +241,11 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
           ),
           const SizedBox(height: 12),
           Text(
-            widget.meal.nutriments.energyPerUnit == null
+            meal.nutriments.energyPerUnit == null
                 ? '—'
                 : EnergyDisplay.formatWithUnit(
                     context,
-                    base * widget.meal.nutriments.energyPerUnit!,
+                    base * meal.nutriments.energyPerUnit!,
                   ),
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               color: Theme.of(context).colorScheme.primary,
@@ -128,6 +254,7 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
           ),
           const SizedBox(height: 16),
           editor,
+          if (widget.editingIntake != null) _nutritionEditor(context),
           actions,
         ],
       ),
@@ -150,6 +277,7 @@ Future<LogTrayItem?> showFoodQuantitySheet({
   required IntakeTypeEntity type,
   required bool usesImperialUnits,
   IntakeEntity? editingIntake,
+  LogTrayItem? initialItem,
 }) => showModalBottomSheet<LogTrayItem>(
   context: context,
   useSafeArea: true,
@@ -161,6 +289,7 @@ Future<LogTrayItem?> showFoodQuantitySheet({
     type: type,
     usesImperialUnits: usesImperialUnits,
     editingIntake: editingIntake,
+    initialItem: initialItem,
     asBottomSheet: true,
   ),
 );

@@ -96,7 +96,7 @@ void main() {
     }
   });
   testWidgets(
-    'hub presents six card entrances and close; meal choices stay together',
+    'hub presents entrances and close without duplicate meal choices',
     (tester) async {
       await _open(tester);
       for (final id in [
@@ -110,7 +110,7 @@ void main() {
       ]) {
         expect(_id(id), findsOneWidget);
       }
-      expect(find.byType(ChoiceChip), findsNWidgets(4));
+      expect(find.byType(ChoiceChip), findsNothing);
       await tester.tap(_id('logging-hub-close'));
       await tester.pumpAndSettle();
       expect(_id('logging-record-meal'), findsNothing);
@@ -118,7 +118,7 @@ void main() {
   );
 
   testWidgets(
-    'meal selection follows into the library with the selected date',
+    'library keeps the suggested meal and selected date without a selector',
     (tester) async {
       AddMealScreenArguments? args;
       await _open(
@@ -129,12 +129,10 @@ void main() {
           }
         },
       );
-      await tester.tap(_id('logging-meal-snack'));
-      await tester.pumpAndSettle();
       await tester.ensureVisible(_id('logging-food-library'));
       await tester.tap(_id('logging-food-library'));
       await tester.pumpAndSettle();
-      expect(args!.mealType, AddMealType.snackType);
+      expect(args!.mealType, AddMealType.lunchType);
       expect(args!.day, DateTime(2026, 11, 19));
       expect(args!.isFoodLibrary, isTrue);
     },

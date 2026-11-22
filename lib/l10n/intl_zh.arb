@@ -1667,5 +1667,9 @@
   "appUpdateInstallerOpened": "请在系统安装界面继续。取消后可再次点击“安装更新”。",
   "appUpdateDownload": "下载更新",
   "appUpdateInstall": "安装更新",
-  "appUpdateCheck": "检查更新"
+  "appUpdateCheck": "检查更新",
+  "loggingEditFood": "修改食物",
+  "loggingEditNutrition": "修改营养成分",
+  "loggingNutritionPer100": "每100{unit}的营养成分",
+  "loggingNutrientInvalid": "请输入大于或等于0的有效数值"
 }

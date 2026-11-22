@@ -379,7 +379,7 @@ void main() {
       await settle(tester);
       await tester.enterText(find.byType(TextFormField), '50');
       await passMidnight(tester);
-      await tester.tap(find.text(l10nEn.loggingSaveAmount));
+      await tester.tap(find.bySemanticsIdentifier('meal-detail-add'));
       await settle(tester);
 
       expect(intakeBox.values.single.amount, 50);

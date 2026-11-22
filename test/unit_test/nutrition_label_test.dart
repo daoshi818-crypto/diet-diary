@@ -14,6 +14,7 @@ import 'package:opennutritracker/features/add_meal/domain/meal_photo_interpreter
 const _label = {
   'name': '燕麦片',
   'brand': '测试品牌',
+  'basisText': '每份30克',
   'basisQuantity': 30,
   'basisUnit': 'g',
   'energy': 450,
@@ -49,6 +50,7 @@ void main() {
     final meal = NutritionLabelDraft.fromJson({
       ..._label,
       'basisUnit': 'ml',
+      'basisText': '每100毫升',
       'basisQuantity': 100,
       'sodiumMg': null,
       'energyUnit': 'kcal',

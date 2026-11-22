@@ -33,7 +33,8 @@ class AddItemBottomSheet extends StatefulWidget {
 }
 
 class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
-  late IntakeTypeEntity _type = widget.suggestedType ?? IntakeTypeEntity.lunch;
+  late final IntakeTypeEntity _type =
+      widget.suggestedType ?? IntakeTypeEntity.lunch;
 
   @override
   Widget build(BuildContext context) {
@@ -48,26 +49,6 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(s.addLabel, style: theme.textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              for (final type in IntakeTypeEntity.values)
-                Semantics(
-                  identifier: 'logging-meal-${type.name}',
-                  child: ChoiceChip(
-                    label: Text(
-                      AddMealExtension.fromIntakeTypeEntity(
-                        type,
-                      ).getTypeName(context),
-                    ),
-                    selected: _type == type,
-                    onSelected: (_) => setState(() => _type = type),
-                  ),
-                ),
-            ],
-          ),
           const SizedBox(height: 8),
           LayoutBuilder(
             builder: (context, constraints) {

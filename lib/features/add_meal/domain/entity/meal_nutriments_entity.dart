@@ -93,6 +93,42 @@ class MealNutrimentsEntity extends Equatable {
     this.niacin100,
   });
 
+  MealNutrimentsEntity withEditedValues({
+    required double? energyKcal100,
+    required double? carbohydrates100,
+    required double? fat100,
+    required double? proteins100,
+    required double? sugars100,
+    required double? saturatedFat100,
+    required double? fiber100,
+    required double? sodium100,
+  }) => MealNutrimentsEntity(
+    energyKcal100: energyKcal100,
+    carbohydrates100: carbohydrates100,
+    fat100: fat100,
+    proteins100: proteins100,
+    sugars100: sugars100,
+    saturatedFat100: saturatedFat100,
+    fiber100: fiber100,
+    monounsaturatedFat100: monounsaturatedFat100,
+    polyunsaturatedFat100: polyunsaturatedFat100,
+    transFat100: transFat100,
+    cholesterol100: cholesterol100,
+    sodium100: sodium100,
+    potassium100: potassium100,
+    magnesium100: magnesium100,
+    calcium100: calcium100,
+    iron100: iron100,
+    zinc100: zinc100,
+    phosphorus100: phosphorus100,
+    vitaminA100: vitaminA100,
+    vitaminC100: vitaminC100,
+    vitaminD100: vitaminD100,
+    vitaminB6100: vitaminB6100,
+    vitaminB12100: vitaminB12100,
+    niacin100: niacin100,
+  );
+
   factory MealNutrimentsEntity.empty() => const MealNutrimentsEntity(
         energyKcal100: null,
         carbohydrates100: null,

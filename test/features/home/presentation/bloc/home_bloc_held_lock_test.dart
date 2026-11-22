@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/data/dbo/meal_dbo.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -212,6 +213,60 @@ void main() {
       expect(IntakeEntity.fromIntakeDBO(intakeBox.values.single).amount, 150);
     },
   );
+
+  test(
+    'nutrition-only edits update the diary snapshot and all totals',
+    () async {
+      final updated = _toast.meal.withNutriments(
+        const MealNutrimentsEntity(
+          energyKcal100: 150,
+          carbohydrates100: 20,
+          fat100: 5,
+          proteins100: 8,
+          sugars100: null,
+          saturatedFat100: null,
+          fiber100: 3,
+        ),
+      );
+      await writeBehindLock(
+        () => bloc.updateIntakeItem('toast', {
+          'meal': MealDBO.fromMealEntity(updated),
+        }),
+      );
+      final row = trackedDayBox.get('2026-10-05')!;
+      expect(row.caloriesTracked, 150);
+      expect(row.carbsTracked, 20);
+      expect(row.fatTracked, 5);
+      expect(row.proteinTracked, 8);
+      final saved = IntakeEntity.fromIntakeDBO(intakeBox.values.single);
+      expect(saved.amount, 100);
+      expect(saved.meal.nutriments.fiber100, 3);
+      expect(_toast.meal.nutriments.energyKcal100, 200);
+    },
+  );
+
+  test('macro edits apply even when energy and weight stay the same', () async {
+    await bloc.updateIntakeItem('toast', {
+      'meal': MealDBO.fromMealEntity(
+        _toast.meal.withNutriments(
+          const MealNutrimentsEntity(
+            energyKcal100: 200,
+            carbohydrates100: 25,
+            fat100: 8,
+            proteins100: 7,
+            sugars100: null,
+            saturatedFat100: null,
+            fiber100: null,
+          ),
+        ),
+      ),
+    });
+    final row = trackedDayBox.get('2026-10-05')!;
+    expect(row.caloriesTracked, 200);
+    expect(row.carbsTracked, 25);
+    expect(row.fatTracked, 8);
+    expect(row.proteinTracked, closeTo(7, 1e-9));
+  });
 
   test(
     'a delete completes only once the entry and its row are written',

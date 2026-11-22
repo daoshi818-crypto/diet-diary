@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/data/dbo/meal_dbo.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:logging/logging.dart';
@@ -337,6 +338,7 @@ class _DiaryPageState extends State<DiaryPage> with WidgetsBindingObserver {
       await _calendarDayBloc.updateIntakeItem(intakeEntity.id, {
         'amount': changeIntakeAmount.amount,
         'unit': changeIntakeAmount.unit,
+        'meal': MealDBO.fromMealEntity(changeIntakeAmount.meal),
       }, day);
       _diaryBloc.add(const LoadDiaryYearEvent());
       _calendarDayBloc.add(LoadCalendarDayEvent(_selectedDate));

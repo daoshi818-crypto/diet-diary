@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:opennutritracker/core/utils/ai_credential_storage.dart';
 import 'package:opennutritracker/core/utils/ai_model_catalogue.dart';
+import 'package:opennutritracker/core/utils/deepseek_endpoint.dart';
 import 'package:opennutritracker/core/utils/gemini_endpoint.dart';
 import 'package:opennutritracker/core/utils/plaintext_destination_guard.dart';
 import 'package:opennutritracker/features/add_meal/data/meal_items_api_factory.dart';
@@ -22,6 +23,7 @@ class AiStructuredApi {
     required Map<String, Object?> schema,
     MealPhoto? photo,
     bool jsonFallback = false,
+    bool extractionOnly = false,
   }) async {
     final curated = AiModelCatalogue.resolve(
       selection.provider,
@@ -183,6 +185,7 @@ class AiStructuredApi {
         };
     }
     final compatible = selection.provider == AiProvider.ownServer;
+    final deepSeek = compatible && isDeepSeekEndpoint(endpoint);
     Future<Map<String, dynamic>> retryJson() => request(
       selection: selection,
       system: system,
@@ -191,14 +194,21 @@ class AiStructuredApi {
       schema: schema,
       photo: photo,
       jsonFallback: true,
+      extractionOnly: extractionOnly,
     );
-    if (compatible && jsonFallback) {
+    if (compatible && (jsonFallback || deepSeek)) {
       body.remove('tools');
       body.remove('tool_choice');
       body['response_format'] = {'type': 'json_object'};
+      if (deepSeek && extractionOnly) {
+        body['thinking'] = {'type': 'disabled'};
+      }
       final messages = body['messages'] as List;
       (messages.first as Map)['content'] =
-          '$system\nReturn only a JSON object matching this schema: ${jsonEncode(schema)}';
+          '$system\nReturn only the data JSON object matching this schema. '
+          'Put the data fields directly at the root; do not return a JSON Schema '
+          'or wrap values in type, properties or required. '
+          'Schema: ${jsonEncode(schema)}';
     }
     final http.Response response;
     try {
@@ -227,6 +237,7 @@ class AiStructuredApi {
     }
     if (compatible &&
         !jsonFallback &&
+        !deepSeek &&
         {400, 422}.contains(response.statusCode) &&
         RegExp(
           r'tool|function|response_format',
@@ -247,7 +258,7 @@ class AiStructuredApi {
       );
     }
     try {
-      final decoded = jsonDecode(response.body);
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       if (decoded is! Map) throw const FormatException();
       if (decoded['error'] != null) {
         throw MealInterpreterException(
@@ -281,6 +292,11 @@ class AiStructuredApi {
         }
       } else {
         final choice = decoded['choices'][0];
+        if (choice['finish_reason'] == 'length') {
+          throw const MealInterpreterException(
+            'Incomplete structured AI response',
+          );
+        }
         if (choice['finish_reason'] == 'error') {
           final code = choice['error']?['code'];
           throw MealInterpreterException(
@@ -326,7 +342,7 @@ class AiStructuredApi {
     } on MealInterpreterException {
       rethrow;
     } catch (_) {
-      if (compatible && !jsonFallback) return retryJson();
+      if (compatible && !jsonFallback && !deepSeek) return retryJson();
       throw const MealInterpreterException('Unreadable structured AI response');
     }
   }
