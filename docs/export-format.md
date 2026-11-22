@@ -235,7 +235,7 @@ keeps its own goals. Those older builds ignore the file when they meet it.
 
 ```jsonc
 {
-  "version": 2,                     // format version, see below
+  "version": 3,                     // format version, see below
   "nutritionGoalSchedule": null,    // encoded, versioned goal history (see below)
   "kcalAdjustment": -300.0,         // kcal added to the daily goal, -1000..1000
   "carbGoalPct": 0.4,               // macro split as fractions of the kcal goal:
@@ -269,6 +269,14 @@ of macro energy; `deficit` means TDEE minus the saved value. Plans apply from th
 effective day, while existing past diary targets remain unchanged. Version 1
 backups restore the legacy fields and clear this schedule. Invalid schedules
 reject the archive before any writes.
+
+Version 3 includes the `mifflinWeeklyActivity` method and its `activityPlan`:
+`dailyActivity` (`sedentary`, `light`, `moderate`, `strenuous`) plus `exercises`.
+Each exercise stores `type`, `sessionsPerWeek`, `minutesPerSession`, `intensity`,
+`energySource` (`estimated`, `activeCalories`, `totalCalories`) and optional
+`caloriesPerSession`. The plan is required for this method. Version 1/2 backups
+and plans using the older methods remain readable. See
+[weekly activity TDEE](tdee-weekly-activity.md) for calculation details.
 
 Only goals that belong to a profile are in the file:
 

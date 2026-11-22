@@ -17,7 +17,7 @@ import 'package:opennutritracker/core/domain/entity/config_entity.dart';
 class GoalSettingsBackup {
   /// Bumped only for a change an older reader would misread. A reader
   /// that meets a newer version skips the file rather than guess.
-  static const formatVersion = 2;
+  static const formatVersion = 3;
 
   // The ranges the Settings dialogs enforce. Kept loose where an older
   // build's rounding could have stored a value just off the mark: the macro

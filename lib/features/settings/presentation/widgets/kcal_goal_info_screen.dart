@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/presentation/widgets/activity_plan_editor.dart';
 import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
 import 'package:opennutritracker/core/domain/entity/kcal_goal_breakdown_entity.dart';
@@ -156,7 +157,12 @@ class _InputsCard extends StatelessWidget {
         ),
         _ValueRow(
           label: l10n.activityLabel,
-          value: breakdown.plan?.tdeeMethod == TdeeMethod.mifflinStJeor
+          value: breakdown.plan?.tdeeMethod == TdeeMethod.mifflinWeeklyActivity
+              ? dailyActivityTitle(
+                  l10n,
+                  breakdown.plan!.activityPlan.dailyActivity,
+                )
+              : breakdown.plan?.tdeeMethod == TdeeMethod.mifflinStJeor
               ? '× ${breakdown.plan!.activityMultiplier.toStringAsFixed(2)}'
               : breakdown.palCategory.getName(context),
         ),
@@ -199,6 +205,54 @@ class _TdeeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = S.of(context);
+    if (breakdown.plan?.tdeeMethod == TdeeMethod.mifflinWeeklyActivity) {
+      final activity = breakdown.plan!.activityPlan;
+      final resting =
+          (breakdown.tdeeKcal -
+              activity.dailyExerciseCalories(breakdown.weightKG)) /
+          activity.dailyActivity.multiplier;
+      return _SectionCard(
+        title: l10n.kcalGoalInfoTdeeSection,
+        children: [
+          ActivityPlanSummary(
+            plan: activity,
+            weightKg: breakdown.weightKG,
+            restingKcal: resting,
+            formatEnergy: (value) =>
+                EnergyDisplay.formatWithUnit(context, value),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n
+                .weeklyExerciseAverage(
+                  EnergyDisplay.formatValue(
+                    context,
+                    activity.weeklyActiveCalories(breakdown.weightKG),
+                  ),
+                  EnergyDisplay.formatValue(
+                    context,
+                    activity.dailyExerciseCalories(breakdown.weightKG),
+                  ),
+                )
+                .replaceAll('kcal', EnergyDisplay.unitLabel(context)),
+          ),
+          const SizedBox(height: 8),
+          for (final exercise in activity.exercises)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                '${exerciseTypeTitle(l10n, exercise.type)} · '
+                '${l10n.weeklyExerciseSchedule(exercise.sessionsPerWeek.toString(), exercise.minutesPerSession.toString())}\n'
+                '${EnergyDisplay.formatWithUnit(context, exercise.weeklyActiveCalories(breakdown.weightKG))} ${l10n.trendsPerWeekSuffix}',
+              ),
+            ),
+          Text(
+            l10n.exerciseNetEnergyHint,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      );
+    }
     if (breakdown.plan?.tdeeMethod == TdeeMethod.mifflinStJeor) {
       final factor = breakdown.plan!.activityMultiplier;
       return _SectionCard(

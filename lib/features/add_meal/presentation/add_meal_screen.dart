@@ -224,7 +224,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
       ),
       bottomNavigationBar: _logTray.isEmpty || keyboardVisible
           ? null
-          : SafeArea(top: false, child: _buildLogButton()),
+          : SafeArea(top: false, child: _buildTrayFooter()),
       body: SafeArea(
         top: false,
         child: Center(
@@ -233,119 +233,137 @@ class _AddMealScreenState extends State<AddMealScreen> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: LayoutBuilder(
-                builder: (context, constraints) => Column(
-                  children: [
-                    const SizedBox(height: 8),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxHeight: constraints.maxHeight * .5,
+                builder: (context, constraints) {
+                  final compact =
+                      constraints.maxHeight <
+                      300 +
+                          (MediaQuery.textScalerOf(context).scale(14) - 14) * 4;
+                  return Column(
+                    children: [
+                      const SizedBox(height: 8),
+                      MealSearchBar(
+                        searchStringListener: _searchStringListener,
+                        onSearchSubmit: _onSearchSubmit,
+                        onSearchChanged: _onSearchChanged,
+                        onBarcodePressed: null,
                       ),
-                      child: SingleChildScrollView(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            MealSearchBar(
-                              searchStringListener: _searchStringListener,
-                              onSearchSubmit: _onSearchSubmit,
-                              onSearchChanged: _onSearchChanged,
-                              onBarcodePressed: null,
-                            ),
-                            ValueListenableBuilder<String>(
-                              valueListenable: _searchStringListener,
-                              builder: (context, query, _) => Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (query.trim().isEmpty &&
-                                      !keyboardVisible) ...[
-                                    const SizedBox(height: 12),
-                                    AddFoodMethodTiles(
-                                      onBarcodePressed: _onBarcodeIconPressed,
-                                      onSnapMealPressed: () =>
-                                          _openBulkAdd(startWithPhoto: true),
-                                      onDescribePressed: () => setState(
-                                        () => _describeOpen = !_describeOpen,
-                                      ),
-                                      describeOpen: _describeOpen,
-                                      showAi: !_aiHidden,
-                                    ),
-                                    if (!_aiHidden)
-                                      Semantics(
-                                        identifier: 'add-meal-nutrition-label',
-                                        child: TextButton.icon(
-                                          onPressed: _openNutritionLabel,
-                                          icon: const Icon(
-                                            Icons.document_scanner_outlined,
+                      const SizedBox(height: 8),
+                      _buildSourceChips(context, palette),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: ValueListenableBuilder<String>(
+                          valueListenable: _searchStringListener,
+                          builder: (context, query, _) => NestedScrollView(
+                            key: const PageStorageKey('add-meal-results'),
+                            headerSliverBuilder:
+                                (context, innerBoxIsScrolled) => [
+                                  SliverToBoxAdapter(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        if (query.trim().isEmpty &&
+                                            !keyboardVisible) ...[
+                                          AddFoodMethodTiles(
+                                            onBarcodePressed:
+                                                _onBarcodeIconPressed,
+                                            onSnapMealPressed: () =>
+                                                _openBulkAdd(
+                                                  startWithPhoto: true,
+                                                ),
+                                            onDescribePressed: () => setState(
+                                              () => _describeOpen =
+                                                  !_describeOpen,
+                                            ),
+                                            describeOpen: _describeOpen,
+                                            showAi: !_aiHidden,
                                           ),
-                                          label: Text(
-                                            S.of(context).labelScanTitle,
+                                          if (!_aiHidden)
+                                            Semantics(
+                                              identifier:
+                                                  'add-meal-nutrition-label',
+                                              child: TextButton.icon(
+                                                onPressed: _openNutritionLabel,
+                                                icon: const Icon(
+                                                  Icons
+                                                      .document_scanner_outlined,
+                                                ),
+                                                label: Text(
+                                                  S.of(context).labelScanTitle,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                        if (_describeOpen &&
+                                            query.trim().isEmpty) ...[
+                                          const SizedBox(height: 8),
+                                          DescribeMealPanel(
+                                            onFindFoods: (text) =>
+                                                _openBulkAdd(initialText: text),
                                           ),
-                                        ),
-                                      ),
-                                  ],
-                                  if (_describeOpen &&
-                                      query.trim().isEmpty &&
-                                      !keyboardVisible) ...[
-                                    const SizedBox(height: 12),
-                                    DescribeMealPanel(
-                                      onFindFoods: (text) =>
-                                          _openBulkAdd(initialText: text),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                            if (_isFoodLibrary) ...[
-                              const SizedBox(height: 8),
-                              _buildLibraryMealSelector(context),
-                            ],
-                            if (!_logTray.isEmpty) ...[
-                              const SizedBox(height: 12),
-                              Semantics(
-                                identifier: 'add-meal-review-tray',
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: TextButton.icon(
-                                    onPressed: _reviewLogTray,
-                                    icon: const Icon(
-                                      Icons.receipt_long_rounded,
-                                    ),
-                                    label: Text(
-                                      S
-                                          .of(context)
-                                          .logTrayTitle(_logTray.length),
+                                        ],
+                                        if (_isFoodLibrary) ...[
+                                          const SizedBox(height: 8),
+                                          _buildLibraryMealSelector(context),
+                                        ],
+                                      ],
                                     ),
                                   ),
-                                ),
-                              ),
-                              if (keyboardVisible &&
-                                  constraints.maxHeight < 300)
-                                _buildLogButton(),
-                            ],
-                            const SizedBox(height: 8),
-                            _buildSourceChips(context, palette),
-                          ],
+                                ],
+                            body: _buildResults(context, palette, query),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Expanded(
-                      child: ValueListenableBuilder<String>(
-                        valueListenable: _searchStringListener,
-                        builder: (context, query, _) =>
-                            _buildResults(context, palette, query),
-                      ),
-                    ),
-                    if (!_logTray.isEmpty &&
-                        keyboardVisible &&
-                        constraints.maxHeight >= 300)
-                      _buildLogButton(),
-                  ],
-                ),
+                      if (!_logTray.isEmpty && keyboardVisible)
+                        _buildTrayFooter(compact: compact),
+                    ],
+                  );
+                },
               ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTrayFooter({bool compact = false}) {
+    if (compact) {
+      return Row(
+        children: [
+          Semantics(
+            identifier: 'add-meal-review-tray',
+            child: IconButton(
+              onPressed: _reviewLogTray,
+              tooltip: S.of(context).logTrayTitle(_logTray.length),
+              icon: Badge(
+                label: Text(_logTray.length.toString()),
+                child: const Icon(Icons.receipt_long_rounded),
+              ),
+            ),
+          ),
+          Expanded(child: _buildLogButton()),
+        ],
+      );
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Semantics(
+            identifier: 'add-meal-review-tray',
+            child: TextButton.icon(
+              onPressed: _reviewLogTray,
+              icon: const Icon(Icons.receipt_long_rounded),
+              label: Text(S.of(context).logTrayTitle(_logTray.length)),
+              iconAlignment: IconAlignment.start,
+            ),
+          ),
+        ),
+        _buildLogButton(),
+      ],
     );
   }
 

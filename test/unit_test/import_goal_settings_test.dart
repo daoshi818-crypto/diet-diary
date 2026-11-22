@@ -783,7 +783,7 @@ void main() {
       );
       await config.setNutritionGoalSchedule(schedule.encode());
       final backup = GoalSettingsBackup.fromConfigDBO(await config.getConfig());
-      expect(backup.toJson()['version'], 2);
+      expect(backup.toJson()['version'], GoalSettingsBackup.formatVersion);
       await profileConfigBox.clear();
       expect((await config.getConfig()).nutritionGoalScheduleJson, isNull);
       await config.initializeConfig();

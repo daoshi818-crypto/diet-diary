@@ -180,7 +180,7 @@ void main() {
     expect(settingsBloc.savedAdjustments, [1000]);
   });
 
-  testWidgets('keeps the stored adjustment when the typed value is empty', (
+  testWidgets('clearing the field removes the stored adjustment', (
     tester,
   ) async {
     settingsBloc.storedAdjustment = 100;
@@ -190,7 +190,7 @@ void main() {
     await tester.tap(find.text(l10nEn.dialogOKLabel));
     await tester.pumpAndSettle();
 
-    expect(settingsBloc.savedAdjustments, [100]);
+    expect(settingsBloc.savedAdjustments, [0]);
   });
 
   testWidgets('a slider-set value in kJ mode is saved exactly', (tester) async {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/features/onboarding/domain/entity/goal_suggestion_entity.dart';
 import 'package:opennutritracker/features/onboarding/domain/entity/user_goal_selection_entity.dart';
@@ -8,6 +9,9 @@ class OnboardingGoalPageBody extends StatefulWidget {
   final Function(bool active, UserGoalSelectionEntity? selectedGoal)
   setButtonContent;
   final UserGoalSelectionEntity? initialGoal;
+  final double? initialDeficit;
+  final ValueChanged<double>? onDeficitChanged;
+  final double? estimatedTdee;
 
   /// Entered on the previous pages, and used only to derive the suggestion.
   /// Without them the page shows no suggestion.
@@ -19,6 +23,9 @@ class OnboardingGoalPageBody extends StatefulWidget {
     super.key,
     required this.setButtonContent,
     this.initialGoal,
+    this.initialDeficit,
+    this.onDeficitChanged,
+    this.estimatedTdee,
     this.heightCm,
     this.weightKg,
     this.targetWeightKg,
@@ -30,6 +37,40 @@ class OnboardingGoalPageBody extends StatefulWidget {
 
 class _OnboardingGoalPageBodyState extends State<OnboardingGoalPageBody> {
   late UserGoalSelectionEntity? _selected = widget.initialGoal;
+  late final _deficit = TextEditingController(
+    text: (widget.initialDeficit ?? _defaultDeficit(_selected)).toStringAsFixed(
+      0,
+    ),
+  );
+
+  static double _defaultDeficit(UserGoalSelectionEntity? goal) =>
+      switch (goal) {
+        UserGoalSelectionEntity.loseWeight => 500,
+        UserGoalSelectionEntity.gainWeigh => -500,
+        _ => 0,
+      };
+
+  @override
+  void dispose() {
+    _deficit.dispose();
+    super.dispose();
+  }
+
+  double get _deficitValue => _deficit.text.trim().isEmpty
+      ? 0
+      : double.tryParse(_deficit.text.replaceAll(',', '.')) ?? double.nan;
+
+  bool get _validDeficit =>
+      _deficitValue.isFinite &&
+      _deficitValue.abs() <= 10000 &&
+      (widget.estimatedTdee == null ||
+          (widget.estimatedTdee! - _deficitValue > 0 &&
+              widget.estimatedTdee! - _deficitValue <= 20000));
+
+  void _report() {
+    widget.onDeficitChanged?.call(_deficitValue);
+    widget.setButtonContent(_selected != null && _validDeficit, _selected);
+  }
 
   /// Derived on every build rather than cached, so going back to the
   /// height/weight page and changing a value can't leave the badge marking
@@ -84,6 +125,53 @@ class _OnboardingGoalPageBodyState extends State<OnboardingGoalPageBody> {
             if (suggestion != null) ...[
               const SizedBox(height: Dimens.spacing8),
               _buildSuggestionCard(suggestion),
+            ],
+            if (_selected != null) ...[
+              const SizedBox(height: 20),
+              Semantics(
+                identifier: 'onboarding-calorie-deficit',
+                child: TextFormField(
+                  controller: _deficit,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                    signed: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,\-]')),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: S.of(context).goalDeficitInput,
+                    suffixText: 'kcal',
+                    border: const OutlineInputBorder(),
+                    errorText: _validDeficit
+                        ? null
+                        : _deficitValue.isFinite && _deficitValue.abs() <= 10000
+                        ? S.of(context).goalEnergyError
+                        : S.of(context).goalDeficitError,
+                    errorMaxLines: 3,
+                    suffixIcon: Semantics(
+                      identifier: 'onboarding-deficit-clear',
+                      child: IconButton(
+                        tooltip: S.of(context).buttonResetLabel,
+                        icon: const Icon(Icons.clear_rounded),
+                        onPressed: () {
+                          setState(() => _deficit.clear());
+                          _report();
+                        },
+                      ),
+                    ),
+                  ),
+                  onChanged: (_) {
+                    setState(() {});
+                    _report();
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                S.of(context).goalDeficitHint,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ],
         ),
@@ -180,7 +268,12 @@ class _OnboardingGoalPageBodyState extends State<OnboardingGoalPageBody> {
   }
 
   void _onSelected(UserGoalSelectionEntity goal) {
-    setState(() => _selected = goal);
-    widget.setButtonContent(true, goal);
+    setState(() {
+      if (_selected != goal) {
+        _deficit.text = _defaultDeficit(goal).toStringAsFixed(0);
+      }
+      _selected = goal;
+    });
+    _report();
   }
 }

@@ -14,6 +14,8 @@ void main() {
     double? heightCm,
     double? weightKg,
     double? targetWeightKg,
+    double? estimatedTdee,
+    ValueChanged<double>? onDeficitChanged,
     void Function(bool, UserGoalSelectionEntity?)? onSelected,
   }) async {
     await tester.pumpWidget(
@@ -26,6 +28,8 @@ void main() {
             heightCm: heightCm,
             weightKg: weightKg,
             targetWeightKg: targetWeightKg,
+            estimatedTdee: estimatedTdee,
+            onDeficitChanged: onDeficitChanged,
           ),
         ),
       ),
@@ -53,6 +57,37 @@ void main() {
     expect(chips.every((chip) => !chip.selected), isTrue);
     expect(lastActive, isNull, reason: 'the page must not report a choice');
   });
+
+  testWidgets(
+    'the first-run deficit can be set, cleared, and validates against TDEE',
+    (tester) async {
+      double? deficit;
+      bool? active;
+      await pumpPage(
+        tester,
+        estimatedTdee: 2500,
+        onDeficitChanged: (value) => deficit = value,
+        onSelected: (value, _) => active = value,
+      );
+      await tester.tap(find.text(l10nEn.goalLoseWeight));
+      await tester.pumpAndSettle();
+      expect(deficit, 500);
+      final field = find.byType(TextFormField);
+      await tester.ensureVisible(field);
+      await tester.enterText(field, '200');
+      await tester.pumpAndSettle();
+      expect(deficit, 200);
+      expect(active, isTrue);
+      await tester.enterText(field, '');
+      await tester.pumpAndSettle();
+      expect(deficit, 0);
+      expect(active, isTrue);
+      await tester.enterText(field, '2500');
+      await tester.pumpAndSettle();
+      expect(active, isFalse);
+      expect(find.text(l10nEn.goalEnergyError), findsOneWidget);
+    },
+  );
 
   testWidgets('a high BMI marks lose and quotes the number and band', (
     tester,

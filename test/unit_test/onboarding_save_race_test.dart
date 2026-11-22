@@ -2,6 +2,12 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
+import 'package:opennutritracker/core/utils/calc/calorie_goal_calc.dart';
+import 'package:opennutritracker/features/onboarding/domain/entity/user_activity_selection_entity.dart';
+import 'package:opennutritracker/features/onboarding/domain/entity/user_gender_selection_entity.dart';
+import 'package:opennutritracker/features/onboarding/domain/entity/user_goal_selection_entity.dart';
 import 'package:opennutritracker/core/data/repository/config_repository.dart';
 import 'package:opennutritracker/core/data/repository/user_repository.dart';
 import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
@@ -40,6 +46,12 @@ class _FakeUserRepository implements UserRepository {
 
 class _FakeConfigRepository implements ConfigRepository {
   final Completer<void> anonCompleter = Completer<void>();
+  String? nutritionGoals;
+
+  @override
+  Future<void> setNutritionGoalSchedule(String? value) async {
+    nutritionGoals = value;
+  }
 
   @override
   Future<void> setConfigHasAcceptedAnonymousData(bool _) async {
@@ -181,6 +193,95 @@ void main() {
         configRepo.anonCompleter.complete();
         await saveFuture;
         expect(resolved, isTrue);
+      },
+    );
+
+    test('an invalid intake cannot partially save a new profile', () async {
+      bloc.userSelection.dailyCalorieDeficit = 10000;
+      await expectLater(
+        bloc.saveOnboardingData(
+          makeUser(),
+          false,
+          false,
+          BodyWeightUnit.kg,
+          false,
+          appTheme: AppThemeEntity.system,
+          foodSourceToggles: const {},
+          dailyReminderEnabled: false,
+          reminderLocale: const Locale('en'),
+          useMaterialYou: true,
+          accentColor: null,
+        ),
+        throwsFormatException,
+      );
+      expect(userRepo.writeStarted, isFalse);
+      expect(configRepo.nutritionGoals, isNull);
+    });
+
+    test(
+      'preview and persisted goals use the same daily activity, workouts and deficit',
+      () async {
+        bloc.userSelection
+          ..gender = UserGenderSelectionEntity.genderFemale
+          ..birthday = DateTime(1990, 6, 15)
+          ..height = 165
+          ..weight = 70
+          ..activity = UserActivitySelectionEntity.sedentary
+          ..goal = UserGoalSelectionEntity.loseWeight
+          ..dailyCalorieDeficit = 200
+          ..activityPlan = const ActivityPlan(
+            exercises: [
+              WeeklyExercise(
+                type: PlannedExerciseType.strength,
+                sessionsPerWeek: 2,
+                minutesPerSession: 45,
+              ),
+              WeeklyExercise(
+                type: PlannedExerciseType.cardio,
+                sessionsPerWeek: 3,
+                minutesPerSession: 35,
+                energySource: ExerciseEnergySource.activeCalories,
+                caloriesPerSession: 250,
+              ),
+            ],
+          );
+        final preview = bloc.getOverviewBreakdown()!;
+        final user = bloc.userSelection.toUserEntity()!;
+        userRepo.writeCompleter.complete();
+        configRepo.anonCompleter.complete();
+        await bloc.saveOnboardingData(
+          user,
+          false,
+          false,
+          BodyWeightUnit.kg,
+          false,
+          appTheme: AppThemeEntity.system,
+          foodSourceToggles: const {},
+          dailyReminderEnabled: false,
+          reminderLocale: const Locale('en'),
+          useMaterialYou: true,
+          accentColor: null,
+        );
+        final saved = NutritionGoalSchedule.decode(
+          configRepo.nutritionGoals!,
+        ).plans.single;
+        expect(saved.tdeeMethod, TdeeMethod.mifflinWeeklyActivity);
+        expect(saved.activityPlan, bloc.userSelection.activityPlan);
+        expect(saved.energyMode, EnergyGoalMode.deficit);
+        expect(saved.energyValue, 200);
+        expect(
+          CalorieGoalCalc.getTotalKcalGoal(
+            user,
+            500,
+            kcalUserAdjustment: 200,
+            plan: saved,
+          ),
+          preview.totalKcalGoal,
+        );
+        expect(bloc.getOverviewCalorieGoal(), preview.totalKcalGoal);
+        bloc.resetSelection();
+        expect(bloc.userSelection.activityPlan.exercises, isEmpty);
+        expect(bloc.userSelection.dailyCalorieDeficit, isNull);
       },
     );
 

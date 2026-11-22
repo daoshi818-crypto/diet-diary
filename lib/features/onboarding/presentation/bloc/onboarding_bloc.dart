@@ -6,6 +6,7 @@ import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
 import 'package:opennutritracker/core/domain/entity/body_weight_unit_entity.dart';
 import 'package:opennutritracker/core/domain/entity/kcal_goal_breakdown_entity.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
 import 'package:opennutritracker/core/domain/entity/weight_log_entity.dart';
 import 'package:opennutritracker/core/domain/usecase/add_config_usecase.dart';
@@ -118,7 +119,20 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
     required bool useMaterialYou,
     required int? accentColor,
   }) async {
+    final goalPlan = _initialGoalPlan(userEntity);
+    final target = goalPlan.calorieTarget(
+      CalorieGoalCalc.getTdee(userEntity, plan: goalPlan),
+    );
+    if (!goalPlan.isValid ||
+        !target.isFinite ||
+        target <= 0 ||
+        target > 20000) {
+      throw const FormatException('Invalid onboarding calorie target');
+    }
     await _addUserUsecase.addUser(userEntity);
+    await _addConfigUsecase.setNutritionGoalSchedule(
+      const NutritionGoalSchedule().save(goalPlan).encode(),
+    );
     // The weight given here is the first reading, not only the profile's
     // current value: without it Weight history opened empty on a profile
     // that plainly has a weight (#1367). The log is keyed by day and every
@@ -189,9 +203,18 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
     final userEntity = userSelection.toUserEntity();
     double? calorieGoal;
     if (userEntity != null) {
-      calorieGoal = CalorieGoalCalc.getTotalKcalGoal(userEntity, 0);
+      calorieGoal = CalorieGoalCalc.getTotalKcalGoal(
+        userEntity,
+        0,
+        plan: _initialGoalPlan(userEntity),
+      );
     }
-    return calorieGoal;
+    return calorieGoal != null &&
+            calorieGoal.isFinite &&
+            calorieGoal > 0 &&
+            calorieGoal <= 20000
+        ? calorieGoal
+        : null;
   }
 
   double? getOverviewCarbsGoal() {
@@ -239,6 +262,28 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
       // No manual offset or logged activity exists during onboarding; both
       // become available once the user is in the app.
       totalKcalActivities: 0,
+      plan: _initialGoalPlan(userEntity),
+    );
+  }
+
+  NutritionGoalPlan _initialGoalPlan(UserEntity user) {
+    final now = DateTime.now();
+    return NutritionGoalPlan(
+      effectiveFrom: DateTime(now.year, now.month, now.day),
+      energyMode: EnergyGoalMode.deficit,
+      energyValue:
+          userSelection.dailyCalorieDeficit ??
+          -CalorieGoalCalc.getKcalGoalAdjustment(
+            user.goal,
+            weeklyWeightGoalKg: user.weeklyWeightGoalKg,
+          ),
+      macroMode: MacroGoalMode.percentage,
+      carbs: MacroCalc.defaultCarbsPercentageGoal * 100,
+      protein: MacroCalc.defaultProteinsPercentageGoal * 100,
+      fat: MacroCalc.defaultFatsPercentageGoal * 100,
+      referenceWeightKg: user.weightKG,
+      tdeeMethod: TdeeMethod.mifflinWeeklyActivity,
+      activityPlan: userSelection.activityPlan,
     );
   }
 

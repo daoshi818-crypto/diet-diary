@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
+import 'package:opennutritracker/core/domain/entity/kcal_goal_breakdown_entity.dart';
+import 'package:opennutritracker/core/presentation/widgets/activity_plan_editor.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
 import 'package:opennutritracker/core/utils/calc/tdee_calc.dart';
 import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
@@ -14,6 +17,7 @@ import 'package:opennutritracker/core/utils/tracked_day_lock.dart';
 import 'package:opennutritracker/features/diary/presentation/bloc/calendar_day_bloc.dart';
 import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dart';
 import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
+import 'package:opennutritracker/features/profile/presentation/bloc/profile_bloc.dart';
 import 'package:opennutritracker/features/settings/presentation/bloc/settings_bloc.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/kcal_goal_info_screen.dart';
 import 'package:opennutritracker/generated/l10n.dart';
@@ -27,14 +31,23 @@ Future<void> openNutritionGoals(BuildContext context) async {
   locator<DiaryBloc>().add(const LoadDiaryYearEvent());
   locator<CalendarDayBloc>().add(RefreshCalendarDayEvent());
   locator<SettingsBloc>().add(LoadSettingsEvent());
+  if (locator.isRegistered<ProfileBloc>()) {
+    locator<ProfileBloc>().add(LoadProfileEvent());
+  }
 }
 
 class NutritionGoalsData {
   final double tdee;
   final NutritionGoalPlan plan;
   final UserEntity? user;
+  final double legacyOffset;
 
-  const NutritionGoalsData({required this.tdee, required this.plan, this.user});
+  const NutritionGoalsData({
+    required this.tdee,
+    required this.plan,
+    this.user,
+    this.legacyOffset = 0,
+  });
 }
 
 class NutritionGoalsScreen extends StatefulWidget {
@@ -52,6 +65,7 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
   final _energy = TextEditingController();
   final _activityFactor = TextEditingController();
   TdeeMethod _tdeeMethod = TdeeMethod.iom2005;
+  ActivityPlan _activityPlan = const ActivityPlan();
   final _weight = TextEditingController();
   final _carbs = TextEditingController();
   final _protein = TextEditingController();
@@ -81,20 +95,20 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
       final day = DayBoundaryCalc.currentLogicalDayMinutes(
         config.dayStartOffsetTotalMinutes,
       );
-      final target = CalorieGoalCalc.getTotalKcalGoal(
-        user,
-        0,
-        kcalUserAdjustment: config.userKcalAdjustment,
-        caloriesTaperEnabled: user.caloriesTaperEnabled,
-      );
       final plan = config.nutritionGoalSchedule.onDay(day);
       final data = NutritionGoalsData(
         tdee: CalorieGoalCalc.getTdee(user, plan: plan),
         user: user,
+        legacyOffset: plan == null ? config.userKcalAdjustment ?? 0 : 0,
         plan: NutritionGoalPlan(
           effectiveFrom: day,
-          energyMode: plan?.energyMode ?? EnergyGoalMode.fixed,
-          energyValue: plan?.energyValue ?? target,
+          energyMode: plan?.energyMode ?? EnergyGoalMode.deficit,
+          energyValue:
+              plan?.energyValue ??
+              -CalorieGoalCalc.getKcalGoalAdjustment(
+                user.goal,
+                weeklyWeightGoalKg: user.weeklyWeightGoalKg,
+              ),
           macroMode: plan?.macroMode ?? MacroGoalMode.percentage,
           carbs:
               plan?.carbs ??
@@ -110,8 +124,9 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
               (config.userFatGoalPct ?? MacroCalc.defaultFatsPercentageGoal) *
                   100,
           referenceWeightKg: plan?.referenceWeightKg ?? user.weightKG,
-          tdeeMethod: plan?.tdeeMethod ?? TdeeMethod.mifflinStJeor,
+          tdeeMethod: plan?.tdeeMethod ?? TdeeMethod.mifflinWeeklyActivity,
           activityMultiplier: plan?.activityMultiplier ?? 1.5,
+          activityPlan: plan?.activityPlan ?? const ActivityPlan(),
         ),
       );
       if (mounted) setState(() => _applyData(data));
@@ -129,6 +144,7 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
   void _applyData(NutritionGoalsData data) {
     _data = data;
     _tdeeMethod = data.plan.tdeeMethod;
+    _activityPlan = data.plan.activityPlan;
     _activityFactor.text = _number(data.plan.activityMultiplier);
     _energyMode = data.plan.energyMode;
     _macroMode = data.plan.macroMode;
@@ -146,7 +162,11 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
   }
 
   double _value(TextEditingController controller) =>
-      double.tryParse(controller.text.replaceAll(',', '.')) ?? double.nan;
+      identical(controller, _energy) &&
+          _energyMode == EnergyGoalMode.deficit &&
+          controller.text.trim().isEmpty
+      ? 0
+      : double.tryParse(controller.text.replaceAll(',', '.')) ?? double.nan;
 
   NutritionGoalPlan get _plan => NutritionGoalPlan(
     effectiveFrom: _data!.plan.effectiveFrom,
@@ -159,15 +179,17 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
     referenceWeightKg: _value(_weight),
     tdeeMethod: _tdeeMethod,
     activityMultiplier: _value(_activityFactor),
+    activityPlan: _activityPlan,
   );
 
   double get _tdee {
     final user = _data?.user;
     if (user == null) return _data!.tdee;
     final plan = _plan;
-    if (!plan.activityMultiplier.isFinite ||
-        plan.activityMultiplier < 1.1 ||
-        plan.activityMultiplier > 2.5) {
+    if (_tdeeMethod == TdeeMethod.mifflinStJeor &&
+        (!plan.activityMultiplier.isFinite ||
+            plan.activityMultiplier < 1.1 ||
+            plan.activityMultiplier > 2.5)) {
       return double.nan;
     }
     return CalorieGoalCalc.getTdee(user, plan: plan);
@@ -446,19 +468,49 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
                         validPreview ? '${difference.abs().round()} kcal' : '—',
                       ),
                       const Divider(height: 24),
+                      if (validPreview) ...[
+                        Text(
+                          _energyMode == EnergyGoalMode.deficit
+                              ? s.goalEnergyEquation(
+                                  _tdee.round().toString(),
+                                  _number(plan.energyValue),
+                                  target.round().toString(),
+                                )
+                              : s.goalFixedEquation(target.round().toString()),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      if (_data!.legacyOffset != 0) ...[
+                        Text(
+                          s.goalLegacyOffsetNotice(
+                            _number(_data!.legacyOffset),
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 8),
+                      ],
                       Text(
                         s.goalActivityIncluded,
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
-                      if (widget.initialData == null)
+                      if (_data!.user != null)
                         Semantics(
                           identifier: 'goals-calculation-info',
                           child: TextButton.icon(
-                            onPressed: () => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => const KcalGoalInfoScreen(),
-                              ),
-                            ),
+                            onPressed: !validPreview
+                                ? null
+                                : () => Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => KcalGoalInfoScreen(
+                                        breakdown:
+                                            KcalGoalBreakdownEntity.compute(
+                                              user: _data!.user!,
+                                              totalKcalActivities: 0,
+                                              plan: plan,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
                             icon: const Icon(
                               Icons.info_outline_rounded,
                               size: 18,
@@ -663,6 +715,10 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
         ),
         items: [
           DropdownMenuItem(
+            value: TdeeMethod.mifflinWeeklyActivity,
+            child: Text(s.goalTdeeWeekly),
+          ),
+          DropdownMenuItem(
             value: TdeeMethod.mifflinStJeor,
             child: Text(s.goalTdeeMifflin),
           ),
@@ -677,7 +733,19 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
       ),
     ),
     const SizedBox(height: 12),
-    if (_tdeeMethod == TdeeMethod.mifflinStJeor) ...[
+    if (_tdeeMethod == TdeeMethod.mifflinWeeklyActivity) ...[
+      ActivityPlanEditor(
+        value: _activityPlan,
+        weightKg: _data!.user!.weightKG,
+        onChanged: (plan) => setState(() => _activityPlan = plan),
+      ),
+      const SizedBox(height: 16),
+      ActivityPlanSummary(
+        plan: _activityPlan,
+        weightKg: _data!.user!.weightKG,
+        restingKcal: TDEECalc.restingMifflinKcal(_data!.user!),
+      ),
+    ] else if (_tdeeMethod == TdeeMethod.mifflinStJeor) ...[
       Text(s.goalActivityFactorGuide),
       const SizedBox(height: 8),
       Wrap(
@@ -715,6 +783,11 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
     ] else
       Text(s.goalIomActivityGuide(_data!.user!.pal.getName(context))),
     const SizedBox(height: 8),
+    if (_tdeeMethod != TdeeMethod.mifflinWeeklyActivity)
+      Text(
+        s.goalLegacyMethodHint,
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
     Text(s.goalTdeeEstimateHint, style: Theme.of(context).textTheme.bodySmall),
   ]);
 
@@ -769,6 +842,16 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
         suffixText: unit,
         errorMaxLines: 3,
         border: const OutlineInputBorder(),
+        suffixIcon: identical(controller, _energy)
+            ? Semantics(
+                identifier: 'goals-energy-clear',
+                child: IconButton(
+                  tooltip: S.of(context).buttonResetLabel,
+                  onPressed: () => setState(() => _energy.clear()),
+                  icon: const Icon(Icons.clear_rounded),
+                ),
+              )
+            : null,
       ),
       validator: (_) => validate(_value(controller)),
       onChanged: (_) => setState(() => _error = null),

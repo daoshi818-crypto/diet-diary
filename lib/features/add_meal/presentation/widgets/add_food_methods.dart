@@ -202,6 +202,7 @@ class _AiBadge extends StatelessWidget {
         ),
         child: Text(
           'AI',
+          textScaler: TextScaler.noScaling,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
             color: tileColor,
             fontSize: 10,

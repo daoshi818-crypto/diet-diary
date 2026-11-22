@@ -108,7 +108,7 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     _bodyPages = [
-      const HomePage(),
+      const HomePage(bottomPadding: 128),
       DiaryPage(onDateChanged: (date) => _diaryDate = date),
       const TrendsPage(),
       const ProfilePage(),
@@ -140,32 +140,18 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
         ],
       ),
       floatingActionButton: _selectedPageIndex == 0
-          ? null
-          : Semantics(
-              identifier: 'fab-add-item',
-              child: SizedBox.square(
-                dimension: 48,
-                child: FloatingActionButton.small(
-                  onPressed: () => _onFabPressed(context),
-                  tooltip: S.of(context).addLabel,
-                  child: const Icon(Icons.add),
-                ),
-              ),
-            ),
+          ? _homeQuickActions(context)
+          : _addButton(context),
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       bottomNavigationBar: BottomAppBar(
         color: palette.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         height:
-            78 +
-            (_selectedPageIndex == 0 ? 60 : 0) +
-            (MediaQuery.textScalerOf(context).scale(12) - 12).clamp(0, 24),
+            78 + (MediaQuery.textScalerOf(context).scale(12) - 12).clamp(0, 24),
         padding: EdgeInsets.zero,
-
-        child: Column(
+        child: Row(
           children: [
-            if (_selectedPageIndex == 0) _homeQuickActions(context),
             Expanded(
               child: Row(
                 children: [
@@ -189,6 +175,11 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
                     palette: palette,
                     onTap: _setPage,
                   ),
+                  if (_selectedPageIndex == 0)
+                    SizedBox(
+                      width: 56,
+                      child: Center(child: _addButton(context)),
+                    ),
                   _NavItem(
                     id: 'nav-trends',
                     icon: Icons.insights_outlined,
@@ -218,44 +209,76 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _homeQuickActions(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            S.of(context).loggingHubTitle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelLarge,
-          ),
-        ),
-        Semantics(
-          identifier: 'home-quick-water',
-          child: SizedBox.square(
-            dimension: 48,
-            child: IconButton.filledTonal(
-              tooltip: S.of(context).logWaterDialogTitle,
-              onPressed: _openWater,
-              icon: const Icon(Icons.water_drop_rounded),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Semantics(
-          identifier: 'home-quick-food',
-          child: SizedBox.square(
-            dimension: 48,
-            child: IconButton.filled(
-              tooltip: S.of(context).quickRecordFood,
-              onPressed: _openFood,
-              icon: const Icon(Icons.restaurant_rounded),
-            ),
-          ),
-        ),
-      ],
+  Widget _addButton(BuildContext context) => Semantics(
+    identifier: 'fab-add-item',
+    child: SizedBox.square(
+      dimension: 48,
+      child: FloatingActionButton.small(
+        onPressed: () => _onFabPressed(context),
+        tooltip: S.of(context).addLabel,
+        child: const Icon(Icons.add),
+      ),
     ),
   );
+
+  Widget _homeQuickActions(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      _quickAction(
+        context,
+        'home-quick-food',
+        S.of(context).quickRecordFood,
+        Icons.restaurant_rounded,
+        _openFood,
+      ),
+      const SizedBox(height: 8),
+      _quickAction(
+        context,
+        'home-quick-water',
+        S.of(context).logWaterDialogTitle,
+        Icons.water_drop_rounded,
+        _openWater,
+      ),
+    ],
+  );
+
+  Widget _quickAction(
+    BuildContext context,
+    String id,
+    String tooltip,
+    IconData icon,
+    VoidCallback onPressed,
+  ) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      identifier: id,
+      child: SizedBox.square(
+        dimension: 48,
+        child: IconButton(
+          tooltip: tooltip,
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          icon: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: colors.surface,
+              border: Border.all(color: colors.outline),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.shadow.withValues(alpha: .12),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Icon(icon, size: 20, color: colors.primary),
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _openWater() async {
     final config = await locator<GetConfigUsecase>().getConfig();

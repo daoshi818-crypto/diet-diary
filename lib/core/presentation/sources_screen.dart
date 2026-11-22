@@ -22,6 +22,12 @@ class SourcesScreen extends StatelessWidget {
         description: l10n.sourcesEnergyDescription,
         sources: const [
           _SourceLink(
+            citation: 'Mifflin MD, et al. (1990). A new predictive equation for '
+                'resting energy expenditure in healthy individuals. '
+                'The American Journal of Clinical Nutrition, 51(2):241–247.',
+            url: 'https://doi.org/10.1093/ajcn/51.2.241',
+          ),
+          _SourceLink(
             citation:
                 'Institute of Medicine (2005). Dietary Reference Intakes for '
                 'Energy, Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, '

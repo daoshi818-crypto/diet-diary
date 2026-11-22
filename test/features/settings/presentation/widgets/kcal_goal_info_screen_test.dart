@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
 import 'package:opennutritracker/core/domain/entity/kcal_goal_breakdown_entity.dart';
 import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
@@ -90,6 +91,52 @@ Future<void> _pump(
 
 void main() {
   group('KcalGoalInfoScreen', () {
+    for (final kj in [false, true]) {
+      testWidgets('split TDEE explains the saved activity plan in kJ=$kj', (
+        tester,
+      ) async {
+        final breakdown = KcalGoalBreakdownEntity.compute(
+          user: _buildUser(),
+          userKcalAdjustment: 200,
+          totalKcalActivities: 400,
+          plan: NutritionGoalPlan(
+            effectiveFrom: DateTime(2026, 11, 22),
+            energyMode: EnergyGoalMode.deficit,
+            energyValue: 200,
+            macroMode: MacroGoalMode.percentage,
+            carbs: 50,
+            protein: 25,
+            fat: 25,
+            referenceWeightKg: 80,
+            tdeeMethod: TdeeMethod.mifflinWeeklyActivity,
+            activityPlan: const ActivityPlan(
+              exercises: [
+                WeeklyExercise(
+                  type: PlannedExerciseType.cardio,
+                  sessionsPerWeek: 3,
+                  minutesPerSession: 35,
+                  energySource: ExerciseEnergySource.activeCalories,
+                  caloriesPerSession: 250,
+                ),
+              ],
+            ),
+          ),
+        );
+        await _pump(tester, breakdown, usesKilojoules: kj);
+        expect(find.text(l10nEn.dailyActivitySedentary), findsOneWidget);
+        expect(find.text(l10nEn.goalTdeeWeeklyFormula), findsOneWidget);
+        expect(
+          find.textContaining(l10nEn.weeklyExerciseSchedule('3.0', '35.0')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('1.27'), findsNothing);
+        expect(find.text(l10nEn.kcalGoalInfoManualSection), findsNothing);
+        expect(find.text(kj ? '9385 kJ' : '2243 kcal'), findsNWidgets(2));
+        expect(find.text(kj ? '8549 kJ' : '2043 kcal'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
     testWidgets('custom grams retain decimals and replace the legacy offset', (
       tester,
     ) async {

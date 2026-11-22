@@ -1,9 +1,16 @@
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
+import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_gender_entity.dart';
 import 'package:opennutritracker/core/utils/calc/pal_calc.dart';
 
 class TDEECalc {
+  static double getTDEEKcalWeeklyActivity(UserEntity user, ActivityPlan plan) {
+    if (!plan.isValid) throw ArgumentError.value(plan, 'plan');
+    return restingMifflinKcal(user) * plan.dailyActivity.multiplier +
+        plan.dailyExerciseCalories(user.weightKG);
+  }
+
   /// Mifflin et al., AJCN 1990, doi:10.1093/ajcn/51.2.241.
   static double restingMifflinKcal(UserEntity user) {
     final base = 10 * user.weightKG + 6.25 * user.heightCM - 5 * user.age;

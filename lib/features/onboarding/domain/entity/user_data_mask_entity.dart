@@ -1,4 +1,5 @@
 import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
+import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
 import 'package:opennutritracker/core/domain/entity/body_weight_unit_entity.dart';
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
@@ -16,7 +17,9 @@ class UserDataMaskEntity {
   double? height;
   double? weight;
   UserActivitySelectionEntity? activity;
+  ActivityPlan activityPlan = const ActivityPlan();
   UserGoalSelectionEntity? goal;
+  double? dailyCalorieDeficit;
 
   /// Optional weight the user is working towards. Captured on the same
   /// onboarding screen as the current weight so new users don't have to
@@ -78,7 +81,8 @@ class UserDataMaskEntity {
         height != null &&
         weight != null &&
         activity != null &&
-        goal != null) {
+        goal != null &&
+        (dailyCalorieDeficit == null || dailyCalorieDeficit!.isFinite)) {
       return true;
     } else {
       return false;
@@ -146,8 +150,9 @@ class UserDataMaskEntity {
       gender: userGender,
       goal: userGoal,
       pal: userPal,
-      caloriesProfile:
-          userGender == UserGenderEntity.nonBinary ? caloriesProfile : null,
+      caloriesProfile: userGender == UserGenderEntity.nonBinary
+          ? caloriesProfile
+          : null,
       targetWeightKg: targetWeight,
     );
   }

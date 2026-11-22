@@ -32,7 +32,9 @@ import 'package:opennutritracker/features/home/presentation/widgets/quick_weight
 import 'package:opennutritracker/generated/l10n.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final double bottomPadding;
+
+  const HomePage({super.key, this.bottomPadding = 24});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -308,7 +310,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               ),
             const FastingHomeChip(),
             const SizedBox(height: Dimens.spacing8),
-            const SizedBox(height: 24.0),
+            SizedBox(height: widget.bottomPadding),
           ],
         ),
         Align(

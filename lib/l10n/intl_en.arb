@@ -630,7 +630,7 @@
   "newCustomMealLabel": "New Custom Food",
   "niacinLabel": "niacin (B3)",
   "noActivityRecentlyAddedLabel": "No activity recently added",
-  "noMealsRecentlyAddedLabel": "No meals recently added",
+  "noMealsRecentlyAddedLabel": "No recently logged foods yet",
   "noResultsFound": "No results found",
   "noResultsSubtitle": "No foods matched that search. Try a different name, scan the barcode, or create your own.",
   "noResultsScanBarcode": "Scan barcode",
@@ -1185,11 +1185,11 @@
   "snackExample": "e.g. apple, ice cream, chocolate ...",
   "snackLabel": "Snack",
   "sodiumLabel": "sodium",
-  "sourcesActivityDescription": "Calories burned during an activity are estimated as MET × body weight (kg) × duration (hours), using values from the Adult Compendium of Physical Activities.",
+  "sourcesActivityDescription": "Exercise estimates reference the 2024 Adult Compendium MET values. Planned exercise subtracts 1 MET of resting energy; known active calories can be entered directly. Generic cardio intensities are rough guides.",
   "sourcesActivityTitle": "Activity calories (MET values)",
   "sourcesBmiDescription": "BMI is computed as weight (kg) divided by height squared (m²). The health categories (underweight, normal, pre-obesity, obesity class I–III) follow the World Health Organization's adult BMI classification.",
   "sourcesBmiTitle": "Body Mass Index (BMI)",
-  "sourcesEnergyDescription": "Daily calorie targets, basal metabolic rate, and physical activity coefficients use the equations from the Institute of Medicine. Source: Institute of Medicine (2005). Dietary Reference Intakes for Energy, Carbohydrate, Fiber, Fat, Fatty Acids, Cholesterol, Protein, and Amino Acids, Chapter 5 and Table 5-5.",
+  "sourcesEnergyDescription": "New profiles use Mifflin–St Jeor resting energy × a daily factor excluding workouts, plus weekly net exercise ÷ 7. The seated factor of 1.2 is a practical starting assumption. Older plans retain their method; all results are estimates.",
   "sourcesEnergyTitle": "Energy needs (TDEE, BMR & activity level)",
   "sourcesIconTooltip": "View sources",
   "sourcesMacrosDescription": "The default split of 60% carbohydrates, 25% fat, and 15% protein falls within the population nutrient intake ranges published by the WHO. You can adjust this in Settings → Calculations. Source: WHO Technical Report Series 916 (2003), Diet, Nutrition and the Prevention of Chronic Diseases.",
@@ -1621,7 +1621,7 @@
   "goalDeficitMode": "Set deficit",
   "goalIntakeLabel": "Daily intake",
   "goalDeficitInput": "Daily deficit",
-  "goalDeficitHint": "Positive for a deficit; negative for a surplus",
+  "goalDeficitHint": "Positive means a deficit, negative a surplus. Enter 0 or clear the field for no deficit.",
   "goalTdeeLabel": "Estimated TDEE",
   "goalPlannedDeficit": "Planned deficit",
   "goalPlannedSurplus": "Planned surplus",
@@ -1671,7 +1671,7 @@
   "goalRestingEnergy": "Estimated resting expenditure",
   "goalActivityFactorGuide": "Consider work, walking and training together: 1.2 mostly sedentary; 1.35 some activity; 1.5 desk work with regular training; 1.7 active throughout the day; 1.9 very demanding activity. These are starting estimates, not measurements.",
   "goalIomActivityGuide": "Current IOM category: {category}. A few weekly workouts do not imply an active whole day; account for time spent sitting at work.",
-  "goalTdeeEstimateHint": "Formulas and activity assumptions produce different estimates. Review several weeks of weight and intake to adjust the multiplier. Saving applies from today; historical records are retained.",
+  "goalTdeeEstimateHint": "TDEE is a starting estimate, not a measurement. Calibrate against several weeks of intake and weight trends. Saving applies from today; historical records are retained.",
   "@goalIomActivityGuide": {
     "placeholders": {
       "category": {
@@ -1715,6 +1715,112 @@
   "@labelScanDisclosure": {
     "placeholders": {
       "destination": {
+        "type": "String"
+      }
+    }
+  },
+  "dailyActivityTitle": "Daily activity, excluding workouts",
+  "dailyActivityHint": "Choose your workday and usual movement. Add workouts separately below.",
+  "dailyActivitySedentary": "Mostly seated",
+  "dailyActivitySedentaryHint": "Office or study, little walking.",
+  "dailyActivityLight": "Some standing and walking",
+  "dailyActivityLightHint": "Mostly light duties, with regular walking or standing.",
+  "dailyActivityModerate": "Frequently on your feet",
+  "dailyActivityModerateHint": "A mobile or standing job for much of the day.",
+  "dailyActivityStrenuous": "Physical work",
+  "dailyActivityStrenuousHint": "A physically demanding job for much of the day.",
+  "weeklyExerciseTitle": "Weekly workouts",
+  "weeklyExerciseHint": "Add strength and cardio separately. Use the average duration of one session.",
+  "weeklyExerciseEmpty": "No workouts added; only daily activity is included.",
+  "weeklyExerciseAdd": "Add workout",
+  "plannedExerciseStrength": "Strength training",
+  "plannedExerciseCardio": "Cardio",
+  "plannedExerciseOther": "Other exercise",
+  "exerciseTypeLabel": "Workout type",
+  "exerciseSessionsLabel": "Sessions per week",
+  "exerciseMinutesLabel": "Average session duration",
+  "exerciseIntensityLabel": "Average intensity",
+  "exerciseIntensityLight": "Light",
+  "exerciseIntensityModerate": "Moderate",
+  "exerciseIntensityVigorous": "Vigorous",
+  "exerciseEnergySourceLabel": "Calorie source",
+  "exerciseEnergyEstimated": "Estimate from intensity",
+  "exerciseEnergyActive": "Known active calories",
+  "exerciseEnergyTotal": "Known total session calories",
+  "exerciseCaloriesLabel": "Calories per session",
+  "exerciseEstimateHint": "A rough MET estimate. Strength: 3 / 3.5 / 6 MET; cardio or other: 4 / 6 / 8 MET. Include rest periods in the average intensity; use known calories when available.",
+  "exerciseActiveEnergyHint": "Enter active calories only; resting energy is already included in daily activity.",
+  "exerciseTotalEnergyHint": "Includes resting energy during the session. The app subtracts 1 MET of resting energy before adding it.",
+  "exerciseNetEnergyHint": "Only net activity calories are added: weekly exercise ÷ 7. Logging an individual workout does not add it again or increase the intake budget.",
+  "goalTdeeWeekly": "Daily activity + weekly workouts",
+  "goalDailyEnergy": "Daily baseline expenditure",
+  "goalExerciseDaily": "Average daily exercise",
+  "goalTdeeWeeklyFormula": "TDEE = resting estimate × daily factor + weekly net exercise ÷ 7",
+  "goalLegacyMethodHint": "This saved plan uses an older activity method. Choose daily activity + weekly workouts to enter them separately; your historical goals are retained.",
+  "goalEnergyEquation": "TDEE {tdee} − deficit {deficit} = intake {intake} kcal",
+  "@goalEnergyEquation": {
+    "placeholders": {
+      "tdee": {
+        "type": "String"
+      },
+      "deficit": {
+        "type": "String"
+      },
+      "intake": {
+        "type": "String"
+      }
+    }
+  },
+  "goalFixedEquation": "Fixed intake: {intake} kcal; no extra calorie offset is added.",
+  "@goalFixedEquation": {
+    "placeholders": {
+      "intake": {
+        "type": "String"
+      }
+    }
+  },
+  "goalLegacyOffsetNotice": "The old calorie offset ({offset} kcal) is excluded from this new plan. Saving uses only the target shown here.",
+  "@goalLegacyOffsetNotice": {
+    "placeholders": {
+      "offset": {
+        "type": "String"
+      }
+    }
+  },
+  "exerciseNumberError": "Enter a number greater than 0 and no more than {maximum}.",
+  "@exerciseNumberError": {
+    "placeholders": {
+      "maximum": {
+        "type": "String"
+      }
+    }
+  },
+  "weeklyExerciseSchedule": "{sessions} sessions/week · {minutes} min/session",
+  "@weeklyExerciseSchedule": {
+    "placeholders": {
+      "sessions": {
+        "type": "String"
+      },
+      "minutes": {
+        "type": "String"
+      }
+    }
+  },
+  "exerciseActivePerSession": "Net activity: about {calories} kcal/session",
+  "@exerciseActivePerSession": {
+    "placeholders": {
+      "calories": {
+        "type": "String"
+      }
+    }
+  },
+  "weeklyExerciseAverage": "Weekly net exercise {weekly} kcal ÷ 7 = {daily} kcal/day",
+  "@weeklyExerciseAverage": {
+    "placeholders": {
+      "weekly": {
+        "type": "String"
+      },
+      "daily": {
         "type": "String"
       }
     }

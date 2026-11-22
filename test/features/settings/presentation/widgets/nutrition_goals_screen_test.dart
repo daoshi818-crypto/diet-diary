@@ -6,6 +6,12 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
+import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
+import 'package:opennutritracker/core/domain/entity/config_entity.dart';
+import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
+import 'package:opennutritracker/core/domain/usecase/get_config_usecase.dart';
+import 'package:opennutritracker/core/domain/usecase/get_user_usecase.dart';
 import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_gender_entity.dart';
@@ -15,6 +21,9 @@ import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/app_theme.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/nutrition_goals_screen.dart';
 import 'package:opennutritracker/generated/l10n.dart';
+import 'package:opennutritracker/core/utils/energy_unit_provider.dart';
+import 'package:opennutritracker/features/settings/presentation/widgets/kcal_goal_info_screen.dart';
+import 'package:provider/provider.dart';
 
 final _capture = GlobalKey();
 final _day = DateTime(2026, 11, 21);
@@ -37,6 +46,9 @@ Widget _wrap({
   UserEntity? user,
   double scale = 1,
   bool dark = false,
+  bool loadStored = false,
+  double tdee = 2400,
+  double legacyOffset = 0,
   Future<bool> Function(NutritionGoalPlan)? onSave,
 }) => MaterialApp(
   locale: const Locale('zh'),
@@ -53,16 +65,45 @@ Widget _wrap({
     child: RepaintBoundary(key: _capture, child: child!),
   ),
   home: NutritionGoalsScreen(
-    initialData: NutritionGoalsData(
-      tdee: 2400,
-      plan: plan ?? _plan(),
-      user: user,
-    ),
+    initialData: loadStored
+        ? null
+        : NutritionGoalsData(
+            tdee: tdee,
+            plan: plan ?? _plan(),
+            user: user,
+            legacyOffset: legacyOffset,
+          ),
     onSave: onSave ?? (_) async => false,
   ),
 );
 
 Finder _id(String value) => find.bySemanticsIdentifier(value);
+
+class _StoredConfig extends Fake implements GetConfigUsecase {
+  @override
+  Future<ConfigEntity> getConfig() async => ConfigEntity(
+    true,
+    true,
+    false,
+    AppThemeEntity.system,
+    userKcalAdjustment: 200,
+  );
+}
+
+class _StoredUser extends Fake implements GetUserUsecase {
+  @override
+  Future<UserEntity> getUserData() async {
+    final day = DateTime.now().subtract(const Duration(days: 1));
+    return UserEntity(
+      birthday: DateTime(day.year - 24, day.month, day.day),
+      heightCM: 175,
+      weightKG: 68,
+      gender: UserGenderEntity.male,
+      pal: UserPALEntity.active,
+      goal: UserWeightGoalEntity.maintainWeight,
+    );
+  }
+}
 
 Future<void> _show(WidgetTester tester, Finder finder) async {
   if (finder.evaluate().isEmpty) {
@@ -128,6 +169,118 @@ void main() {
     }
   });
 
+  testWidgets('2500 minus 200 is 2300; the deficit can be cleared to zero', (
+    tester,
+  ) async {
+    NutritionGoalPlan? saved;
+    await tester.pumpWidget(
+      _wrap(
+        tdee: 2500,
+        legacyOffset: 200,
+        plan: NutritionGoalPlan(
+          effectiveFrom: _day,
+          energyMode: EnergyGoalMode.deficit,
+          energyValue: 200,
+          macroMode: MacroGoalMode.percentage,
+          carbs: 50,
+          protein: 25,
+          fat: 25,
+          referenceWeightKg: 68,
+        ),
+        onSave: (plan) async {
+          saved = plan;
+          return false;
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('2300 kcal'), findsOneWidget);
+    expect(
+      find.textContaining('TDEE 2500 − 缺口 200 ＝ 目标摄入 2300'),
+      findsOneWidget,
+    );
+    await _edit(tester, 'goals-energy-input', '');
+    await _save(tester);
+    expect(saved!.energyValue, 0);
+    expect(saved!.calorieTarget(2500), 2500);
+    await _edit(tester, 'goals-energy-input', '200');
+    await _save(tester);
+    expect(saved!.calorieTarget(2500), 2300);
+  });
+
+  testWidgets(
+    'new plan excludes an old +200 offset and defaults to split activity',
+    (tester) async {
+      GetIt.I.registerSingleton<GetConfigUsecase>(_StoredConfig());
+      GetIt.I.registerSingleton<GetUserUsecase>(_StoredUser());
+      addTearDown(GetIt.I.reset);
+      NutritionGoalPlan? saved;
+      await tester.pumpWidget(
+        _wrap(
+          loadStored: true,
+          onSave: (plan) async {
+            saved = plan;
+            return false;
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('旧版热量调整（200 kcal）不计入本次新目标'), findsOneWidget);
+      await _save(tester);
+      expect(saved!.energyMode, EnergyGoalMode.deficit);
+      expect(saved!.energyValue, 0);
+      expect(saved!.tdeeMethod, TdeeMethod.mifflinWeeklyActivity);
+      expect(saved!.activityPlan, const ActivityPlan());
+      expect(saved!.calorieTarget(1990.5), 1990.5);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'calculation details follow the unsaved deficit and activity plan',
+    (tester) async {
+      final user = await _StoredUser().getUserData();
+      await tester.pumpWidget(
+        ChangeNotifierProvider(
+          create: (_) => EnergyUnitProvider(),
+          child: _wrap(
+            user: user,
+            plan: NutritionGoalPlan(
+              effectiveFrom: _day,
+              energyMode: EnergyGoalMode.deficit,
+              energyValue: 200,
+              macroMode: MacroGoalMode.percentage,
+              carbs: 50,
+              protein: 25,
+              fat: 25,
+              referenceWeightKg: 68,
+              tdeeMethod: TdeeMethod.mifflinWeeklyActivity,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _edit(tester, 'goals-energy-input', '350');
+      tester.testTextInput.hide();
+      tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position
+          .jumpTo(0);
+      await tester.pumpAndSettle();
+      await _show(tester, _id('goals-calculation-info'));
+      await tester.tap(_id('goals-calculation-info'));
+      await tester.pumpAndSettle();
+      final screen = tester.widget<KcalGoalInfoScreen>(
+        find.byType(KcalGoalInfoScreen),
+      );
+      expect(screen.breakdown!.plan!.energyValue, 350);
+      expect(screen.breakdown!.tdeeKcal, closeTo(1990.5, .001));
+      expect(screen.breakdown!.totalKcalGoal, closeTo(1640.5, .001));
+      expect(screen.breakdown!.manualKcalAdjustment, 0);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('65 kg coefficients keep the independent 1800 kcal target', (
     tester,
   ) async {
@@ -159,6 +312,64 @@ void main() {
     expect(saved!.calorieTarget(2400), 1800);
     expect(saved!.macroGoals(1800), const MacroGoals(195, 104, 45.5));
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('split TDEE editor fits a small screen at scale $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final user = await _StoredUser().getUserData();
+      await tester.pumpWidget(
+        _wrap(
+          user: user,
+          scale: scale,
+          plan: NutritionGoalPlan(
+            effectiveFrom: _day,
+            energyMode: EnergyGoalMode.deficit,
+            energyValue: 200,
+            macroMode: MacroGoalMode.percentage,
+            carbs: 50,
+            protein: 25,
+            fat: 25,
+            referenceWeightKg: 68,
+            tdeeMethod: TdeeMethod.mifflinWeeklyActivity,
+            activityPlan: const ActivityPlan(
+              exercises: [
+                WeeklyExercise(
+                  type: PlannedExerciseType.strength,
+                  sessionsPerWeek: 2,
+                  minutesPerSession: 45,
+                ),
+                WeeklyExercise(
+                  type: PlannedExerciseType.cardio,
+                  sessionsPerWeek: 3,
+                  minutesPerSession: 35,
+                  energySource: ExerciseEnergySource.activeCalories,
+                  caloriesPerSession: 250,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await _screenshot(tester, 'split-tdee-top-$scale');
+      await _show(tester, _id('activity-plan-daily-sedentary'));
+      await _screenshot(tester, 'split-tdee-daily-$scale');
+      await _show(tester, _id('activity-plan-add-exercise'));
+      await _screenshot(tester, 'split-tdee-workouts-$scale');
+      await tester.tap(_id('activity-plan-add-exercise'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await _screenshot(tester, 'split-tdee-dialog-$scale');
+      Navigator.of(tester.element(find.byType(AlertDialog))).pop();
+      await tester.pumpAndSettle();
+      await _edit(tester, 'goals-energy-input', '200');
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
     'TDEE activity factor and custom deficit update the same saved plan',

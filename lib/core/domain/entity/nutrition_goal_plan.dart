@@ -1,12 +1,13 @@
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
+import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
 
 enum MacroGoalMode { grams, percentage, perKg }
 
 enum EnergyGoalMode { fixed, deficit }
 
-enum TdeeMethod { iom2005, mifflinStJeor }
+enum TdeeMethod { iom2005, mifflinStJeor, mifflinWeeklyActivity }
 
 class MacroGoals extends Equatable {
   final double carbs;
@@ -37,6 +38,7 @@ class NutritionGoalPlan extends Equatable {
   final double referenceWeightKg;
   final TdeeMethod tdeeMethod;
   final double activityMultiplier;
+  final ActivityPlan activityPlan;
 
   const NutritionGoalPlan({
     required this.effectiveFrom,
@@ -49,6 +51,7 @@ class NutritionGoalPlan extends Equatable {
     required this.referenceWeightKg,
     this.tdeeMethod = TdeeMethod.iom2005,
     this.activityMultiplier = 1.5,
+    this.activityPlan = const ActivityPlan(),
   });
 
   double calorieTarget(double tdee) =>
@@ -69,6 +72,7 @@ class NutritionGoalPlan extends Equatable {
   };
 
   bool get isValid {
+    if (!activityPlan.isValid) return false;
     if (![
       energyValue,
       carbs,
@@ -112,6 +116,7 @@ class NutritionGoalPlan extends Equatable {
       referenceWeightKg: referenceWeightKg,
       tdeeMethod: tdeeMethod,
       activityMultiplier: activityMultiplier,
+      activityPlan: activityPlan,
     );
   }
 
@@ -146,9 +151,14 @@ class NutritionGoalPlan extends Equatable {
     'referenceWeightKg': referenceWeightKg,
     'tdeeMethod': tdeeMethod.name,
     'activityMultiplier': activityMultiplier,
+    'activityPlan': activityPlan.toJson(),
   };
 
   factory NutritionGoalPlan.fromJson(Map<String, dynamic> json) {
+    if (json['tdeeMethod'] == TdeeMethod.mifflinWeeklyActivity.name &&
+        !json.containsKey('activityPlan')) {
+      throw const FormatException('Weekly TDEE requires an activity plan');
+    }
     double number(String key) {
       final value = json[key];
       if (value is! num || !value.isFinite) {
@@ -176,6 +186,11 @@ class NutritionGoalPlan extends Equatable {
       activityMultiplier: json.containsKey('activityMultiplier')
           ? number('activityMultiplier')
           : 1.5,
+      activityPlan: json.containsKey('activityPlan')
+          ? ActivityPlan.fromJson(
+              Map<String, dynamic>.from(json['activityPlan'] as Map),
+            )
+          : const ActivityPlan(),
     );
     if (!plan.isValid) throw const FormatException('Invalid nutrition goals');
     return plan;
@@ -193,6 +208,7 @@ class NutritionGoalPlan extends Equatable {
     referenceWeightKg,
     tdeeMethod,
     activityMultiplier,
+    activityPlan,
   ];
 }
 

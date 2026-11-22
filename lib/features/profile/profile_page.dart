@@ -2,6 +2,8 @@ import 'package:opennutritracker/features/settings/presentation/widgets/nutritio
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:opennutritracker/core/domain/entity/body_weight_unit_entity.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
+import 'package:opennutritracker/core/presentation/widgets/activity_plan_editor.dart';
 import 'package:opennutritracker/core/domain/entity/calories_profile_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_bmi_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
@@ -77,6 +79,7 @@ class _ProfilePageState extends State<ProfilePage> {
             state.usesImperialHeightUnits,
             state.effectiveWaterGoalMl,
             state.usesImperialFoodUnits,
+            state.nutritionPlan,
           );
         } else {
           return _getLoadingContent();
@@ -97,6 +100,7 @@ class _ProfilePageState extends State<ProfilePage> {
     bool usesImperialHeightUnits,
     int effectiveWaterGoalMl,
     bool usesImperialFoodUnits,
+    NutritionGoalPlan? nutritionPlan,
   ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final palette = isDark ? AppPalette.dark : AppPalette.light;
@@ -134,18 +138,29 @@ class _ProfilePageState extends State<ProfilePage> {
               palette: palette,
               icon: Icons.directions_walk_rounded,
               title: S.of(context).activityLabel,
-              subtitle: user.pal.getName(context),
-              onTap: () => _showSetPALCategoryDialog(context, user),
+              subtitle: switch (nutritionPlan?.tdeeMethod) {
+                TdeeMethod.mifflinWeeklyActivity => dailyActivityTitle(
+                  S.of(context), nutritionPlan!.activityPlan.dailyActivity),
+                TdeeMethod.mifflinStJeor => '${S.of(context).goalActivityFactor} ×${nutritionPlan!.activityMultiplier}',
+                _ => user.pal.getName(context),
+              },
+              onTap: () => nutritionPlan?.tdeeMethod == TdeeMethod.mifflinWeeklyActivity ||
+                  nutritionPlan?.tdeeMethod == TdeeMethod.mifflinStJeor
+                ? openNutritionGoals(context) : _showSetPALCategoryDialog(context, user),
             ),
             _ProfileTile(
               identifier: 'profile-goal',
               palette: palette,
               icon: Icons.flag_rounded,
               title: S.of(context).goalLabel,
-              subtitle: user.goal.getName(context),
-              onTap: () => _showSetGoalDialog(context, user),
+              subtitle: nutritionPlan == null ? user.goal.getName(context) :
+                '${nutritionPlan.energyMode == EnergyGoalMode.fixed
+                  ? S.of(context).goalIntakeLabel : S.of(context).goalDeficitInput} '
+                '${nutritionPlan.energyValue.round()} kcal',
+              onTap: () => nutritionPlan == null
+                ? _showSetGoalDialog(context, user) : openNutritionGoals(context),
             ),
-            _ProfileTile(
+            if (nutritionPlan == null) _ProfileTile(
               identifier: 'profile-weekly-goal',
               palette: palette,
               icon: Icons.trending_down_rounded,
@@ -221,7 +236,7 @@ class _ProfilePageState extends State<ProfilePage> {
             // as current weight approaches the target. Surfaced here only
             // once a target weight is set, since without one the toggle
             // has nothing to scale against.
-            if (user.targetWeightKg != null)
+            if (user.targetWeightKg != null && nutritionPlan == null)
               _ProfileSwitchTile(
                 identifier: 'profile-calorie-taper',
                 palette: palette,

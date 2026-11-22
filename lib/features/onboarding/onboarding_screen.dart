@@ -258,6 +258,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           bodyWidget: OnboardingActivityPageBody(
             setButtonContent: _setActivityPageData,
             initialActivity: selection.activity,
+            initialPlan: selection.activityPlan,
+            weightKg: selection.weight,
+            onPlanChanged: (plan) => selection.activityPlan = plan,
           ),
           footer: HighlightButton(
             buttonLabel: S.of(context).buttonNextLabel,
@@ -274,6 +277,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           bodyWidget: OnboardingGoalPageBody(
             setButtonContent: _setGoalPageData,
             initialGoal: selection.goal,
+            initialDeficit: selection.dailyCalorieDeficit,
+            estimatedTdee: _onboardingBloc.getOverviewBreakdown()?.tdeeKcal,
+            onDeficitChanged: (value) => selection.dailyCalorieDeficit = value,
             heightCm: selection.height,
             weightKg: selection.weight,
             targetWeightKg: selection.targetWeight,
@@ -446,7 +452,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void checkUserDataProvided() {
-    _onboardingBloc.userSelection.checkDataProvided()
+    (_onboardingBloc.userSelection.checkDataProvided() &&
+        _onboardingBloc.getOverviewCalorieGoal() != null)
         ? _setOverviewPageContent(true)
         : _setOverviewPageContent(false);
   }

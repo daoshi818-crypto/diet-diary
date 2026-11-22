@@ -36,10 +36,10 @@ void main() {
   ) async {
     await pumpPage(tester);
 
-    expect(find.text(l10nEn.palSedentaryDescriptionLabel), findsOneWidget);
-    expect(find.text(l10nEn.palLowActiveDescriptionLabel), findsOneWidget);
-    expect(find.text(l10nEn.palActiveDescriptionLabel), findsOneWidget);
-    expect(find.text(l10nEn.palVeryActiveDescriptionLabel), findsOneWidget);
+    expect(find.text(l10nEn.dailyActivitySedentaryHint), findsOneWidget);
+    expect(find.text(l10nEn.dailyActivityLightHint), findsOneWidget);
+    expect(find.text(l10nEn.dailyActivityModerateHint), findsOneWidget);
+    expect(find.text(l10nEn.dailyActivityStrenuousHint), findsOneWidget);
   });
 
   testWidgets('nothing is selected until the user picks', (tester) async {
@@ -63,7 +63,7 @@ void main() {
       },
     );
 
-    await tester.tap(find.text(l10nEn.palVeryActiveLabel));
+    await tester.tap(find.bySemanticsIdentifier('onboarding-activity-very'));
     await tester.pump();
 
     expect(reported, UserActivitySelectionEntity.veryActive);
@@ -75,9 +75,11 @@ void main() {
     UserActivitySelectionEntity? reported;
     await pumpPage(tester, onSelected: (_, activity) => reported = activity);
 
-    await tester.tap(find.text(l10nEn.palSedentaryLabel));
+    await tester.tap(
+      find.bySemanticsIdentifier('onboarding-activity-sedentary'),
+    );
     await tester.pump();
-    await tester.tap(find.text(l10nEn.palActiveLabel));
+    await tester.tap(find.bySemanticsIdentifier('onboarding-activity-active'));
     await tester.pump();
 
     expect(reported, UserActivitySelectionEntity.active);

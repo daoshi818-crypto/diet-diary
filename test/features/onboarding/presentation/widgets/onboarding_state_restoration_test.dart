@@ -138,7 +138,7 @@ void main() {
       expect(
         find.descendant(
           of: find.ancestor(
-            of: find.text(l10nEn.palActiveLabel),
+            of: find.textContaining(l10nEn.dailyActivityModerate),
             matching: find.byType(Row),
           ),
           matching: find.byIcon(Icons.radio_button_checked),

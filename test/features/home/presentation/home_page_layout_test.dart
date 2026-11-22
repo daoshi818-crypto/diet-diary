@@ -180,118 +180,205 @@ void main() {
     await GetIt.I.reset();
   });
 
-  for (final scale in [1.0, 2.0]) {
-    testWidgets('main shell keeps controls clear of the safe area at $scale', (
-      tester,
-    ) async {
-      tester.view.physicalSize = const Size(375, 667);
-      tester.view.devicePixelRatio = 1;
-      tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
-      tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
-      addTearDown(tester.view.reset);
-      GetIt.I.registerSingleton<GetConfigUsecase>(_Config());
-      GetIt.I.registerSingleton<DiaryBloc>(_Diary());
-      GetIt.I.registerSingleton<CalendarDayBloc>(_Calendar());
-      GetIt.I.registerSingleton<ActivityDetailBloc>(_Activity());
-      GetIt.I.registerSingleton<ProfileBloc>(_Profile());
-      GetIt.I.registerSingleton<TrendsBloc>(_Trends());
-      final pushed = <RouteSettings>[];
-      await tester.pumpWidget(
-        ChangeNotifierProvider(
-          create: (_) => EnergyUnitProvider(),
-          child: MaterialApp(
-            locale: const Locale('zh'),
-            localizationsDelegates: const [
-              S.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: S.supportedLocales,
-            theme: buildAppTheme(AppPalette.light),
-            builder: (context, child) => MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(scale)),
-              child: RepaintBoundary(key: _capture, child: child!),
-            ),
-            onGenerateRoute: (settings) {
-              pushed.add(settings);
-              return MaterialPageRoute<void>(builder: (_) => const Scaffold());
-            },
-            home: const MainScreen(),
-          ),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      final water = find.bySemanticsIdentifier('home-quick-water');
-      final food = find.bySemanticsIdentifier('home-quick-food');
-      expect(tester.getSize(water), const Size(48, 48));
-      expect(tester.getSize(food), const Size(48, 48));
-      expect(
-        tester.getRect(find.byType(HomePage)).bottom,
-        lessThanOrEqualTo(tester.getRect(water).top),
-      );
-      final nav = ['nav-home', 'nav-diary', 'nav-trends', 'nav-you'];
-      expect(
-        tester.getSize(find.byType(BottomAppBar)).height,
-        closeTo(78 + 60 + 34 + 12 * (scale - 1), .01),
-      );
-      for (final id in nav) {
-        final rect = tester.getRect(find.bySemanticsIdentifier(id));
-        expect(rect.bottom, lessThanOrEqualTo(667 - 34));
-        expect(rect.width, closeTo(375 / 4, .01));
-        expect(rect.height, greaterThanOrEqualTo(48));
+  for (final size in [const Size(375, 667), const Size(812, 375)]) {
+    for (final dark in [false, true]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'main shell $size dark=$dark keeps controls clear at $scale',
+          (tester) async {
+            tester.view.physicalSize = size;
+            tester.view.devicePixelRatio = 1;
+            tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+            tester.view.viewPadding = const FakeViewPadding(
+              top: 24,
+              bottom: 34,
+            );
+            addTearDown(tester.view.reset);
+            GetIt.I.registerSingleton<GetConfigUsecase>(_Config());
+            GetIt.I.registerSingleton<DiaryBloc>(_Diary());
+            GetIt.I.registerSingleton<CalendarDayBloc>(_Calendar());
+            GetIt.I.registerSingleton<ActivityDetailBloc>(_Activity());
+            GetIt.I.registerSingleton<ProfileBloc>(_Profile());
+            GetIt.I.registerSingleton<TrendsBloc>(_Trends());
+            final pushed = <RouteSettings>[];
+            await tester.pumpWidget(
+              ChangeNotifierProvider(
+                create: (_) => EnergyUnitProvider(),
+                child: MaterialApp(
+                  locale: const Locale('zh'),
+                  localizationsDelegates: const [
+                    S.delegate,
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: S.supportedLocales,
+                  theme: buildAppTheme(
+                    dark ? AppPalette.dark : AppPalette.light,
+                  ),
+                  builder: (context, child) => MediaQuery(
+                    data: MediaQuery.of(
+                      context,
+                    ).copyWith(textScaler: TextScaler.linear(scale)),
+                    child: RepaintBoundary(key: _capture, child: child!),
+                  ),
+                  onGenerateRoute: (settings) {
+                    pushed.add(settings);
+                    return MaterialPageRoute<void>(
+                      builder: (_) => const Scaffold(),
+                    );
+                  },
+                  home: const MainScreen(),
+                ),
+              ),
+            );
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            final water = find.bySemanticsIdentifier('home-quick-water');
+            final food = find.bySemanticsIdentifier('home-quick-food');
+            expect(tester.getSize(water), const Size(48, 48));
+            expect(tester.getSize(food), const Size(48, 48));
+            final add = find.bySemanticsIdentifier('fab-add-item');
+            expect(add, findsOneWidget);
+            expect(
+              tester.getRect(food).center.dx,
+              tester.getRect(water).center.dx,
+            );
+            expect(
+              tester.getRect(food).bottom + 8,
+              lessThanOrEqualTo(tester.getRect(water).top),
+            );
+            final navBar = find.byType(BottomAppBar);
+            expect(find.ancestor(of: food, matching: navBar), findsNothing);
+            expect(find.ancestor(of: water, matching: navBar), findsNothing);
+            expect(tester.getRect(food).left, greaterThan(size.width / 2));
+            expect(
+              tester.getRect(water).bottom + 8,
+              lessThanOrEqualTo(tester.getRect(navBar).top),
+            );
+            expect(
+              tester.getRect(food).top,
+              greaterThanOrEqualTo(tester.getRect(find.byType(HomePage)).top),
+            );
+            expect(tester.getRect(add).overlaps(tester.getRect(food)), isFalse);
+            expect(
+              tester.getRect(add).overlaps(tester.getRect(water)),
+              isFalse,
+            );
+            final nav = ['nav-home', 'nav-diary', 'nav-trends', 'nav-you'];
+            expect(
+              tester.getSize(find.byType(BottomAppBar)).height,
+              closeTo(78 + 34 + 12 * (scale - 1), .01),
+            );
+            for (final id in nav) {
+              final rect = tester.getRect(find.bySemanticsIdentifier(id));
+              expect(rect.bottom, lessThanOrEqualTo(size.height - 34));
+              expect(rect.width, closeTo((size.width - 56) / 4, .01));
+              expect(rect.height, greaterThanOrEqualTo(48));
+            }
+            if (const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) {
+              await tester.runAsync(() async {
+                final dir = Directory(
+                  const String.fromEnvironment('GOAL_PREVIEW_DIR'),
+                );
+                await dir.create(recursive: true);
+                final boundary =
+                    _capture.currentContext!.findRenderObject()!
+                        as RenderRepaintBoundary;
+                final img = await boundary.toImage(pixelRatio: 1.5);
+                final bytes = await img.toByteData(
+                  format: ui.ImageByteFormat.png,
+                );
+                await File(
+                  '${dir.path}/main-shell-${size.width.toInt()}-$dark-$scale.png',
+                ).writeAsBytes(bytes!.buffer.asUint8List());
+                img.dispose();
+              });
+            }
+            final scrollable = find
+                .descendant(
+                  of: find.byType(HomePage),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            final dinner = find.byWidgetPredicate(
+              (widget) => widget is IntakeVerticalList && widget.title == '晚餐',
+            );
+            await tester.scrollUntilVisible(
+              dinner,
+              180,
+              scrollable: scrollable,
+            );
+            final lastMenu = find.descendant(
+              of: dinner,
+              matching: find.bySemanticsIdentifier('intake-section-menu'),
+            );
+            await Scrollable.ensureVisible(
+              tester.element(lastMenu),
+              alignment: 0,
+            );
+            await tester.pump();
+            expect(lastMenu.hitTestable(), findsOneWidget);
+            expect(
+              tester.getRect(lastMenu).overlaps(tester.getRect(food)),
+              isFalse,
+            );
+            expect(
+              tester.getRect(lastMenu).overlaps(tester.getRect(water)),
+              isFalse,
+            );
+            await tester.tap(add);
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            expect(
+              find.byKey(const ValueKey('logging-hub-panel')),
+              findsOneWidget,
+            );
+            Navigator.of(
+              tester.element(find.byKey(const ValueKey('logging-hub-panel'))),
+            ).pop();
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            await tester.tapAt(tester.getTopLeft(water) + const Offset(3, 3));
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            expect(find.byType(LogWaterDialog), findsOneWidget);
+            await tester.tap(find.bySemanticsIdentifier('log-water-save'));
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            expect(home.water, 750);
+            await tester.tap(food);
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            expect(pushed.single.name, NavigationOptions.addMealRoute);
+            expect(
+              (pushed.single.arguments as AddMealScreenArguments).day,
+              _day,
+            );
+            final navigator = tester.state<NavigatorState>(
+              find.byType(Navigator).first,
+            );
+            navigator.pop();
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            await tester.tap(find.bySemanticsIdentifier('nav-diary'));
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            await tester.tap(find.bySemanticsIdentifier('fab-add-item'));
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 500));
+            final panel = find.byKey(const ValueKey('logging-hub-panel'));
+            expect(
+              tester.getRect(panel).top,
+              greaterThanOrEqualTo(size.height / 2),
+            );
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+            await tester.pump();
+          },
+        );
       }
-      if (const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) {
-        await tester.runAsync(() async {
-          final dir = Directory(
-            const String.fromEnvironment('GOAL_PREVIEW_DIR'),
-          );
-          await dir.create(recursive: true);
-          final boundary =
-              _capture.currentContext!.findRenderObject()!
-                  as RenderRepaintBoundary;
-          final img = await boundary.toImage(pixelRatio: 1.5);
-          final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-          await File(
-            '${dir.path}/main-shell-$scale.png',
-          ).writeAsBytes(bytes!.buffer.asUint8List());
-          img.dispose();
-        });
-      }
-      await tester.tap(water);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(find.byType(LogWaterDialog), findsOneWidget);
-      await tester.tap(find.bySemanticsIdentifier('log-water-save'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(home.water, 750);
-      await tester.tap(food);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(pushed.single.name, NavigationOptions.addMealRoute);
-      expect((pushed.single.arguments as AddMealScreenArguments).day, _day);
-      final navigator = tester.state<NavigatorState>(
-        find.byType(Navigator).first,
-      );
-      navigator.pop();
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.bySemanticsIdentifier('nav-diary'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      await tester.tap(find.bySemanticsIdentifier('fab-add-item'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
-      final panel = find.byKey(const ValueKey('logging-hub-panel'));
-      expect(tester.getRect(panel).top, greaterThanOrEqualTo(667 / 2));
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox.shrink());
-      await tester.pump();
-    });
+    }
   }
 
   for (final size in [const Size(375, 667), const Size(812, 375)]) {

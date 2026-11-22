@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
+import 'package:opennutritracker/core/presentation/widgets/activity_plan_editor.dart';
 import 'package:opennutritracker/core/domain/entity/kcal_goal_breakdown_entity.dart';
 import 'package:opennutritracker/core/presentation/sources_screen.dart';
 import 'package:opennutritracker/core/presentation/widgets/low_kcal_warning_card.dart';
@@ -202,7 +204,16 @@ class OnboardingOverviewPageBody extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDerivationRow(
+          if (breakdown.plan?.tdeeMethod == TdeeMethod.mifflinWeeklyActivity)
+            ActivityPlanSummary(
+              plan: breakdown.plan!.activityPlan,
+              weightKg: breakdown.weightKG,
+              restingKcal: (breakdown.tdeeKcal -
+                  breakdown.plan!.activityPlan.dailyExerciseCalories(breakdown.weightKG)) /
+                  breakdown.plan!.activityPlan.dailyActivity.multiplier,
+              formatEnergy: (value) => EnergyDisplay.formatWithUnit(context, value),
+            )
+          else _buildDerivationRow(
             context,
             S.of(context).kcalGoalInfoTdeeResultLabel,
             EnergyDisplay.formatWithUnit(context, breakdown.tdeeKcal),

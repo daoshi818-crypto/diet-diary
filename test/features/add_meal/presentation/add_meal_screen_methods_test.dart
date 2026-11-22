@@ -1,4 +1,9 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -133,41 +138,195 @@ Future<void> _register({bool imperial = false, bool aiHidden = false}) async {
 
 /// The add-food screen at the root, and a stub for every route it pushes
 /// that records what it was asked for.
-Widget _app(List<RouteSettings> pushed, {MealEntity? initialMeal}) =>
-    ChangeNotifierProvider(
-      create: (_) => EnergyUnitProvider(),
-      child: MaterialApp(
-        localizationsDelegates: const [
-          S.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: S.supportedLocales,
-        onGenerateRoute: (settings) {
-          if (settings.name == Navigator.defaultRouteName) {
-            return MaterialPageRoute<void>(
-              settings: RouteSettings(
-                name: settings.name,
-                arguments: AddMealScreenArguments(
-                  AddMealType.breakfastType,
-                  DateTime(2026, 10, 18),
-                  initialMeal: initialMeal,
-                ),
-              ),
-              builder: (_) => const AddMealScreen(),
-            );
-          }
-          pushed.add(settings);
-          return MaterialPageRoute<void>(
-            settings: settings,
-            builder: (_) => const Scaffold(body: SizedBox()),
-          );
-        },
+final _captureAdd = GlobalKey();
+
+Widget _app(
+  List<RouteSettings> pushed, {
+  MealEntity? initialMeal,
+  bool chinese = false,
+  bool dark = false,
+  double scale = 1,
+}) => ChangeNotifierProvider(
+  create: (_) => EnergyUnitProvider(),
+  child: MaterialApp(
+    locale: chinese ? const Locale('zh') : const Locale('en'),
+    theme: ThemeData(
+      fontFamily: 'Nunito',
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFF555E8C),
+        brightness: dark ? Brightness.dark : Brightness.light,
       ),
-    );
+    ),
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(scale)),
+      child: RepaintBoundary(key: _captureAdd, child: child!),
+    ),
+    localizationsDelegates: const [
+      S.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: S.supportedLocales,
+    onGenerateRoute: (settings) {
+      if (settings.name == Navigator.defaultRouteName) {
+        return MaterialPageRoute<void>(
+          settings: RouteSettings(
+            name: settings.name,
+            arguments: AddMealScreenArguments(
+              AddMealType.breakfastType,
+              DateTime(2026, 10, 18),
+              initialMeal: initialMeal,
+            ),
+          ),
+          builder: (_) => const AddMealScreen(),
+        );
+      }
+      pushed.add(settings);
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const Scaffold(body: SizedBox()),
+      );
+    },
+  ),
+);
+
+Future<void> _captureScreen(
+  WidgetTester tester,
+  Size size,
+  double scale,
+) async {
+  if (const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) {
+    await tester.runAsync(() async {
+      final boundary =
+          _captureAdd.currentContext!.findRenderObject()!
+              as RenderRepaintBoundary;
+      final img = await boundary.toImage(pixelRatio: 1.5);
+      final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+      final dir = Directory(const String.fromEnvironment('GOAL_PREVIEW_DIR'));
+      await dir.create(recursive: true);
+      await File(
+        '${dir.path}/add-food-${size.width.toInt()}-'
+        '${size.height.toInt()}-$scale.png',
+      ).writeAsBytes(bytes!.buffer.asUint8List());
+      img.dispose();
+    });
+  }
+}
 
 void main() {
+  setUpAll(() async {
+    if (!const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) return;
+    await (FontLoader('CustomIcons')..addFont(
+          File(
+            'fonts/CustomIcons.ttf',
+          ).readAsBytes().then(ByteData.sublistView),
+        ))
+        .load();
+    await (FontLoader('Nunito')..addFont(
+          File(
+            'C:/Windows/Fonts/msyh.ttc',
+          ).readAsBytes().then(ByteData.sublistView),
+        ))
+        .load();
+    final icons = Platform.environment['FOOD_PREVIEW_ICON_FONT'];
+    if (icons != null) {
+      await (FontLoader(
+        'MaterialIcons',
+      )..addFont(File(icons).readAsBytes().then(ByteData.sublistView))).load();
+    }
+  });
+  for (final size in const [Size(375, 812), Size(360, 640), Size(812, 375)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('Chinese food search remains usable at $size / $scale', (
+        tester,
+      ) async {
+        await _register();
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        final meal = const NutritionLabelDraft(
+          name: '原味燕麦片',
+          basisQuantity: 100,
+          energy: 263,
+          energyUnit: 'kcal',
+          protein: 8,
+          fat: 3,
+          carbs: 51,
+        ).toMeal();
+        await tester.pumpWidget(
+          _app(
+            [],
+            initialMeal: meal,
+            chinese: true,
+            dark: scale == 2,
+            scale: scale,
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsIdentifier('meal-detail-add'));
+        await tester.pumpAndSettle();
+        final search = find.bySemanticsIdentifier('meal-search-field');
+        final submit = find.bySemanticsIdentifier('meal-search-submit');
+        final recent = find.widgetWithText(ChoiceChip, '最近');
+        final review = find.bySemanticsIdentifier('add-meal-review-tray');
+        final log = find.bySemanticsIdentifier('add-meal-tray-log');
+        expect(search.hitTestable(), findsOneWidget);
+        expect(submit.hitTestable(), findsOneWidget);
+        expect(recent.hitTestable(), findsOneWidget);
+        expect(review.hitTestable(), findsOneWidget);
+        expect(log.hitTestable(), findsOneWidget);
+        expect(find.text('记录 1 项'), findsOneWidget);
+        expect(find.textContaining('"记录'), findsNothing);
+        final initialSearch = tester.getRect(search);
+        final initialRecent = tester.getRect(recent);
+        expect(initialSearch.bottom, lessThanOrEqualTo(initialRecent.top));
+        expect(tester.getRect(log).bottom, lessThanOrEqualTo(size.height));
+        await _captureScreen(tester, size, scale);
+        await tester.drag(find.byType(NestedScrollView), const Offset(0, -400));
+        await tester.pumpAndSettle();
+        expect(tester.getRect(search), initialSearch);
+        expect(tester.getRect(recent), initialRecent);
+        expect(tester.getRect(review).overlaps(tester.getRect(log)), isFalse);
+        expect(tester.takeException(), isNull);
+        if (size.height > size.width) {
+          final field = find.descendant(
+            of: search,
+            matching: find.byType(TextField),
+          );
+          await tester.showKeyboard(field);
+          tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(log);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(log).bottom,
+            lessThanOrEqualTo(size.height - 280),
+          );
+          expect(tester.takeException(), isNull);
+          tester.view.viewInsets = FakeViewPadding.zero;
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+        }
+        await tester.tap(review);
+        await tester.pumpAndSettle();
+        expect(find.text('原味燕麦片'), findsOneWidget);
+        await tester.tap(find.bySemanticsIdentifier('add-meal-tray-remove'));
+        await tester.pumpAndSettle();
+        Navigator.of(tester.element(find.byType(LogTrayList))).pop();
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsIdentifier('add-meal-tray-log'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await getIt.reset();
+        await _favourites?.dispose();
+        _favourites = null;
+      });
+    }
+  }
+
   testWidgets(
     'saved nutrition label opens grams and adds the corrected amount',
     (tester) async {

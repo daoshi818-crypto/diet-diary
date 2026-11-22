@@ -59,6 +59,11 @@ jobs:
             test/core/presentation/widgets/logging_dialog_layout_test.dart \
             test/unit_test/nutrition_goal_plan_test.dart \
             test/unit_test/tdee_method_test.dart \
+            test/unit_test/weekly_activity_tdee_test.dart \
+            test/unit_test/onboarding_save_race_test.dart \
+            test/core/presentation/widgets/activity_plan_editor_test.dart \
+            test/features/onboarding/presentation/widgets/onboarding_goal_page_body_test.dart \
+            test/features/profile/presentation/profile_page_weight_test.dart \
             test/unit_test/nutrition_label_test.dart \
             test/unit_test/ai_model_list_api_test.dart \
             test/features/add_meal/presentation/nutrition_label_screen_test.dart \
@@ -70,6 +75,7 @@ jobs:
             test/features/home/presentation/widgets/dashboard_widget_test.dart \
             test/features/settings/presentation/bloc/settings_bloc_update_tracked_day_test.dart \
             test/features/settings/presentation/widgets/nutrition_goals_screen_test.dart \
+            test/features/settings/presentation/widgets/kcal_adjustment_dialog_typed_value_test.dart \
             test/features/settings/presentation/widgets/kcal_goal_info_screen_test.dart
       - name: Prepare release signing
         env:

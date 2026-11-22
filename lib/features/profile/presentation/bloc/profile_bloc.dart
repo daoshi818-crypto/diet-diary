@@ -2,6 +2,8 @@ import 'package:opennutritracker/core/domain/usecase/get_macro_goal_usecase.dart
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:opennutritracker/core/domain/entity/body_weight_unit_entity.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
+import 'package:opennutritracker/core/utils/calc/day_boundary_calc.dart';
 import 'package:opennutritracker/core/domain/entity/user_bmi_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_entity.dart';
 import 'package:opennutritracker/core/domain/usecase/add_tracked_day_usecase.dart';
@@ -50,6 +52,11 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
         ProfileLoadedState(
           userBMI: userBMIEntity,
           userEntity: user,
+          nutritionPlan: userConfig.nutritionGoalSchedule.onDay(
+            DayBoundaryCalc.currentLogicalDayMinutes(
+              userConfig.dayStartOffsetTotalMinutes,
+            ),
+          ),
           bodyWeightUnit: userConfig.bodyWeightUnit,
           usesImperialHeightUnits: userConfig.usesImperialHeightUnits,
           usesImperialFoodUnits: userConfig.usesImperialFoodUnits,

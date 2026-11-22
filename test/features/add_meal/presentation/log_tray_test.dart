@@ -730,7 +730,7 @@ void main() {
 
       await tester.tap(find.bySemanticsIdentifier('add-meal-tray-clear'));
       await tester.pumpAndSettle();
-      await tester.pageBack();
+      Navigator.of(tester.element(find.byType(LogTrayList))).pop();
       await tester.pumpAndSettle();
       expect(_logButton(), findsNothing);
       expect(_mealDetailBloc.writes, isEmpty);

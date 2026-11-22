@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
+import 'package:opennutritracker/core/domain/entity/config_entity.dart';
+import 'package:opennutritracker/core/domain/entity/app_theme_entity.dart';
+import 'package:opennutritracker/core/domain/entity/nutrition_goal_plan.dart';
+import 'package:opennutritracker/core/domain/usecase/get_config_usecase.dart';
+import 'package:opennutritracker/features/settings/presentation/widgets/nutrition_goals_screen.dart';
 import 'package:get_it/get_it.dart';
 import 'package:opennutritracker/core/domain/entity/body_weight_unit_entity.dart';
 import 'package:opennutritracker/core/domain/entity/user_bmi_entity.dart';
@@ -59,6 +65,19 @@ class _FakeGetUserUsecase extends Fake implements GetUserUsecase {
 
   @override
   Future<UserEntity> getUserData() async => user;
+}
+
+class _GoalConfig extends Fake implements GetConfigUsecase {
+  final NutritionGoalPlan plan;
+  _GoalConfig(this.plan);
+  @override
+  Future<ConfigEntity> getConfig() async => ConfigEntity(
+    true,
+    true,
+    false,
+    AppThemeEntity.system,
+    nutritionGoalSchedule: NutritionGoalSchedule([plan]),
+  );
 }
 
 /// Single-profile stub so ProfileSwitcherHeader (rendered unconditionally at
@@ -126,6 +145,57 @@ void main() {
     await fakeProfileBloc.close();
     await GetIt.instance.reset();
   });
+
+  testWidgets(
+    'planned activity opens the shared editor and hides ignored legacy controls',
+    (tester) async {
+      final now = DateTime.now();
+      final plan = NutritionGoalPlan(
+        effectiveFrom: DateTime(now.year, now.month, now.day),
+        energyMode: EnergyGoalMode.deficit,
+        energyValue: 200,
+        macroMode: MacroGoalMode.percentage,
+        carbs: 50,
+        protein: 25,
+        fat: 25,
+        referenceWeightKg: user.weightKG,
+        tdeeMethod: TdeeMethod.mifflinWeeklyActivity,
+        activityPlan: const ActivityPlan(),
+      );
+      final initialBloc = fakeProfileBloc;
+      await locator.unregister<ProfileBloc>();
+      fakeProfileBloc = _FakeProfileBloc(
+        ProfileLoadedState(
+          userBMI: const UserBMIEntity(
+            bmiValue: 24.7,
+            nutritionalStatus: UserNutritionalStatus.normalWeight,
+          ),
+          userEntity: user,
+          bodyWeightUnit: BodyWeightUnit.kg,
+          usesImperialHeightUnits: false,
+          effectiveWaterGoalMl: 2000,
+          nutritionPlan: plan,
+        ),
+      );
+      locator.registerSingleton<ProfileBloc>(fakeProfileBloc);
+      addTearDown(() => initialBloc.close());
+      locator.registerSingleton<GetConfigUsecase>(_GoalConfig(plan));
+      await tester.binding.setSurfaceSize(const Size(400, 2000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(_wrap(const ProfilePage()));
+      await tester.pumpAndSettle();
+      expect(find.text(l10nEn.dailyActivitySedentary), findsOneWidget);
+      expect(find.bySemanticsIdentifier('profile-weekly-goal'), findsNothing);
+      expect(find.bySemanticsIdentifier('profile-calorie-taper'), findsNothing);
+      await tester.tap(find.bySemanticsIdentifier('profile-activity'));
+      await tester.pumpAndSettle();
+      expect(find.byType(NutritionGoalsScreen), findsOneWidget);
+      expect(find.text(l10nEn.nutritionGoalsTitle), findsOneWidget);
+      Navigator.of(tester.element(find.byType(NutritionGoalsScreen))).pop();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('tapping the profile weight tile logs a weight-history entry '
       '(regression #510: Profile weight edits used to skip WeightLogBox)', (

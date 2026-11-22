@@ -17,6 +17,7 @@ class ProfileLoadingState extends ProfileState {
 class ProfileLoadedState extends ProfileState {
   final UserBMIEntity userBMI;
   final UserEntity userEntity;
+  final NutritionGoalPlan? nutritionPlan;
 
   // Granular unit preferences. Height (cm/ft) and body weight (kg/lb/st) are
   // chosen independently of the food unit preference.
@@ -33,6 +34,7 @@ class ProfileLoadedState extends ProfileState {
   const ProfileLoadedState({
     required this.userBMI,
     required this.userEntity,
+    this.nutritionPlan,
     required this.bodyWeightUnit,
     required this.usesImperialHeightUnits,
     this.usesImperialFoodUnits = false,
@@ -43,6 +45,7 @@ class ProfileLoadedState extends ProfileState {
   List<Object?> get props => [
         userBMI,
         userEntity,
+        nutritionPlan,
         bodyWeightUnit,
         usesImperialHeightUnits,
         usesImperialFoodUnits,

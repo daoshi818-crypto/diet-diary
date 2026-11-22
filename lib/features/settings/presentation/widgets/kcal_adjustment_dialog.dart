@@ -98,7 +98,9 @@ class _KcalAdjustmentDialogState extends State<KcalAdjustmentDialog> {
     // value stays consistent across unit toggles.
     final usesKj =
         Provider.of<EnergyUnitProvider>(context, listen: false).usesKilojoules;
-    final parsed = int.tryParse(_kcalController.text);
+    final parsed = int.tryParse(
+      _kcalController.text.trim().isEmpty ? '0' : _kcalController.text,
+    );
     if (parsed == null) {
       // Bad input — snap the field back to the last good value.
       final display =
