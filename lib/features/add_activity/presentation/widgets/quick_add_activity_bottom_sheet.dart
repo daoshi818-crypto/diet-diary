@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:logging/logging.dart';
@@ -11,7 +12,6 @@ import 'package:opennutritracker/core/utils/energy_unit_provider.dart';
 import 'package:opennutritracker/core/utils/id_generator.dart';
 import 'package:opennutritracker/core/utils/locator.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
-import 'package:opennutritracker/core/utils/sheet_bottom_inset.dart';
 import 'package:opennutritracker/features/diary/presentation/bloc/calendar_day_bloc.dart';
 import 'package:opennutritracker/features/diary/presentation/bloc/diary_bloc.dart';
 import 'package:opennutritracker/features/home/presentation/bloc/home_bloc.dart';
@@ -111,10 +111,10 @@ class _QuickAddActivityBottomSheetState
       // Resolve the message before navigating: the push below tears down
       // this sheet, so reading from context afterwards is unsafe.
       final addedMessage = S.of(context).quickAddActivityAddedSnack;
-      Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
-        NavigationOptions.mainRoute,
-        (route) => false,
-      );
+      Navigator.of(
+        context,
+        rootNavigator: true,
+      ).pushNamedAndRemoveUntil(NavigationOptions.mainRoute, (route) => false);
       scaffoldMessenger.showSnackBar(SnackBar(content: Text(addedMessage)));
     } catch (e, st) {
       _log.severe('Quick Add activity save failed', e, st);
@@ -129,71 +129,63 @@ class _QuickAddActivityBottomSheetState
     final usesKj = context.watch<EnergyUnitProvider>().usesKilojoules;
     final s = S.of(context);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          Dimens.spacing24,
-          Dimens.spacing8,
-          Dimens.spacing24,
-          Dimens.spacing24,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: Dimens.spacing16),
-              child: Text(
-                s.quickAddActivityTitleLabel,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                textAlign: TextAlign.center,
+    return AppModalSheet(
+      identifier: 'quick-add-activity',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: Dimens.spacing16),
+            child: Text(
+              s.quickAddActivityTitleLabel,
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          _field(
+            controller: _nameController,
+            identifier: 'quick-add-activity-name',
+            label: s.quickAddActivityNameLabel,
+            isRequired: false,
+            numeric: false,
+            autofocus: true,
+          ),
+          _field(
+            controller: _energyController,
+            identifier: 'quick-add-activity-energy',
+            label: usesKj
+                ? s.quickAddActivityEnergyLabelKj
+                : s.quickAddActivityEnergyLabelKcal,
+            isRequired: true,
+          ),
+          _field(
+            controller: _durationController,
+            identifier: 'quick-add-activity-duration',
+            label: s.quickAddActivityDurationLabel,
+            isRequired: false,
+          ),
+          const SizedBox(height: Dimens.spacing16),
+          Semantics(
+            identifier: 'quick-add-activity-submit',
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                shape: Dimens.shapeM,
+                padding: const EdgeInsets.symmetric(vertical: Dimens.spacing16),
               ),
+              onPressed: _canSubmit ? _onSubmit : null,
+              child: _saving
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(s.quickAddSubmitLabel),
             ),
-            _field(
-              controller: _nameController,
-              identifier: 'quick-add-activity-name',
-              label: s.quickAddActivityNameLabel,
-              isRequired: false,
-              numeric: false,
-              autofocus: true,
-            ),
-            _field(
-              controller: _energyController,
-              identifier: 'quick-add-activity-energy',
-              label: usesKj
-                  ? s.quickAddActivityEnergyLabelKj
-                  : s.quickAddActivityEnergyLabelKcal,
-              isRequired: true,
-            ),
-            _field(
-              controller: _durationController,
-              identifier: 'quick-add-activity-duration',
-              label: s.quickAddActivityDurationLabel,
-              isRequired: false,
-            ),
-            const SizedBox(height: Dimens.spacing16),
-            Semantics(
-              identifier: 'quick-add-activity-submit',
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  shape: Dimens.shapeM,
-                  padding: const EdgeInsets.symmetric(vertical: Dimens.spacing16),
-                ),
-                onPressed: _canSubmit ? _onSubmit : null,
-                child: _saving
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(s.quickAddSubmitLabel),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -216,8 +208,9 @@ class _QuickAddActivityBottomSheetState
         child: TextField(
           controller: controller,
           autofocus: autofocus,
-          textCapitalization:
-              numeric ? TextCapitalization.none : TextCapitalization.sentences,
+          textCapitalization: numeric
+              ? TextCapitalization.none
+              : TextCapitalization.sentences,
           keyboardType: numeric
               ? const TextInputType.numberWithOptions(decimal: true)
               : TextInputType.text,
@@ -230,11 +223,17 @@ class _QuickAddActivityBottomSheetState
             fillColor: palette.surfaceMuted,
             border: OutlineInputBorder(
               borderRadius: Dimens.borderRadiusM,
-              borderSide: BorderSide(color: palette.border, width: Dimens.hairline),
+              borderSide: BorderSide(
+                color: palette.border,
+                width: Dimens.hairline,
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: Dimens.borderRadiusM,
-              borderSide: BorderSide(color: palette.border, width: Dimens.hairline),
+              borderSide: BorderSide(
+                color: palette.border,
+                width: Dimens.hairline,
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: Dimens.borderRadiusM,

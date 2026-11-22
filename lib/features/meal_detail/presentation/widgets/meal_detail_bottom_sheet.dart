@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
@@ -171,41 +172,37 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        top: false,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * .7,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                child: Text(
-                  S.of(context).foodChoosePortion,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              Flexible(
-                child: Semantics(
-                  identifier: 'meal-detail-portion-options',
-                  container: true,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: options.length,
-                    itemBuilder: (context, index) => ListTile(
-                      key: ValueKey('portion-option-${options[index].id}'),
-                      leading: const Icon(Icons.straighten_rounded),
-                      title: Text(options[index].label),
-                      onTap: () => Navigator.of(context).pop(options[index]),
+      backgroundColor: Colors.transparent,
+      builder: (context) => AppModalSheet(
+        identifier: 'meal-detail-portions',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              S.of(context).foodChoosePortion,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Semantics(
+              identifier: 'meal-detail-portion-options',
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final option in options)
+                    Semantics(
+                      identifier: 'meal-detail-portion-${option.id}',
+                      child: ListTile(
+                        key: ValueKey('portion-option-${option.id}'),
+                        leading: const Icon(Icons.straighten_rounded),
+                        title: Text(option.label),
+                        onTap: () => Navigator.pop(context, option),
+                      ),
                     ),
-                  ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

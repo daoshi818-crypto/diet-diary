@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/add_meal/util/food_query.dart';
 import 'package:bloc_concurrency/bloc_concurrency.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -25,7 +26,7 @@ class RecentMealBloc extends Bloc<RecentMealEvent, RecentMealState> {
   Future<_RecentSnapshot>? _snapshot;
 
   RecentMealBloc(this._getIntakeUsecase, this._getConfigUsecase)
-      : super(RecentMealInitial()) {
+    : super(RecentMealInitial()) {
     on<LoadRecentMealEvent>((event, emit) async {
       _snapshot = null;
       await _emitFiltered(event.searchString, emit);
@@ -73,9 +74,7 @@ class RecentMealBloc extends Bloc<RecentMealEvent, RecentMealState> {
   }
 
   bool Function(IntakeEntity) matchesSearchString(String searchString) {
-    return (intake) =>
-        (intake.meal.name?.toLowerCase().contains(searchString) ?? false) ||
-        (intake.meal.brands?.toLowerCase().contains(searchString) ?? false);
+    return (intake) => foodMatchesQuery(intake.meal, searchString);
   }
 }
 

@@ -61,6 +61,8 @@ Future<void> _open(
             onPressed: () => showModalBottomSheet<void>(
               context: context,
               isScrollControlled: true,
+              useSafeArea: true,
+              backgroundColor: Colors.transparent,
               builder: (_) => AddItemBottomSheet(
                 day: DateTime(2026, 11, 19),
                 showActivityTracking: activity,
@@ -187,7 +189,7 @@ void main() {
     for (final dark in [false, true]) {
       for (final scale in [1.0, 2.0]) {
         testWidgets(
-          'hub stays below half screen $size dark=$dark scale=$scale',
+          'hub uses available height with a separate close $size dark=$dark scale=$scale',
           (tester) async {
             tester.view.physicalSize = size;
             tester.view.devicePixelRatio = 1;
@@ -202,9 +204,10 @@ void main() {
             final panel = tester.getRect(
               find.byKey(const ValueKey('logging-hub-panel')),
             );
-            expect(panel.height, lessThanOrEqualTo(size.height * .48 + 1));
-            expect(panel.top, greaterThanOrEqualTo(size.height * .45));
-            expect(panel.bottom, lessThanOrEqualTo(size.height - 24));
+            final close = tester.getRect(_id('logging-hub-close'));
+            expect(panel.top, greaterThanOrEqualTo(0));
+            expect(panel.bottom, lessThanOrEqualTo(close.top - 8));
+            expect(close.bottom, lessThanOrEqualTo(size.height - 24));
             expect(tester.takeException(), isNull);
             if (const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) {
               await tester.runAsync(() async {

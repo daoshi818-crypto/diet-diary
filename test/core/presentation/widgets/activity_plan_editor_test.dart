@@ -109,8 +109,8 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await _show(tester, _id('activity-plan-add-exercise'));
-        await tester.tap(_id('activity-plan-add-exercise'));
+        await _show(tester, _id('activity-plan-add-cardio'));
+        await tester.tap(_id('activity-plan-add-cardio'));
         await tester.pumpAndSettle();
         final fields = tester
             .widgetList<TextFormField>(find.byType(TextFormField))
@@ -120,15 +120,14 @@ void main() {
           isEmpty,
           reason: 'workout frequency and duration must come from the user',
         );
+        await _show(tester, _id('exercise-save'));
         await tester.tap(_id('exercise-save'));
         await tester.pumpAndSettle();
         expect(value.exercises, isEmpty);
         await _type(tester, 'exercise-sessions', '3');
         await _type(tester, 'exercise-minutes', '35');
-        await _show(tester, _id('exercise-type'));
-        await tester.tap(_id('exercise-type'));
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('有氧运动').last);
+        await _show(tester, _id('exercise-known-calories'));
+        await tester.tap(_id('exercise-known-calories'));
         await tester.pumpAndSettle();
         await _show(tester, _id('exercise-energy-source'));
         await tester.tap(_id('exercise-energy-source'));
@@ -137,6 +136,7 @@ void main() {
         await tester.pumpAndSettle();
         await _type(tester, 'exercise-calories', '250');
         tester.testTextInput.hide();
+        await _show(tester, _id('exercise-save'));
         await tester.tap(_id('exercise-save'));
         await tester.pumpAndSettle();
         expect(value.exercises.single.type, PlannedExerciseType.cardio);
@@ -152,6 +152,7 @@ void main() {
         await tester.pumpAndSettle();
         await _type(tester, 'exercise-calories', '300');
         tester.testTextInput.hide();
+        await _show(tester, _id('exercise-save'));
         await tester.tap(_id('exercise-save'));
         await tester.pumpAndSettle();
         expect(value.weeklyActiveCalories(68), 900);

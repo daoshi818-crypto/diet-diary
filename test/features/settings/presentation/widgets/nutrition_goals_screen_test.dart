@@ -358,13 +358,13 @@ void main() {
       await _screenshot(tester, 'split-tdee-top-$scale');
       await _show(tester, _id('activity-plan-daily-sedentary'));
       await _screenshot(tester, 'split-tdee-daily-$scale');
-      await _show(tester, _id('activity-plan-add-exercise'));
+      await _show(tester, _id('activity-plan-add-strength'));
       await _screenshot(tester, 'split-tdee-workouts-$scale');
-      await tester.tap(_id('activity-plan-add-exercise'));
+      await tester.tap(_id('activity-plan-add-strength'));
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       await _screenshot(tester, 'split-tdee-dialog-$scale');
-      Navigator.of(tester.element(find.byType(AlertDialog))).pop();
+      Navigator.of(tester.element(_id('weekly-exercise-close'))).pop();
       await tester.pumpAndSettle();
       await _edit(tester, 'goals-energy-input', '200');
       expect(tester.takeException(), isNull);

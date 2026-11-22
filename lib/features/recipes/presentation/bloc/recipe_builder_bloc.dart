@@ -54,9 +54,13 @@ class RecipeBuilderBloc
       // Generate the recipe id eagerly so any photo the user attaches
       // before they hit save can be filed under the correct filename
       // (recipe_images/<id>.webp). The id is still kept on save below.
-      emit(RecipeBuilderState.initial().copyWith(
-        id: IdGenerator.getUniqueID(),
-      ));
+      emit(
+        RecipeBuilderState.initial().copyWith(
+          id: IdGenerator.getUniqueID(),
+          ingredients: List.unmodifiable(event.initialIngredients),
+        ),
+      );
+      _recompute(emit);
     } else {
       final r = event.existing!;
       // Empty id is the sentinel used by the duplicate-recipe action: keep

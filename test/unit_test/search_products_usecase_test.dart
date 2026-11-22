@@ -234,6 +234,21 @@ void main() {
       );
     });
 
+    test('multi-keyword AND search covers custom foods history recipes and cache', () async {
+      final custom = _meal(code:'custom-oat',name:'西麦即食麦片',source:MealSourceEntity.custom);
+      final history = _meal(code:'history-oat',name:'西麦原味麦片',source:MealSourceEntity.custom);
+      final cached = _meal(code:'cached-oat',name:'西麦全谷麦片',source:MealSourceEntity.fdc);
+      final excluded = _meal(code:'wrong-food',name:'西麦饼干',source:MealSourceEntity.custom);
+      customMealDataSource.meals.addAll([custom,excluded].map(MealDBO.fromMealEntity));
+      getIntakeUsecase.recentIntake = [_intake('history',history)];
+      await cachedOffMealDataSource.cache(MealDBO.fromMealEntity(cached));
+      recipeDataSource.recipes.add(_recipeDbo(id:'recipe-oat',name:'西麦麦片酸奶碗'));
+      for(final query in ['西麦 麦片','麦片 西麦','  西麦   麦片  ']) {
+        final result = await useCase.searchFDCFoodByString(query,skipRemote:true);
+        expect(result.meals.map((m)=>m.code).toSet(),{'custom-oat','history-oat','cached-oat','recipe-oat'});
+      }
+    });
+
     test('prepends matching custom meals for OFF search', () async {
       final customMatch = _meal(
           code: 'custom-1', name: 'Tofu Bowl', source: MealSourceEntity.custom);

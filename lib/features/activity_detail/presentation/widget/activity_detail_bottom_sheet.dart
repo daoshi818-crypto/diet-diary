@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:opennutritracker/core/domain/entity/custom_activity_template_entity.dart';
@@ -76,15 +77,19 @@ class _ActivityDetailBottomSheetState extends State<ActivityDetailBottomSheet> {
   }
 
   Future<void> _openTemplatePicker() async {
-    final templates =
-        await widget.activityDetailBloc.loadCustomActivityTemplates();
+    final templates = await widget.activityDetailBloc
+        .loadCustomActivityTemplates();
     if (!mounted) return;
 
     final picked = await showModalBottomSheet<CustomActivityTemplateEntity>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return SafeArea(
+        return AppModalSheet(
+          identifier: 'activity-template-picker',
+          scrollable: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: templates.isEmpty
@@ -115,8 +120,7 @@ class _ActivityDetailBottomSheetState extends State<ActivityDetailBottomSheet> {
                         leading: const Icon(Icons.bookmark_rounded),
                         title: Text(template.name),
                         subtitle: Text('${tileValue.toInt()} $tileUnit'),
-                        onTap: () =>
-                            Navigator.of(listContext).pop(template),
+                        onTap: () => Navigator.of(listContext).pop(template),
                       );
                     },
                   ),
@@ -126,11 +130,13 @@ class _ActivityDetailBottomSheetState extends State<ActivityDetailBottomSheet> {
     );
 
     if (picked != null && mounted) {
-      final usesKj =
-          Provider.of<EnergyUnitProvider>(context, listen: false)
-              .usesKilojoules;
-      final displayValue =
-          usesKj ? UnitCalc.kcalToKj(picked.typicalKcal) : picked.typicalKcal;
+      final usesKj = Provider.of<EnergyUnitProvider>(
+        context,
+        listen: false,
+      ).usesKilojoules;
+      final displayValue = usesKj
+          ? UnitCalc.kcalToKj(picked.typicalKcal)
+          : picked.typicalKcal;
       setState(() {
         _nameController.text = picked.name;
         widget.quantityTextController.text = displayValue.toInt().toString();
@@ -177,8 +183,9 @@ class _ActivityDetailBottomSheetState extends State<ActivityDetailBottomSheet> {
     // at save time. For compendium activities the field stays in
     // minutes regardless of the energy unit.
     final usesKj = context.watch<EnergyUnitProvider>().usesKilojoules;
-    final customUnitSuffix =
-        usesKj ? S.of(context).kjLabel : S.of(context).kcalLabel;
+    final customUnitSuffix = usesKj
+        ? S.of(context).kjLabel
+        : S.of(context).kcalLabel;
     return BottomSheet(
       elevation: 0,
       backgroundColor: Colors.transparent,
@@ -194,7 +201,11 @@ class _ActivityDetailBottomSheetState extends State<ActivityDetailBottomSheet> {
               topRight: Radius.circular(Dimens.radiusXL),
             ),
             boxShadow: [
-              BoxShadow(color: palette.shadow, blurRadius: 18, offset: const Offset(0, -6)),
+              BoxShadow(
+                color: palette.shadow,
+                blurRadius: 18,
+                offset: const Offset(0, -6),
+              ),
             ],
           ),
           // SafeArea(top: false) — keeps the sticky bottom Add button above
@@ -218,7 +229,8 @@ class _ActivityDetailBottomSheetState extends State<ActivityDetailBottomSheet> {
                           children: [
                             Expanded(
                               child: Semantics(
-                                identifier: 'activity-detail-template-name-input',
+                                identifier:
+                                    'activity-detail-template-name-input',
                                 container: true,
                                 child: TextFormField(
                                   controller: _nameController,
@@ -272,10 +284,10 @@ class _ActivityDetailBottomSheetState extends State<ActivityDetailBottomSheet> {
                                   context,
                                   labelText: isCustom
                                       ? (usesKj
-                                          ? S.of(context).mealEnergyLabel
-                                          : S
-                                              .of(context)
-                                              .customActivityKcalLabel)
+                                            ? S.of(context).mealEnergyLabel
+                                            : S
+                                                  .of(context)
+                                                  .customActivityKcalLabel)
                                       : S.of(context).quantityLabel,
                                   hintText: isCustom
                                       ? S.of(context).customActivityKcalHint
@@ -331,20 +343,21 @@ class _ActivityDetailBottomSheetState extends State<ActivityDetailBottomSheet> {
                           identifier: 'activity-detail-add-button',
                           child: ElevatedButton.icon(
                             onPressed: _saving ? null : _onAddPressed,
-                            style: ElevatedButton.styleFrom(
-                              foregroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .onPrimaryContainer,
-                              backgroundColor: Theme.of(context)
-                                  .colorScheme
-                                  .primaryContainer,
-                              shape: Dimens.shapeM,
-                              padding: const EdgeInsets.symmetric(
-                                vertical: Dimens.spacing16,
-                              ),
-                            ).copyWith(
-                              elevation: ButtonStyleButton.allOrNull(0.0),
-                            ),
+                            style:
+                                ElevatedButton.styleFrom(
+                                  foregroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.onPrimaryContainer,
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primaryContainer,
+                                  shape: Dimens.shapeM,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: Dimens.spacing16,
+                                  ),
+                                ).copyWith(
+                                  elevation: ButtonStyleButton.allOrNull(0.0),
+                                ),
                             icon: const Icon(Icons.add_rounded),
                             label: Text(S.of(context).addLabel),
                           ),

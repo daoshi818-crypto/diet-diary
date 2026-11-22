@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
@@ -283,45 +284,38 @@ class _NutritionGoalsScreenState extends State<NutritionGoalsScreen> {
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (context) => SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                s.goalReviewTitle,
-                style: Theme.of(context).textTheme.titleLarge,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AppModalSheet(
+        identifier: 'goals-macro-review',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              s.goalReviewTitle,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            Text(s.goalMacroMismatch),
+            const SizedBox(height: 16),
+            _reviewChoice(
+              'goals-balance-carbs',
+              s.goalBalanceCarbs,
+              balanced,
+              target,
+            ),
+            if (balanced == null)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(s.goalCannotBalance),
               ),
-              const SizedBox(height: 12),
-              Text(s.goalMacroMismatch),
-              const SizedBox(height: 16),
-              _reviewChoice(
-                'goals-balance-carbs',
-                s.goalBalanceCarbs,
-                balanced,
-                target,
-              ),
-              if (balanced == null)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(s.goalCannotBalance),
-                ),
-              _reviewChoice(
-                'goals-scale-macros',
-                s.goalScaleMacros,
-                scaled,
-                target,
-              ),
-              _reviewChoice(
-                'goals-keep-values',
-                s.goalKeepValues,
-                plan,
-                target,
-              ),
-            ],
-          ),
+            _reviewChoice(
+              'goals-scale-macros',
+              s.goalScaleMacros,
+              scaled,
+              target,
+            ),
+            _reviewChoice('goals-keep-values', s.goalKeepValues, plan, target),
+          ],
         ),
       ),
     );

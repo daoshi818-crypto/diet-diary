@@ -135,6 +135,26 @@ void main() {
       expect(repo.saved.single.id, isNotEmpty);
     });
 
+    test('a matched multi-food meal is saved as a new scalable recipe', () async {
+      final ingredients = [
+        ('金枪鱼',60.0,110.0),('熟米饭',220.0,116.0),('玉米粒',40.0,106.0),
+      ].map((v) => RecipeIngredientEntity(snapshotMeal:_meal(v.$1,kcal:v.$3),amount:v.$2,unit:'g',convertedAmountG:v.$2)).toList();
+      bloc.add(InitializeBuilderEvent(initialIngredients:ingredients));
+      await Future<void>.delayed(Duration.zero);
+      expect(bloc.state.isExistingRecipe,isFalse);
+      expect(bloc.state.id,isNotEmpty);
+      expect(bloc.state.ingredients,hasLength(3));
+      expect(bloc.state.totalWeightG,320);
+      expect(bloc.state.aggregatedNutrimentsPer100.energyKcal100,closeTo(363.6/3.2,.001));
+      bloc.add(const UpdateNameEvent('金枪鱼拌饭'));
+      bloc.add(const SaveRecipeEvent());
+      await Future<void>.delayed(Duration.zero);
+      expect(repo.saved.single.name,'金枪鱼拌饭');
+      expect(repo.saved.single.totalWeightG,320);
+      expect(repo.saved.single.ingredients.map((i)=>i.amount),[60,220,40]);
+      expect(repo.saved.single.aggregatedNutrimentsPer100.energyKcal100! * 1.6,closeTo(181.8,.001));
+    });
+
     test('initialize with existing recipe sets isExistingRecipe', () async {
       final existing = RecipeEntity(
         id: 'existing-1',

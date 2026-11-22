@@ -1,7 +1,7 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/app_card.dart';
-import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
 import 'package:opennutritracker/features/add_activity/presentation/add_activity_screen.dart';
@@ -38,200 +38,141 @@ class _AddItemBottomSheetState extends State<AddItemBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final palette = theme.brightness == Brightness.dark
-        ? AppPalette.dark
-        : AppPalette.light;
     final s = S.of(context);
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight:
-                (MediaQuery.sizeOf(context).height * .5 -
-                        MediaQuery.paddingOf(context).bottom -
-                        20)
-                    .clamp(0, double.infinity),
-            maxWidth: 560,
-          ),
-          child: Material(
-            key: const ValueKey('logging-hub-panel'),
-            color: palette.surface,
-            borderRadius: Dimens.borderRadiusXL,
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 4, 0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          s.addLabel,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleLarge,
-                        ),
-                      ),
-                      Semantics(
-                        identifier: 'logging-hub-close',
-                        child: IconButton(
-                          tooltip: s.dialogCloseLabel,
-                          onPressed: () => Navigator.pop(context),
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            for (final type in IntakeTypeEntity.values)
-                              Semantics(
-                                identifier: 'logging-meal-${type.name}',
-                                child: ChoiceChip(
-                                  label: Text(
-                                    AddMealExtension.fromIntakeTypeEntity(
-                                      type,
-                                    ).getTypeName(context),
-                                  ),
-                                  selected: _type == type,
-                                  onSelected: (_) =>
-                                      setState(() => _type = type),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final columns =
-                                constraints.maxWidth >= 300 &&
-                                    MediaQuery.textScalerOf(
-                                          context,
-                                        ).scale(14) <=
-                                        20
-                                ? 3
-                                : 2;
-                            final width =
-                                (constraints.maxWidth - 8 * (columns - 1)) /
-                                columns;
-                            Widget tile(
-                              String id,
-                              IconData icon,
-                              String title,
-                              String hint,
-                              VoidCallback onTap,
-                            ) => SizedBox(
-                              width: width,
-                              child: _entry(id, icon, title, hint, onTap),
-                            );
-                            return Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                tile(
-                                  'logging-record-meal',
-                                  Icons.restaurant_rounded,
-                                  s.loggingRecordMeal,
-                                  s.loggingRecordMealHint,
-                                  () => _openFood(context),
-                                ),
-                                tile(
-                                  'logging-record-water',
-                                  Icons.water_drop_rounded,
-                                  s.loggingRecordWater,
-                                  s.loggingRecordWaterHint,
-                                  () => _openWater(context),
-                                ),
-                                tile(
-                                  'logging-nutrition-label',
-                                  Icons.document_scanner_outlined,
-                                  s.labelScanShortTitle,
-                                  s.labelScanIntro,
-                                  () => _openLabel(context),
-                                ),
-                                tile(
-                                  'logging-food-library',
-                                  Icons.kitchen_outlined,
-                                  s.loggingFoodLibrary,
-                                  s.loggingFoodLibraryHint,
-                                  () => _openFood(context, library: true),
-                                ),
-                                tile(
-                                  'logging-ai-photo',
-                                  Icons.photo_camera_outlined,
-                                  s.loggingPhoto,
-                                  s.loggingPhotoHint,
-                                  () => _openAi(context, photo: true),
-                                ),
-                                tile(
-                                  'logging-ai-describe',
-                                  Icons.auto_awesome_outlined,
-                                  s.loggingDescribe,
-                                  s.loggingDescribeHint,
-                                  () => _openAi(context, photo: false),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          children: [
-                            if (widget.showActivityTracking)
-                              Semantics(
-                                identifier: 'add-item-activity',
-                                child: TextButton.icon(
-                                  onPressed: () {
-                                    final nav = Navigator.of(context);
-                                    nav.pop();
-                                    nav.pushNamed(
-                                      NavigationOptions.addActivityRoute,
-                                      arguments: AddActivityScreenArguments(
-                                        day: widget.day,
-                                      ),
-                                    );
-                                  },
-                                  icon: const Icon(
-                                    Icons.directions_run_rounded,
-                                  ),
-                                  label: Text(s.activityLabel),
-                                ),
-                              ),
-                            Semantics(
-                              identifier: 'add-item-recipes',
-                              child: TextButton.icon(
-                                onPressed: () {
-                                  final nav = Navigator.of(context);
-                                  nav.pop();
-                                  nav.pushNamed(NavigationOptions.recipesRoute);
-                                },
-                                icon: const Icon(Icons.menu_book_outlined),
-                                label: Text(s.recipesLabel),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+    return AppModalSheet(
+      identifier: 'logging-hub',
+      panelKey: const ValueKey('logging-hub-panel'),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(s.addLabel, style: theme.textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final type in IntakeTypeEntity.values)
+                Semantics(
+                  identifier: 'logging-meal-${type.name}',
+                  child: ChoiceChip(
+                    label: Text(
+                      AddMealExtension.fromIntakeTypeEntity(
+                        type,
+                      ).getTypeName(context),
                     ),
+                    selected: _type == type,
+                    onSelected: (_) => setState(() => _type = type),
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-        ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns =
+                  constraints.maxWidth >= 300 &&
+                      MediaQuery.textScalerOf(context).scale(14) <= 20
+                  ? 3
+                  : 2;
+              final width =
+                  (constraints.maxWidth - 8 * (columns - 1)) / columns;
+              Widget tile(
+                String id,
+                IconData icon,
+                String title,
+                String hint,
+                VoidCallback onTap,
+              ) => SizedBox(
+                width: width,
+                child: _entry(id, icon, title, hint, onTap),
+              );
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  tile(
+                    'logging-record-meal',
+                    Icons.restaurant_rounded,
+                    s.loggingRecordMeal,
+                    s.loggingRecordMealHint,
+                    () => _openFood(context),
+                  ),
+                  tile(
+                    'logging-record-water',
+                    Icons.water_drop_rounded,
+                    s.loggingRecordWater,
+                    s.loggingRecordWaterHint,
+                    () => _openWater(context),
+                  ),
+                  tile(
+                    'logging-nutrition-label',
+                    Icons.document_scanner_outlined,
+                    s.labelScanShortTitle,
+                    s.labelScanIntro,
+                    () => _openLabel(context),
+                  ),
+                  tile(
+                    'logging-food-library',
+                    Icons.kitchen_outlined,
+                    s.loggingFoodLibrary,
+                    s.loggingFoodLibraryHint,
+                    () => _openFood(context, library: true),
+                  ),
+                  tile(
+                    'logging-ai-photo',
+                    Icons.photo_camera_outlined,
+                    s.loggingPhoto,
+                    s.loggingPhotoHint,
+                    () => _openAi(context, photo: true),
+                  ),
+                  tile(
+                    'logging-ai-describe',
+                    Icons.auto_awesome_outlined,
+                    s.loggingDescribe,
+                    s.loggingDescribeHint,
+                    () => _openAi(context, photo: false),
+                  ),
+                ],
+              );
+            },
+          ),
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: 8,
+            children: [
+              if (widget.showActivityTracking)
+                Semantics(
+                  identifier: 'add-item-activity',
+                  child: TextButton.icon(
+                    onPressed: () {
+                      final nav = Navigator.of(context);
+                      nav.pop();
+                      nav.pushNamed(
+                        NavigationOptions.addActivityRoute,
+                        arguments: AddActivityScreenArguments(day: widget.day),
+                      );
+                    },
+                    icon: const Icon(Icons.directions_run_rounded),
+                    label: Text(s.activityLabel),
+                  ),
+                ),
+              Semantics(
+                identifier: 'add-item-recipes',
+                child: TextButton.icon(
+                  onPressed: () {
+                    final nav = Navigator.of(context);
+                    nav.pop();
+                    nav.pushNamed(NavigationOptions.recipesRoute);
+                  },
+                  icon: const Icon(Icons.menu_book_outlined),
+                  label: Text(s.recipesLabel),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

@@ -9,10 +9,14 @@ sealed class RecipeBuilderEvent extends Equatable {
 
 class InitializeBuilderEvent extends RecipeBuilderEvent {
   final RecipeEntity? existing;
-  const InitializeBuilderEvent({this.existing});
+  final List<RecipeIngredientEntity> initialIngredients;
+  const InitializeBuilderEvent({
+    this.existing,
+    this.initialIngredients = const [],
+  });
 
   @override
-  List<Object?> get props => [existing];
+  List<Object?> get props => [existing, initialIngredients];
 }
 
 class UpdateNameEvent extends RecipeBuilderEvent {

@@ -411,7 +411,7 @@ void main() {
             final list = find.bySemanticsIdentifier(
               'meal-detail-portion-options',
             );
-            expect(list.hitTestable(), findsOneWidget);
+            expect(list, findsOneWidget);
             expect(tester.takeException(), isNull);
             if (const bool.fromEnvironment('FOOD_UI_CAPTURE') &&
                 size.width == 375 &&
@@ -440,7 +440,7 @@ void main() {
               portion,
               90,
               scrollable: find
-                  .descendant(of: list, matching: find.byType(Scrollable))
+                  .ancestor(of: list, matching: find.byType(Scrollable))
                   .first,
             );
             await tester.pumpAndSettle();

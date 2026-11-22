@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/utils/custom_text_input_formatter.dart';
@@ -12,7 +13,6 @@ import 'package:opennutritracker/core/utils/energy_unit_provider.dart';
 import 'package:opennutritracker/core/utils/id_generator.dart';
 import 'package:opennutritracker/core/utils/locator.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
-import 'package:opennutritracker/core/utils/sheet_bottom_inset.dart';
 import 'package:opennutritracker/core/utils/tracked_day_lock.dart';
 import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
@@ -266,90 +266,85 @@ class _QuickAddBottomSheetState extends State<QuickAddBottomSheet> {
     final usesKj = context.watch<EnergyUnitProvider>().usesKilojoules;
     final s = S.of(context);
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Text(
-                s.quickAddBottomSheetTitle,
-                style: Theme.of(context).textTheme.titleLarge,
-                textAlign: TextAlign.center,
-              ),
+    return AppModalSheet(
+      identifier: 'quick-add',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Text(
+              s.quickAddBottomSheetTitle,
+              style: Theme.of(context).textTheme.titleLarge,
+              textAlign: TextAlign.center,
             ),
-            _field(
-              controller: _titleController,
-              identifier: 'quick-add-title',
-              label: s.quickAddTitleHint,
-              isRequired: true,
-              numeric: false,
-              autofocus: true,
+          ),
+          _field(
+            controller: _titleController,
+            identifier: 'quick-add-title',
+            label: s.quickAddTitleHint,
+            isRequired: true,
+            numeric: false,
+            autofocus: true,
+          ),
+          _field(
+            controller: _energyController,
+            identifier: 'quick-add-energy',
+            label: usesKj ? s.quickAddEnergyLabelKj : s.quickAddEnergyLabelKcal,
+            isRequired: true,
+            numeric: true,
+          ),
+          _field(
+            controller: _carbsController,
+            identifier: 'quick-add-carbs',
+            label: s.quickAddCarbsHint,
+            isRequired: false,
+            numeric: true,
+          ),
+          _field(
+            controller: _fatController,
+            identifier: 'quick-add-fat',
+            label: s.quickAddFatHint,
+            isRequired: false,
+            numeric: true,
+          ),
+          _field(
+            controller: _proteinController,
+            identifier: 'quick-add-protein',
+            label: s.quickAddProteinHint,
+            isRequired: false,
+            numeric: true,
+          ),
+          const SizedBox(height: 16),
+          Semantics(
+            identifier: 'quick-add-submit',
+            child: FilledButton(
+              onPressed: _canSubmit
+                  ? () => _onSubmit(toList: _addsToList)
+                  : null,
+              child: _saving
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(
+                      _addsToList ? s.addToListLabel : s.quickAddSubmitLabel,
+                    ),
             ),
-            _field(
-              controller: _energyController,
-              identifier: 'quick-add-energy',
-              label: usesKj
-                  ? s.quickAddEnergyLabelKj
-                  : s.quickAddEnergyLabelKcal,
-              isRequired: true,
-              numeric: true,
-            ),
-            _field(
-              controller: _carbsController,
-              identifier: 'quick-add-carbs',
-              label: s.quickAddCarbsHint,
-              isRequired: false,
-              numeric: true,
-            ),
-            _field(
-              controller: _fatController,
-              identifier: 'quick-add-fat',
-              label: s.quickAddFatHint,
-              isRequired: false,
-              numeric: true,
-            ),
-            _field(
-              controller: _proteinController,
-              identifier: 'quick-add-protein',
-              label: s.quickAddProteinHint,
-              isRequired: false,
-              numeric: true,
-            ),
-            const SizedBox(height: 16),
+          ),
+          if (widget.logTray != null && !_addsToList) ...[
+            const SizedBox(height: 8),
             Semantics(
-              identifier: 'quick-add-submit',
-              child: FilledButton(
-                onPressed: _canSubmit
-                    ? () => _onSubmit(toList: _addsToList)
-                    : null,
-                child: _saving
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        _addsToList ? s.addToListLabel : s.quickAddSubmitLabel,
-                      ),
+              identifier: 'quick-add-add-to-list',
+              child: OutlinedButton(
+                onPressed: _canSubmit ? () => _onSubmit(toList: true) : null,
+                child: Text(s.addToListLabel),
               ),
             ),
-            if (widget.logTray != null && !_addsToList) ...[
-              const SizedBox(height: 8),
-              Semantics(
-                identifier: 'quick-add-add-to-list',
-                child: OutlinedButton(
-                  onPressed: _canSubmit ? () => _onSubmit(toList: true) : null,
-                  child: Text(s.addToListLabel),
-                ),
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -129,35 +130,34 @@ class _NutritionLabelScreenState extends State<NutritionLabelScreen> {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
       useSafeArea: true,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
-                child: Text(S.of(context).labelScanDisclosure(destination)),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AppModalSheet(
+        identifier: 'nutrition-label-source',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Text(S.of(context).labelScanDisclosure(destination)),
+            ),
+            Semantics(
+              identifier: 'nutrition-label-camera',
+              child: ListTile(
+                leading: const Icon(Icons.photo_camera_rounded),
+                title: Text(S.of(context).mealImageTakePhoto),
+                onTap: () => Navigator.of(context).pop(ImageSource.camera),
               ),
-              Semantics(
-                identifier: 'nutrition-label-camera',
-                child: ListTile(
-                  leading: const Icon(Icons.photo_camera_rounded),
-                  title: Text(S.of(context).mealImageTakePhoto),
-                  onTap: () => Navigator.of(context).pop(ImageSource.camera),
-                ),
+            ),
+            Semantics(
+              identifier: 'nutrition-label-gallery',
+              child: ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: Text(S.of(context).labelScanGallery),
+                onTap: () => Navigator.of(context).pop(ImageSource.gallery),
               ),
-              Semantics(
-                identifier: 'nutrition-label-gallery',
-                child: ListTile(
-                  leading: const Icon(Icons.photo_library_outlined),
-                  title: Text(S.of(context).labelScanGallery),
-                  onTap: () => Navigator.of(context).pop(ImageSource.gallery),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -305,7 +305,7 @@ class _NutritionLabelScreenState extends State<NutritionLabelScreen> {
                               ),
                               SafeArea(
                                 child: Align(
-                                  alignment: Alignment.topRight,
+                                  alignment: Alignment.bottomCenter,
                                   child: Semantics(
                                     identifier: 'nutrition-label-close-image',
                                     child: CloseButton(

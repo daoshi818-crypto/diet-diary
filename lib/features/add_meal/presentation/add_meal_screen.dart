@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
+import 'package:opennutritracker/features/recipes/presentation/screens/recipe_builder_screen.dart';
 import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.dart';
 import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
 import 'package:logging/logging.dart';
@@ -129,6 +132,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
       _day = args.day;
       _isFoodLibrary = args.isFoodLibrary;
       _argumentsLoaded = true;
+      if (args.initialItems.isNotEmpty) _logTray.addAll(args.initialItems);
       if (args.initialMeal case final meal?) {
         WidgetsBinding.instance.addPostFrameCallback(
           (_) => _addInitialMeal(meal),
@@ -389,27 +393,51 @@ class _AddMealScreenState extends State<AddMealScreen> {
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    showDragHandle: true,
-    builder: (context) => SafeArea(
-      top: false,
-      child: FractionallySizedBox(
-        heightFactor: .7,
-        child: ListenableBuilder(
-          listenable: _logTray,
-          builder: (context, _) => SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  S.of(context).foodTrayReview,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 12),
-                LogTrayList(tray: _logTray),
-              ],
+    backgroundColor: Colors.transparent,
+    builder: (context) => AppModalSheet(
+      identifier: 'food-tray',
+      child: ListenableBuilder(
+        listenable: _logTray,
+        builder: (context, _) => Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              S.of(context).foodTrayReview,
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-          ),
+            const SizedBox(height: 12),
+            LogTrayList(tray: _logTray),
+            const SizedBox(height: 12),
+            Semantics(
+              identifier: 'food-tray-save-recipe',
+              child: OutlinedButton.icon(
+                onPressed: _logTray.isEmpty
+                    ? null
+                    : () {
+                        final ingredients = [
+                          for (final item in _logTray.items)
+                            RecipeIngredientEntity(
+                              snapshotMeal: item.meal,
+                              amount: item.amount,
+                              unit: item.meal.isLiquid ? 'ml' : 'g',
+                              convertedAmountG: item.amount,
+                            ),
+                        ];
+                        final nav = Navigator.of(context);
+                        nav.pop();
+                        nav.pushNamed(
+                          NavigationOptions.recipeBuilderRoute,
+                          arguments: RecipeBuilderArguments(
+                            initialIngredients: ingredients,
+                          ),
+                        );
+                      },
+                icon: const Icon(Icons.menu_book_outlined),
+                label: Text(S.of(context).saveAsMealLabel),
+              ),
+            ),
+          ],
         ),
       ),
     ),
@@ -1291,7 +1319,8 @@ class _AddMealScreenState extends State<AddMealScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (sheetContext) => QuickAddBottomSheet(
         intakeType: _mealType.getIntakeType(),
         day: _day,
@@ -1345,12 +1374,14 @@ class AddMealScreenArguments {
 
   final bool isFoodLibrary;
   final MealEntity? initialMeal;
+  final List<LogTrayItem> initialItems;
 
   AddMealScreenArguments(
     this.mealType,
     this.day, {
     this.isFoodLibrary = false,
     this.initialMeal,
+    this.initialItems = const [],
   });
 }
 

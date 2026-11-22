@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/add_meal/util/food_query.dart';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -38,14 +39,14 @@ class ChineseFoodDataSource {
   }
 
   Future<List<MealEntity>> search(String query, {int limit = 60}) async {
-    final terms = query.trim().toLowerCase().split(RegExp(r'\s+'));
-    if (terms.every((term) => term.isEmpty)) return const [];
+    final terms = foodQueryTerms(query);
+    if (terms.isEmpty) return const [];
     final matches = (await _foods())
         .where((f) => terms.every(f.searchText.contains))
         .toList();
     int score(_LocalFood f) {
-      final name = f.meal.name!.toLowerCase();
-      final q = query.trim().toLowerCase();
+      final name = f.meal.name!.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+      final q = terms.join();
       return name == q ? 0 : (name.startsWith(q) ? 1 : 2);
     }
 

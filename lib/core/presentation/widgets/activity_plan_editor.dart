@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:opennutritracker/core/domain/entity/activity_plan.dart';
@@ -147,96 +148,111 @@ class ActivityPlanEditor extends StatelessWidget {
         const SizedBox(height: 6),
         Text(s.weeklyExerciseHint),
         const SizedBox(height: 12),
-        if (value.exercises.isEmpty)
+        for (final type in [
+          PlannedExerciseType.cardio,
+          PlannedExerciseType.strength,
+          if (value.exercises.any((e) => e.type == PlannedExerciseType.other))
+            PlannedExerciseType.other,
+        ]) ...[
+          const SizedBox(height: 8),
           Text(
-            s.weeklyExerciseEmpty,
-            style: Theme.of(context).textTheme.bodySmall,
+            exerciseTypeTitle(s, type),
+            style: Theme.of(context).textTheme.titleSmall,
           ),
-        for (var i = 0; i < value.exercises.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: AppCard(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
+          const SizedBox(height: 8),
+          if (!value.exercises.any((e) => e.type == type))
+            Text(s.exerciseNoSchedule),
+          for (var i = 0; i < value.exercises.length; i++)
+            if (value.exercises[i].type == type)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: AppCard(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Expanded(
-                        child: Text(
-                          exerciseTypeTitle(s, value.exercises[i].type),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall,
-                        ),
-                      ),
-                      Semantics(
-                        identifier: 'activity-plan-edit-$i',
-                        child: IconButton(
-                          tooltip: s.editItemDialogTitle,
-                          onPressed: () => _edit(context, i),
-                          icon: const Icon(Icons.edit_outlined, size: 20),
-                        ),
-                      ),
-                      Semantics(
-                        identifier: 'activity-plan-delete-$i',
-                        child: IconButton(
-                          tooltip: s.dialogDeleteLabel,
-                          onPressed: () => onChanged(
-                            ActivityPlan(
-                              dailyActivity: value.dailyActivity,
-                              exercises: List.unmodifiable(
-                                [...value.exercises]..removeAt(i),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              exerciseTypeTitle(s, value.exercises[i].type),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                          ),
+                          Semantics(
+                            identifier: 'activity-plan-edit-$i',
+                            child: IconButton(
+                              tooltip: s.editItemDialogTitle,
+                              onPressed: () => _edit(context, i),
+                              icon: const Icon(Icons.edit_outlined, size: 20),
+                            ),
+                          ),
+                          Semantics(
+                            identifier: 'activity-plan-delete-$i',
+                            child: IconButton(
+                              tooltip: s.dialogDeleteLabel,
+                              onPressed: () => onChanged(
+                                ActivityPlan(
+                                  dailyActivity: value.dailyActivity,
+                                  exercises: List.unmodifiable(
+                                    [...value.exercises]..removeAt(i),
+                                  ),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.delete_outline_rounded,
+                                size: 20,
                               ),
                             ),
                           ),
-                          icon: const Icon(
-                            Icons.delete_outline_rounded,
-                            size: 20,
-                          ),
+                        ],
+                      ),
+                      Text(
+                        s.weeklyExerciseSchedule(
+                          _number(value.exercises[i].sessionsPerWeek),
+                          _number(value.exercises[i].minutesPerSession),
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        value.exercises[i].energySource ==
+                                ExerciseEnergySource.estimated
+                            ? '${_intensityTitle(s, value.exercises[i].intensity)} · ${value.exercises[i].met} MET'
+                            : '${_energySourceTitle(s, value.exercises[i].energySource)} · ${_number(value.exercises[i].caloriesPerSession!)} kcal',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      if (hasWeight)
+                        Text(
+                          s.exerciseActivePerSession(
+                            value.exercises[i]
+                                .activeCaloriesPerSession(weightKg!)
+                                .round()
+                                .toString(),
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                     ],
                   ),
-                  Text(
-                    s.weeklyExerciseSchedule(
-                      _number(value.exercises[i].sessionsPerWeek),
-                      _number(value.exercises[i].minutesPerSession),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value.exercises[i].energySource ==
-                            ExerciseEnergySource.estimated
-                        ? '${_intensityTitle(s, value.exercises[i].intensity)} · ${value.exercises[i].met} MET'
-                        : '${_energySourceTitle(s, value.exercises[i].energySource)} · ${_number(value.exercises[i].caloriesPerSession!)} kcal',
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (hasWeight)
-                    Text(
-                      s.exerciseActivePerSession(
-                        value.exercises[i]
-                            .activeCaloriesPerSession(weightKg!)
-                            .round()
-                            .toString(),
-                      ),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                ],
+                ),
+              ),
+          if (type != PlannedExerciseType.other)
+            Semantics(
+              identifier: 'activity-plan-add-${type.name}',
+              child: OutlinedButton.icon(
+                onPressed: value.exercises.length >= 14
+                    ? null
+                    : () => _edit(context, null, type: type),
+                icon: const Icon(Icons.add_rounded),
+                label: Text(
+                  type == PlannedExerciseType.cardio
+                      ? s.exerciseAddCardio
+                      : s.exerciseAddStrength,
+                ),
               ),
             ),
-          ),
-        const SizedBox(height: 8),
-        Semantics(
-          identifier: 'activity-plan-add-exercise',
-          child: OutlinedButton.icon(
-            onPressed: value.exercises.length >= 14
-                ? null
-                : () => _edit(context, null),
-            icon: const Icon(Icons.add_rounded),
-            label: Text(s.weeklyExerciseAdd),
-          ),
-        ),
+        ],
         if (hasWeight)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -257,11 +273,19 @@ class ActivityPlanEditor extends StatelessWidget {
     );
   }
 
-  Future<void> _edit(BuildContext context, int? index) async {
-    final result = await showDialog<WeeklyExercise>(
+  Future<void> _edit(
+    BuildContext context,
+    int? index, {
+    PlannedExerciseType? type,
+  }) async {
+    final result = await showModalBottomSheet<WeeklyExercise>(
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       context: context,
       builder: (_) => _WeeklyExerciseDialog(
         initialValue: index == null ? null : value.exercises[index],
+        type: type ?? value.exercises[index!].type,
       ),
     );
     if (result == null) return;
@@ -336,7 +360,8 @@ class ActivityPlanSummary extends StatelessWidget {
 
 class _WeeklyExerciseDialog extends StatefulWidget {
   final WeeklyExercise? initialValue;
-  const _WeeklyExerciseDialog({this.initialValue});
+  final PlannedExerciseType type;
+  const _WeeklyExerciseDialog({this.initialValue, required this.type});
 
   @override
   State<_WeeklyExerciseDialog> createState() => _WeeklyExerciseDialogState();
@@ -344,8 +369,7 @@ class _WeeklyExerciseDialog extends StatefulWidget {
 
 class _WeeklyExerciseDialogState extends State<_WeeklyExerciseDialog> {
   final _form = GlobalKey<FormState>();
-  late PlannedExerciseType _type =
-      widget.initialValue?.type ?? PlannedExerciseType.strength;
+  late final PlannedExerciseType _type = widget.type;
   late ExerciseIntensity _intensity =
       widget.initialValue?.intensity ?? ExerciseIntensity.moderate;
   late ExerciseEnergySource _source =
@@ -380,52 +404,84 @@ class _WeeklyExerciseDialogState extends State<_WeeklyExerciseDialog> {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    return AlertDialog(
-      title: Text(s.weeklyExerciseAdd),
-      scrollable: true,
-      content: SizedBox(
-        width: 440,
-        child: Form(
-          key: _form,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
+    return AppModalSheet(
+      identifier: 'weekly-exercise',
+      child: Form(
+        key: _form,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              exerciseTypeTitle(s, _type),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            _input(
+              'exercise-sessions',
+              _sessions,
+              s.exerciseSessionsLabel,
+              s.trendsPerWeekSuffix,
+              28,
+            ),
+            const SizedBox(height: 16),
+            _input(
+              'exercise-minutes',
+              _minutes,
+              s.exerciseMinutesLabel,
+              s.minuteShortLabel,
+              720,
+            ),
+            const SizedBox(height: 16),
+            Semantics(
+              identifier: 'exercise-known-calories',
+              child: SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: Text(s.exerciseKnownCalories),
+                value: _source != ExerciseEnergySource.estimated,
+                onChanged: (v) => setState(
+                  () => _source = v
+                      ? ExerciseEnergySource.activeCalories
+                      : ExerciseEnergySource.estimated,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (_source == ExerciseEnergySource.estimated) ...[
               Semantics(
-                identifier: 'exercise-type',
-                child: DropdownButtonFormField<PlannedExerciseType>(
-                  initialValue: _type,
+                identifier: 'exercise-intensity',
+                child: DropdownButtonFormField<ExerciseIntensity>(
+                  initialValue: _intensity,
                   isExpanded: true,
-                  decoration: InputDecoration(labelText: s.exerciseTypeLabel),
+                  decoration: InputDecoration(
+                    labelText: s.exerciseIntensityLabel,
+                  ),
                   items: [
-                    for (final type in PlannedExerciseType.values)
+                    for (final intensity in ExerciseIntensity.values)
                       DropdownMenuItem(
-                        value: type,
-                        child: Text(exerciseTypeTitle(s, type)),
+                        value: intensity,
+                        child: Text(_intensityTitle(s, intensity)),
                       ),
                   ],
-                  onChanged: (type) {
-                    if (type != null) setState(() => _type = type);
+                  onChanged: (v) {
+                    if (v != null) setState(() => _intensity = v);
                   },
                 ),
               ),
-              const SizedBox(height: 16),
-              _input(
-                'exercise-sessions',
-                _sessions,
-                s.exerciseSessionsLabel,
-                s.trendsPerWeekSuffix,
-                28,
+              const SizedBox(height: 8),
+              Text(
+                s.exerciseEstimateHint,
+                style: Theme.of(context).textTheme.bodySmall,
               ),
-              const SizedBox(height: 16),
+            ] else ...[
               _input(
-                'exercise-minutes',
-                _minutes,
-                s.exerciseMinutesLabel,
-                s.minuteShortLabel,
-                720,
+                'exercise-calories',
+                _calories,
+                s.exerciseCaloriesLabel,
+                'kcal',
+                10000,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Semantics(
                 identifier: 'exercise-energy-source',
                 child: DropdownButtonFormField<ExerciseEnergySource>(
@@ -436,93 +492,55 @@ class _WeeklyExerciseDialogState extends State<_WeeklyExerciseDialog> {
                     labelText: s.exerciseEnergySourceLabel,
                   ),
                   items: [
-                    for (final source in ExerciseEnergySource.values)
+                    for (final source in [
+                      ExerciseEnergySource.activeCalories,
+                      ExerciseEnergySource.totalCalories,
+                    ])
                       DropdownMenuItem(
                         value: source,
                         child: Text(_energySourceTitle(s, source)),
                       ),
                   ],
-                  onChanged: (source) {
-                    if (source != null) setState(() => _source = source);
+                  onChanged: (v) {
+                    if (v != null) setState(() => _source = v);
                   },
                 ),
               ),
-              const SizedBox(height: 16),
-              if (_source == ExerciseEnergySource.estimated) ...[
-                Semantics(
-                  identifier: 'exercise-intensity',
-                  child: DropdownButtonFormField<ExerciseIntensity>(
-                    initialValue: _intensity,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: s.exerciseIntensityLabel,
-                    ),
-                    items: [
-                      for (final intensity in ExerciseIntensity.values)
-                        DropdownMenuItem(
-                          value: intensity,
-                          child: Text(_intensityTitle(s, intensity)),
-                        ),
-                    ],
-                    onChanged: (intensity) {
-                      if (intensity != null) {
-                        setState(() => _intensity = intensity);
-                      }
-                    },
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  s.exerciseEstimateHint,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ] else ...[
-                _input(
-                  'exercise-calories',
-                  _calories,
-                  s.exerciseCaloriesLabel,
-                  'kcal',
-                  10000,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _source == ExerciseEnergySource.activeCalories
-                      ? s.exerciseActiveEnergyHint
-                      : s.exerciseTotalEnergyHint,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
+              const SizedBox(height: 8),
+              Text(
+                _source == ExerciseEnergySource.activeCalories
+                    ? s.exerciseActiveEnergyHint
+                    : s.exerciseTotalEnergyHint,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
-          ),
+            const SizedBox(height: 20),
+            Semantics(
+              identifier: 'exercise-save',
+              child: FilledButton(
+                onPressed: () {
+                  if (!_form.currentState!.validate()) return;
+                  Navigator.pop(
+                    context,
+                    WeeklyExercise(
+                      type: _type,
+                      sessionsPerWeek: _value(_sessions),
+                      minutesPerSession: _value(_minutes),
+                      intensity: _intensity,
+                      energySource: _source,
+                      caloriesPerSession:
+                          _source == ExerciseEnergySource.estimated
+                          ? null
+                          : _value(_calories),
+                    ),
+                  );
+                },
+                child: Text(s.buttonSaveLabel),
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(s.dialogCancelLabel),
-        ),
-        Semantics(
-          identifier: 'exercise-save',
-          child: FilledButton(
-            onPressed: () {
-              if (!_form.currentState!.validate()) return;
-              Navigator.of(context).pop(
-                WeeklyExercise(
-                  type: _type,
-                  sessionsPerWeek: _value(_sessions),
-                  minutesPerSession: _value(_minutes),
-                  intensity: _intensity,
-                  energySource: _source,
-                  caloriesPerSession: _source == ExerciseEnergySource.estimated
-                      ? null
-                      : _value(_calories),
-                ),
-              );
-            },
-            child: Text(s.buttonSaveLabel),
-          ),
-        ),
-      ],
     );
   }
 

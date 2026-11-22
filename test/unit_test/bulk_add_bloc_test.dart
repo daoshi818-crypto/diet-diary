@@ -191,6 +191,52 @@ Future<BulkAddLoadedState> parse(
 }
 
 void main() {
+  test(
+    'database matching skips the configured AI and keeps stated grams',
+    () async {
+      var modelReads = 0;
+      final bloc = BulkAddBloc(
+        ResolveParsedMealsUseCase(
+          _FakeSearch({
+            '金枪鱼': [meal('金枪鱼')],
+            '熟米饭': [meal('熟米饭')],
+            '玉米粒': [meal('玉米粒')],
+          }),
+        ),
+        ReadMealTextUseCase(
+          AiCredentialStorage(
+            _MapStorage({
+              'AiApiKeyTag.anthropic': 'sk-test',
+              'AiAssistEnabledTag': 'true',
+            }),
+          ),
+          (_) {
+            modelReads++;
+            return _FixedInterpreter(const []);
+          },
+        ),
+        photoReaderWithoutKey(),
+      );
+      addTearDown(bloc.close);
+      bloc.add(
+        const ParseBulkTextEvent(
+          text: '金枪鱼60g、熟米饭220g、玉米粒40g',
+          usesImperialUnits: false,
+          databaseMatchOnly: true,
+        ),
+      );
+      final state =
+          await bloc.stream.firstWhere((s) => s is BulkAddLoadedState)
+              as BulkAddLoadedState;
+      expect(modelReads, 0);
+      expect(state.source, BulkAddReadSource.parser);
+      expect(state.modelFailure, isNull);
+      expect(state.rows.map((row) => row.meal!.name), ['金枪鱼', '熟米饭', '玉米粒']);
+      expect(state.rows.map((row) => row.amountText), ['60', '220', '40']);
+      expect(state.rows.every((row) => row.unit == 'g'), isTrue);
+    },
+  );
+
   test('a parsed line becomes one row per item', () async {
     final bloc = blocWith({
       'toast': [meal('Toast')],

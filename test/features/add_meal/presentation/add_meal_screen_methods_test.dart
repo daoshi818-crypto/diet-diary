@@ -266,6 +266,10 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.bySemanticsIdentifier('meal-detail-add'),
+        );
+        await tester.pumpAndSettle();
         await tester.tap(find.bySemanticsIdentifier('meal-detail-add'));
         await tester.pumpAndSettle();
         final search = find.bySemanticsIdentifier('meal-search-field');

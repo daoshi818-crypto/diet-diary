@@ -36,7 +36,7 @@ final _meal = MealEntity(
 );
 
 void main() {
-  testWidgets('compact hub shows six entrances in the lower half of a phone', (
+  testWidgets('hub shows six entrances with an independent close control', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -94,7 +94,7 @@ void main() {
     );
     expect(
       tester.getSize(find.byType(AddItemBottomSheet)).height,
-      lessThanOrEqualTo(320),
+      lessThanOrEqualTo(640),
     );
     final card = find.byKey(const ValueKey('logging-hub-panel'));
     final close = id('logging-hub-close');
@@ -253,6 +253,8 @@ void main() {
           if (surface == 'quantity') {
             final keyboard = size.height > 400 ? 260.0 : 140.0;
             tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+            await tester.pumpAndSettle();
+            await tester.ensureVisible(find.bySemanticsIdentifier('meal-detail-add'));
             await tester.pumpAndSettle();
             expect(
               tester

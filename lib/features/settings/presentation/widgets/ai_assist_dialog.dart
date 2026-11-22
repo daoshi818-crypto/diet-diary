@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:opennutritracker/core/presentation/ai_assist_summary.dart';
 import 'package:opennutritracker/core/utils/ai_credential_storage.dart';
 import 'package:opennutritracker/core/utils/ai_model_catalogue.dart';
@@ -982,281 +983,250 @@ class _AiAssistDialogState extends State<AiAssistDialog> {
   }
 
   Widget _buildDialog(BuildContext context, S s, ThemeData theme) {
-    return AlertDialog(
-      // The Experimental marker is deliberately *not* appended here. At a 2x
-      // text scale on a 320px phone it makes this title tall enough to squeeze
-      // the content area and overflow the dialog by 48px — the bound the
-      // model-row test pins. Nothing is lost: the tile that opens this dialog
-      // carries the badge, and the note below states what it means.
-      title: Text(s.settingsAiAssistLabel),
-      content: _loading
-          ? const SizedBox(
-              height: 64,
-              child: Center(child: CircularProgressIndicator()),
-            )
-          // The content is taller than a phone dialog and cannot be made to
-          // fit: the OpenRouter disclosure alone runs past the fold, and
-          // every sentence in it is load-bearing. So rather than pretend,
-          // show the scrollbar permanently. Without it the last paragraph
-          // is clipped mid-word against the bottom edge and reads as the
-          // end of the text.
-          : Scrollbar(
-              controller: _scrollController,
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                // The thumb is drawn over the content, so the text needs a
-                // gutter or it is clipped by the very affordance added to
-                // stop it being clipped.
-                padding: const EdgeInsets.only(right: 12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _label(theme, s.aiAssistProviderLabel),
-                    // Per-tile groupValue/onChanged rather than a RadioGroup
-                    // ancestor, matching CaloriesProfileInfoDialog: inside a
-                    // dialog the ancestor form does not reliably propagate
-                    // taps to RadioListTile children, and the bug it produced
-                    // there was a selection that silently stayed on its
-                    // initial value. Deprecated, and still the form that works
-                    // here.
-                    ...AiProvider.values.map(
-                      (provider) => Semantics(
-                        identifier: AiAssistDialog.providerIdentifier(provider),
+    return Dialog(
+      insetPadding: EdgeInsets.zero,
+      backgroundColor: Colors.transparent,
+      child: AppModalSheet(
+        identifier: 'ai-assist',
+        closeIdentifier: 'ai-assist-cancel',
+        onClose: _cancel,
+        controller: _scrollController,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(s.settingsAiAssistLabel, style: theme.textTheme.titleLarge),
+            const SizedBox(height: 16),
+            if (_loading)
+              const SizedBox(
+                height: 64,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _label(theme, s.aiAssistProviderLabel),
+                  // Per-tile groupValue/onChanged rather than a RadioGroup
+                  // ancestor, matching CaloriesProfileInfoDialog: inside a
+                  // dialog the ancestor form does not reliably propagate
+                  // taps to RadioListTile children, and the bug it produced
+                  // there was a selection that silently stayed on its
+                  // initial value. Deprecated, and still the form that works
+                  // here.
+                  ...AiProvider.values.map(
+                    (provider) => Semantics(
+                      identifier: AiAssistDialog.providerIdentifier(provider),
+                      // ignore: deprecated_member_use
+                      child: RadioListTile<AiProvider>(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(_providerName(context, provider)),
+                        value: provider,
                         // ignore: deprecated_member_use
-                        child: RadioListTile<AiProvider>(
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                          title: Text(_providerName(context, provider)),
-                          value: provider,
-                          // ignore: deprecated_member_use
-                          groupValue: _provider,
-                          // ignore: deprecated_member_use
-                          onChanged: (value) =>
-                              value == null ? null : _selectProvider(value),
+                        groupValue: _provider,
+                        // ignore: deprecated_member_use
+                        onChanged: (value) =>
+                            value == null ? null : _selectProvider(value),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_provider == AiProvider.ownServer) ...[
+                    _label(theme, s.aiAssistEndpointFieldLabel),
+                    Semantics(
+                      identifier: 'ai-assist-endpoint-field',
+                      child: TextField(
+                        key: _endpointFieldKey,
+                        controller: _endpointController,
+                        focusNode: _endpointFocus,
+                        keyboardType: TextInputType.url,
+                        autocorrect: false,
+                        onSubmitted: (_) => FocusScope.of(context).nextFocus(),
+                        decoration: InputDecoration(
+                          labelText: s.aiAssistEndpointFieldLabel,
+                          // A base address, which the store completes to
+                          // the chat route the runtimes actually answer on.
+                          hintText: 'https://api.example.com/v1',
+                          helperText: s.aiAssistCustomEndpointHint,
+                          helperMaxLines: 3,
+                          errorText: _endpointError,
+                          border: const OutlineInputBorder(),
                         ),
+                        // The disclosure below names this host and derives
+                        // its encryption clause from the scheme, so it has
+                        // to follow the field as it is typed. So does every
+                        // verdict this dialog has reached about the address
+                        // — a refusal, and the model-list sentence under
+                        // the button — because each was about text that no
+                        // longer exists. See [_endpointChanged].
+                        onChanged: (_) => _endpointChanged(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  // The credential block sits above the disclosure, which
+                  // reverses what this dialog originally did. On a Pixel 6
+                  // the other way round put the key field *entirely below
+                  // the fold* on the OpenRouter path: the disclosure there
+                  // is three sentences longer, and the dialog ended with a
+                  // paragraph cut off mid-word and no scroll affordance. A
+                  // first-time user saw a wall of text and an OK button and
+                  // no way to enter anything.
+                  //
+                  // The original reasoning — that the disclosure must not be
+                  // behind a link, because saving a key adds a destination —
+                  // survives this. It is still in the dialog, unavoidable,
+                  // and still above the OK button, which is the act that
+                  // actually enables the feature. What it is no longer above
+                  // is a text field the user could not see.
+                  //
+                  // Keyed on **whether a key is stored**, which is not the
+                  // same question as whether the provider is usable. A
+                  // server the user runs is usable on an address alone, and
+                  // its key stays optional afterwards — so the field has to
+                  // remain reachable there rather than being replaced by a
+                  // mask over an empty slot. And on whether that key is for
+                  // the server the address field names — see [_keyIsSaved].
+                  if (_keyIsSaved)
+                    Row(
+                      children: [
+                        const Icon(Icons.key_rounded, size: 18),
+                        const SizedBox(width: 8),
+                        // Flex-constrained per AGENTS.md: "Ключ збережено"
+                        // and a large system font both run much wider than
+                        // the English label.
+                        Expanded(
+                          child: Text(
+                            '${s.aiAssistKeySavedLabel}  '
+                            '${AiCredentialStorage.maskedPlaceholder}',
+                            style: theme.textTheme.bodyMedium,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    )
+                  else ...[
+                    Text(
+                      s.aiAssistNoKeyForProviderLabel,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    if (_provider == AiProvider.ownServer) ...[
-                      _label(theme, s.aiAssistEndpointFieldLabel),
-                      Semantics(
-                        identifier: 'ai-assist-endpoint-field',
-                        child: TextField(
-                          key: _endpointFieldKey,
-                          controller: _endpointController,
-                          focusNode: _endpointFocus,
-                          keyboardType: TextInputType.url,
-                          autocorrect: false,
-                          onSubmitted: (_) =>
-                              FocusScope.of(context).nextFocus(),
-                          decoration: InputDecoration(
-                            labelText: s.aiAssistEndpointFieldLabel,
-                            // A base address, which the store completes to
-                            // the chat route the runtimes actually answer on.
-                            hintText: 'https://api.example.com/v1',
-                            helperText: s.aiAssistCustomEndpointHint,
-                            helperMaxLines: 3,
-                            errorText: _endpointError,
-                            border: const OutlineInputBorder(),
-                          ),
-                          // The disclosure below names this host and derives
-                          // its encryption clause from the scheme, so it has
-                          // to follow the field as it is typed. So does every
-                          // verdict this dialog has reached about the address
-                          // — a refusal, and the model-list sentence under
-                          // the button — because each was about text that no
-                          // longer exists. See [_endpointChanged].
-                          onChanged: (_) => _endpointChanged(),
+                    Semantics(
+                      identifier: 'ai-assist-key-field',
+                      child: TextField(
+                        controller: _apiKeyController,
+                        onChanged: _keyTyped,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        obscureText: true,
+                        decoration: InputDecoration(
+                          labelText: s
+                              .aiAssistKeyFieldLabel(
+                                _provider == AiProvider.ownServer
+                                    ? ''
+                                    : _providerName(context, _provider),
+                              )
+                              .trim(),
+                          border: const OutlineInputBorder(),
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                    // The credential block sits above the disclosure, which
-                    // reverses what this dialog originally did. On a Pixel 6
-                    // the other way round put the key field *entirely below
-                    // the fold* on the OpenRouter path: the disclosure there
-                    // is three sentences longer, and the dialog ended with a
-                    // paragraph cut off mid-word and no scroll affordance. A
-                    // first-time user saw a wall of text and an OK button and
-                    // no way to enter anything.
-                    //
-                    // The original reasoning — that the disclosure must not be
-                    // behind a link, because saving a key adds a destination —
-                    // survives this. It is still in the dialog, unavoidable,
-                    // and still above the OK button, which is the act that
-                    // actually enables the feature. What it is no longer above
-                    // is a text field the user could not see.
-                    //
-                    // Keyed on **whether a key is stored**, which is not the
-                    // same question as whether the provider is usable. A
-                    // server the user runs is usable on an address alone, and
-                    // its key stays optional afterwards — so the field has to
-                    // remain reachable there rather than being replaced by a
-                    // mask over an empty slot. And on whether that key is for
-                    // the server the address field names — see [_keyIsSaved].
-                    if (_keyIsSaved)
-                      Row(
-                        children: [
-                          const Icon(Icons.key_rounded, size: 18),
-                          const SizedBox(width: 8),
-                          // Flex-constrained per AGENTS.md: "Ключ збережено"
-                          // and a large system font both run much wider than
-                          // the English label.
-                          Expanded(
-                            child: Text(
-                              '${s.aiAssistKeySavedLabel}  '
-                              '${AiCredentialStorage.maskedPlaceholder}',
-                              style: theme.textTheme.bodyMedium,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      )
-                    else ...[
-                      Text(
-                        s.aiAssistNoKeyForProviderLabel,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Semantics(
-                        identifier: 'ai-assist-key-field',
-                        child: TextField(
-                          controller: _apiKeyController,
-                          onChanged: _keyTyped,
-                          autocorrect: false,
-                          enableSuggestions: false,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: s
-                                .aiAssistKeyFieldLabel(
-                                  _provider == AiProvider.ownServer
-                                      ? ''
-                                      : _providerName(context, _provider),
-                                )
-                                .trim(),
-                            border: const OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                    ],
-                    // Pausing and removing act on the provider as a whole, so
-                    // they follow "is it usable" rather than "is there a key".
-                    // Identical for the hosted three, where the two are the
-                    // same fact.
-                    if (_configured) ...[
-                      Semantics(
-                        identifier: 'ai-assist-enabled',
-                        child: SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(s.settingsAiAssistEnabledLabel),
-                          value: _enabled,
-                          onChanged: _setEnabled,
-                        ),
-                      ),
-                      Semantics(
-                        identifier: 'ai-assist-remove-key',
-                        child: TextButton.icon(
-                          onPressed: _remove,
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          label: Text(s.aiAssistRemoveKeyLabel),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 12),
-                    // **Model below the credential**, which is new and is a
-                    // fix rather than a preference. A fourth provider added a
-                    // radio row and pushed the key field 17.7dp below the
-                    // fold on a Pixel 6 — the same defect the "key field is
-                    // on screen" test above was written for, returning for a
-                    // different reason. The credential is what this dialog
-                    // exists for, so it sits directly under the choice of who
-                    // to send to; picking a model is the step after deciding
-                    // you can talk to them at all.
-                    _buildModelSection(context, s, theme),
-                    // Directly under the pair it is a fact about. A stored
-                    // verdict describes `(endpoint, model)` and is discarded
-                    // when either changes, so reading it anywhere further from
-                    // those two fields would invite it to be read as a
-                    // property of the provider.
-                    //
-                    // Only for a server the user runs. The other three were
-                    // screened behaviourally over live calls before they were
-                    // ever offered (#735), so there is nothing here a check
-                    // would establish that the curated list does not already
-                    // carry — and an inert "not checked yet" on the Anthropic
-                    // path would imply otherwise.
-                    if (_provider == AiProvider.ownServer && _configured) ...[
-                      const SizedBox(height: 16),
-                      _buildProbeSection(s, theme),
-                    ],
-                    const SizedBox(height: 16),
-                    // Provider paragraph first — it names the destination,
-                    // which is the fact that changes — then the sentences that
-                    // are true whichever provider is chosen.
-                    Text(
-                      '${aiDisclosureFor(s, provider: _provider, typedEndpoint: _endpointController.text)}'
-                      '\n\n${s.aiAssistDisclosureCommon}',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 12),
-                    // What the badge in the title means, spelled out once
-                    // where the user is deciding whether to turn this on. It
-                    // is a statement about the feature's stability, not about
-                    // the model's accuracy — that caution already appears
-                    // above the rows a model produced, where it can be acted
-                    // on.
-                    Text(
-                      s.aiAssistExperimentalNote,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ],
+                  // Pausing and removing act on the provider as a whole, so
+                  // they follow "is it usable" rather than "is there a key".
+                  // Identical for the hosted three, where the two are the
+                  // same fact.
+                  if (_configured) ...[
+                    Semantics(
+                      identifier: 'ai-assist-enabled',
+                      child: SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(s.settingsAiAssistEnabledLabel),
+                        value: _enabled,
+                        onChanged: _setEnabled,
+                      ),
+                    ),
+                    Semantics(
+                      identifier: 'ai-assist-remove-key',
+                      child: TextButton.icon(
+                        onPressed: _remove,
+                        icon: const Icon(Icons.delete_outline_rounded),
+                        label: Text(s.aiAssistRemoveKeyLabel),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  // **Model below the credential**, which is new and is a
+                  // fix rather than a preference. A fourth provider added a
+                  // radio row and pushed the key field 17.7dp below the
+                  // fold on a Pixel 6 — the same defect the "key field is
+                  // on screen" test above was written for, returning for a
+                  // different reason. The credential is what this dialog
+                  // exists for, so it sits directly under the choice of who
+                  // to send to; picking a model is the step after deciding
+                  // you can talk to them at all.
+                  _buildModelSection(context, s, theme),
+                  // Directly under the pair it is a fact about. A stored
+                  // verdict describes `(endpoint, model)` and is discarded
+                  // when either changes, so reading it anywhere further from
+                  // those two fields would invite it to be read as a
+                  // property of the provider.
+                  //
+                  // Only for a server the user runs. The other three were
+                  // screened behaviourally over live calls before they were
+                  // ever offered (#735), so there is nothing here a check
+                  // would establish that the curated list does not already
+                  // carry — and an inert "not checked yet" on the Anthropic
+                  // path would imply otherwise.
+                  if (_provider == AiProvider.ownServer && _configured) ...[
+                    const SizedBox(height: 16),
+                    _buildProbeSection(s, theme),
+                  ],
+                  const SizedBox(height: 16),
+                  // Provider paragraph first — it names the destination,
+                  // which is the fact that changes — then the sentences that
+                  // are true whichever provider is chosen.
+                  Text(
+                    '${aiDisclosureFor(s, provider: _provider, typedEndpoint: _endpointController.text)}'
+                    '\n\n${s.aiAssistDisclosureCommon}',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 12),
+                  // What the badge in the title means, spelled out once
+                  // where the user is deciding whether to turn this on. It
+                  // is a statement about the feature's stability, not about
+                  // the model's accuracy — that caution already appears
+                  // above the rows a model produced, where it can be acted
+                  // on.
+                  Text(
+                    s.aiAssistExperimentalNote,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 16),
+            if (!_loading &&
+                (!_hasKey || _provider == AiProvider.ownServer || _changed))
+              Align(
+                alignment: Alignment.centerRight,
+                child: Semantics(
+                  identifier: 'ai-assist-save-key',
+                  child: TextButton(
+                    onPressed: _save,
+                    child: Text(s.dialogOKLabel),
+                  ),
                 ),
               ),
-            ),
-      actions: [
-        Semantics(
-          identifier: 'ai-assist-cancel',
-          child: TextButton(
-            onPressed: _cancel,
-            child: Text(s.dialogCancelLabel),
-          ),
+          ],
         ),
-        // Offered whenever something on screen can still be typed into, **or
-        // whenever there is already a change to confirm**. For the hosted
-        // three the first half is exactly "before a key exists", which is
-        // what this used to say on its own. A server the user runs keeps an
-        // address and a model name editable for as long as the dialog is
-        // open, and hanging OK off the credential left both fields rendered
-        // with no way to commit a change — the only exit was Remove, which
-        // discards the address as well.
-        //
-        // The second half is #979. Switching to a provider that already has
-        // a key is a change, and it had no way out that kept it: `_hasKey`
-        // is true for that provider, so OK was never rendered, while Cancel
-        // and the back button both run `_cancel` and restore the previous
-        // one. Every exit undid the switch, which made a second configured
-        // destination unreachable — the choice the four-destination design
-        // exists to offer. The test that covered "OK still switches" passed
-        // throughout, because its provider had no key and so was on the
-        // lucky side of this gate.
-        //
-        // `_changed` is the right question rather than `_provider != _providerOnOpen`:
-        // a model pick and the enabled toggle are also changes someone may
-        // want to keep, and they are already written by the time they set it.
-        if (!_loading &&
-            (!_hasKey || _provider == AiProvider.ownServer || _changed))
-          Semantics(
-            identifier: 'ai-assist-save-key',
-            child: TextButton(onPressed: _save, child: Text(s.dialogOKLabel)),
-          ),
-      ],
+      ),
     );
   }
 

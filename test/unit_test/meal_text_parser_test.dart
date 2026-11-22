@@ -803,6 +803,14 @@ void main() {
       expect(result.items[2].quantity, isNull);
     });
 
+    test('Chinese recipe ingredients preserve trailing gram amounts', () {
+      final result = parseMealText('金枪鱼60g、熟米饭220g、玉米粒40g');
+      expect(result.errors,isEmpty);
+      expect(result.items.map((i)=>i.query),['金枪鱼','熟米饭','玉米粒']);
+      expect(result.items.map((i)=>i.quantity),[60,220,40]);
+      expect(result.items.map((i)=>i.unit),['g','g','g']);
+    });
+
     test('a trailing quantity works without a space too', () {
       expect(parseMealText('鸡蛋2').items.single.quantity, 2);
     });

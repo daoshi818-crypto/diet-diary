@@ -117,6 +117,22 @@ void main() {
     await storage.setTermsAccepted(true);
   });
 
+  test('saved endpoint key and selected model survive reopening for all AI entries without a probe', () async {
+    await storage.setActiveProvider(AiProvider.ownServer);
+    await storage.writeOwnServerConfiguration(endpoint:'https://relay.example/v1',model:'selected-vision-model');
+    await storage.writeApiKey('saved-key');
+    final reopened = AiCredentialStorage(backing);
+    expect((await reopened.readProbe()).photo,AiCapability.unknown);
+    for (var entry = 0; entry < 3; entry++) {
+      final selection = await reopened.readSelection();
+      expect(selection,isNotNull);
+      expect(selection!.provider,AiProvider.ownServer);
+      expect(selection.apiKey,'saved-key');
+      expect(selection.modelId,'selected-vision-model');
+      expect(selection.endpoint,'https://relay.example/v1/chat/completions');
+    }
+  });
+
   test('starts with nothing stored and the feature off', () async {
     expect(await storage.readApiKey(), isNull);
     expect(await storage.hasApiKey(), isFalse);

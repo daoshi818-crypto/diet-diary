@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/add_meal/util/food_query.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:opennutritracker/core/domain/usecase/delete_recipe_usecase.dart';
@@ -207,8 +208,7 @@ class _RecipesPageState extends State<RecipesPage>
             );
           }
           final filtered = state.recipes.where((r) {
-            final matchesQuery =
-                q.isEmpty || r.name.toLowerCase().contains(q);
+            final matchesQuery = foodTextMatches(q, [r.name, ...r.tags]);
             final matchesTag =
                 _activeTag == null || r.tags.contains(_activeTag);
             return matchesQuery && matchesTag;

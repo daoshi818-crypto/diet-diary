@@ -1,12 +1,12 @@
 # 饮食日记
 
-基于 [OpenNutriTracker](https://github.com/simonoppowa/OpenNutriTracker) 官方 Flutter 源码的中文定制版，保留上游 Git 历史、GPLv3 许可证及署名。当前提供 Flutter Web 交互预览，暂不生成 APK。
+基于 [OpenNutriTracker](https://github.com/simonoppowa/OpenNutriTracker) 的中文定制版，保留上游历史、GPLv3 许可证及署名。
 
-- 简体中文、统一添加入口、餐次与用量选择、营养详情浮窗、自定义食物筛选，以及紧凑的小屏布局。
-- 餐食、饮水和活动统一从底部中央加号进入。
-- AI 卡片连接原有录入流程；正式 AI 服务、营养成分表识别和本地食物库接入尚待实现。
-- 使用固定 Flutter 3.44.6；启动、配置与限制请见 [网页预览说明](网页预览说明.md)。本地 SDK、密钥和构建产物不纳入仓库。
-- 私有预览仓库关闭 GitHub Actions，避免继承上游自动打包与发布流程；需要 CI 时再单独配置。
+- 本地中文食物库，支持空格多关键词检索、克重录入、自定义食物和组合餐食。
+- 保留中央加号，首页另有独立的饮食、饮水快捷入口。
+- 描述记餐支持食物库匹配和 AI 营养分析；另有食物照片与营养成分表识别。供应商地址、API Key 和所选模型统一保存，结果确认后再录入。
+- TDEE 可选活动系数法，或日常活动＋有氧／力量周计划；目标摄入与三大营养素可独立设定。
+- 推送 main 后自动构建独立签名的 ARM64 APK，并发布到 [Releases](https://github.com/daoshi818-crypto/diet-diary/releases)。密钥和本地构建产物不纳入仓库。
 
 以下保留上游项目介绍。
 
@@ -176,11 +176,11 @@ Retention cuts the other way. Anthropic states images are not stored beyond the 
 
 **One thing is still unique to the OpenRouter path.** An account-level identity is forwarded to the serving vendor on every request and cannot be switched off — because you hold one key, it works as a stable per-user handle at that vendor. Neither direct path forwards one: OpenAI's `safety_identifier` is documented optional and the app does not send it.
 
-**Reading a meal photo** is the same feature with a camera instead of a keyboard, and is offered once a key or address is enabled — for a server you run, only after the setup check above has read a photograph successfully. The photo is encoded in memory, sent for that one request, and then unreachable — it is never written to the app's documents directory, so it is not in your exports and cannot be shown again. The system photo picker does hand the app a temporary copy in its cache; the app attempts to delete that as soon as the photo is encoded, whether or not the request succeeded — best effort, so on the rare occasion the delete fails the copy stays in the cache until the OS clears it. **On the Anthropic-direct path**, Anthropic's [vision documentation](https://platform.claude.com/docs/en/build-with-claude/vision) states images are *"ephemeral and not stored beyond the duration of the API request"* and are not used to train models. **That default has one exception, stated by Anthropic itself, and it is about retention, not training:** its [retention documentation](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention) states that content flagged by its automated trust-and-safety systems may be retained for up to two years regardless of the ephemeral promise, to enforce its Usage Policy. That sentence — ephemeral, with this exception — is Anthropic's and does not travel: via OpenRouter or OpenAI the applicable promise is the weaker one above, and the two are weaker in different ways.
+**Reading a meal photo** is the same feature with a camera instead of a keyboard, and is offered once a key or address is enabled — including a custom provider whose optional capability check has not run; unsupported models show an error when used. The photo is encoded and held in memory while the review page is open, allowing a preview, removal, or retry. It is released when the page is disposed and is never written to the app's documents directory or included in exports. The system photo picker does hand the app a temporary copy in its cache; the app attempts to delete that as soon as the photo is encoded, whether or not the request succeeded — best effort, so on the rare occasion the delete fails the copy stays in the cache until the OS clears it. **On the Anthropic-direct path**, Anthropic's [vision documentation](https://platform.claude.com/docs/en/build-with-claude/vision) states images are *"ephemeral and not stored beyond the duration of the API request"* and are not used to train models. **That default has one exception, stated by Anthropic itself, and it is about retention, not training:** its [retention documentation](https://platform.claude.com/docs/en/manage-claude/api-and-data-retention) states that content flagged by its automated trust-and-safety systems may be retained for up to two years regardless of the ephemeral promise, to enforce its Usage Policy. That sentence — ephemeral, with this exception — is Anthropic's and does not travel: via OpenRouter or OpenAI the applicable promise is the weaker one above, and the two are weaker in different ways.
 
-The model reads *language*, not nutrition: it returns a food name and, when you stated one, an amount. **Every calorie and macro still comes from the food databases below**, so "every number is cited" holds whether or not you enable this. The request carries a tool schema with no nutrition fields ([#633](https://github.com/simonoppowa/OpenNutriTracker/issues/633)), so the model has nowhere to put an estimated calorie count, and whatever it returns is held to the same bounds the offline parser enforces.
+In this fork, **Food library matching** takes nutrition from stored foods. **AI nutrition analysis** and food-photo analysis may estimate energy and macros; those results are marked, editable, and require confirmation. **Nutrition-label recognition** transcribes the printed values and normalizes them to 100 g/ml. No result is silently written to the diary.
 
-From a photo the rule is tighter still: it may **count** what it can see (two eggs, three sausages) but never **measure**. Nothing in a photograph states a weight, so a gram figure read off a picture would be a guess arriving with the same confidence as a number you typed. Any amount that comes back carrying a unit is discarded along with its number, and the row falls to the ordinary default for you to set.
+The new food-photo analysis may estimate edible weight and nutrition. Estimated weights are marked for review, and users can correct grams and nutrition before adding the foods. The legacy name-only photo interpreter retains its original count-only rule.
 
 **How it is built** is documented separately. [The AI implementation](docs/ai-architecture.md) walks a typed meal and a photo end to end, maps the request paths, and shows where each rule above is enforced — the nutrition rule, for one, is a single schema constant with no such field in it, re-checked in Dart against a reply that ignored the schema entirely. This section states what the app promises; that page states how it is made to hold, and defers back here wherever the two touch.
 

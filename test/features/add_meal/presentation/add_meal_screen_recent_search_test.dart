@@ -195,6 +195,21 @@ void main() {
       },
     );
 
+    test('recent and favourite foods support space-separated AND keywords', () async {
+      final meal = _intake('西麦即食燕麦片');
+      final recents = RecentMealBloc(_FakeGetIntakeUsecase([meal,_intake('西麦饼干')]),_FakeGetConfigUsecase());
+      final store = FakeFavourites();store.add(meal.meal);store.add(_intake('西麦饼干').meal);
+      final favourites = FavouriteMealBloc(store.get,_FakeGetConfigUsecase());
+      addTearDown(() async {await recents.close();await favourites.close();await store.dispose();});
+      for (final query in ['西麦 麦片','麦片 西麦','  西麦  麦片 ']) {
+        recents.add(RecentMealSearchChangedEvent(searchString:query));
+        favourites.add(LoadFavouriteMealEvent(searchString:query));
+        await Future<void>.delayed(Duration.zero);
+        expect((recents.state as RecentMealLoadedState).recentMeals.single.name,'西麦即食燕麦片');
+        expect((favourites.state as FavouriteMealLoadedState).favourites.single.name,'西麦即食燕麦片');
+      }
+    });
+
     test('a keystroke before anything is loaded reads storage once', () async {
       final usecase = _FakeGetIntakeUsecase([_intake('Apple')]);
       final bloc = RecentMealBloc(usecase, _FakeGetConfigUsecase());

@@ -309,7 +309,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(await storage.isEnabled(), isFalse);
 
-    await tester.tap(find.text(l10nEn.dialogCancelLabel));
+    await tester.tap(find.bySemanticsIdentifier('ai-assist-cancel'));
     await tester.pumpAndSettle();
 
     expect(find.text(l10nEn.settingsAiAssistPausedLabel), findsOneWidget);

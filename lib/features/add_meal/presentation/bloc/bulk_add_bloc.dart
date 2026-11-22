@@ -442,10 +442,12 @@ class BulkAddBloc extends Bloc<BulkAddEvent, BulkAddState> {
     final attempt = ++_attempt;
     emit(BulkAddLoadingState(attempt: attempt));
 
-    final reading = await _readMealTextUseCase.read(
-      event.text,
-      localeCode: event.localeCode,
-    );
+    final reading = event.databaseMatchOnly
+        ? MealTextReading(parseMealText(event.text), usedModel: false)
+        : await _readMealTextUseCase.read(
+            event.text,
+            localeCode: event.localeCode,
+          );
     if (emit.isDone || _superseded(attempt)) return;
 
     await _resolveAndEmit(

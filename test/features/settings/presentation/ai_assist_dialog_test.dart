@@ -431,7 +431,7 @@ void main() {
 
     final title = tester.widget<Text>(
       find.descendant(
-        of: find.byType(AlertDialog),
+        of: find.byType(AiAssistDialog),
         matching: find.text(l10nEn.settingsAiAssistLabel),
       ),
     );
@@ -859,6 +859,7 @@ void main() {
       );
       await tester.enterText(await manualModelField(tester), 'gemma3:4b');
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
@@ -895,6 +896,7 @@ void main() {
       );
       await tester.enterText(await manualModelField(tester), 'gemma3:4b');
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
@@ -924,6 +926,7 @@ void main() {
         'http://192.168.1.5:11434',
       );
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
@@ -959,7 +962,8 @@ void main() {
             tester.view.viewInsets = const FakeViewPadding(bottom: 560);
           }
           await tester.pumpAndSettle();
-          await tester.tap(find.text(l10nEn.dialogOKLabel));
+          await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
+      await tester.tap(find.text(l10nEn.dialogOKLabel));
           await tester.pumpAndSettle();
           expect(
             find.bySemanticsIdentifier('ai-assist-model-field'),
@@ -991,6 +995,7 @@ void main() {
       // the field that is missing rather than the one that is filled in.
       await tester.enterText(await manualModelField(tester), 'gemma3:4b');
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
       expect(find.text(l10nEn.aiAssistEndpointInvalidLabel), findsOneWidget);
@@ -1013,6 +1018,7 @@ void main() {
       await tester.pumpWidget(_app(storage));
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
@@ -1040,6 +1046,7 @@ void main() {
       );
       await tester.enterText(await manualModelField(tester), '');
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
@@ -1074,6 +1081,7 @@ void main() {
       );
       await tester.enterText(await manualModelField(tester), 'qwen3:8b');
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
@@ -1117,6 +1125,7 @@ void main() {
         'http://192.168.1.9:11434',
       );
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
@@ -1166,6 +1175,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(await storage.isEnabled(), isFalse);
 
+      await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
       await tester.tap(find.text(l10nEn.dialogOKLabel));
       await tester.pumpAndSettle();
 
@@ -1599,7 +1609,8 @@ void main() {
           // text and a model belongs to an address, so writing one against an
           // address that is not stored yet would be wiped by the endpoint write
           // that followed it.
-          await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
+          await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
+      await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
           await tester.pumpAndSettle();
 
           expect(
@@ -1638,7 +1649,8 @@ void main() {
 
         await tester.enterText(await manualModelField(tester), 'gemma3:4b');
         await tester.pumpAndSettle();
-        await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
+        await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
+      await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
         await tester.pumpAndSettle();
 
         expect(
@@ -1808,7 +1820,8 @@ void main() {
         expect(server.requests, hasLength(1));
         expect(modelText(tester), 'gemma3:4b');
 
-        await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
+        await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
+      await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
         await tester.pumpAndSettle();
         expect(find.text(l10nEn.aiAssistModelRequiredLabel), findsNothing);
         expect(
@@ -2200,7 +2213,7 @@ void main() {
         // Changed, so the only thing standing between this and a request is
         // the dialog knowing it is closing.
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
-        await tester.tap(find.text(l10nEn.dialogCancelLabel));
+        await tester.tap(find.bySemanticsIdentifier('ai-assist-cancel'));
         await tester.pumpAndSettle();
 
         expect(
@@ -2259,7 +2272,8 @@ void main() {
         await typeEndpoint(tester, 'http://192.168.1.9:11434');
         await tester.enterText(await manualModelField(tester), 'qwen3:8b');
         await tester.pumpAndSettle();
-        await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
+        await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
+      await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
         await tester.pumpAndSettle();
 
         expect(
@@ -2677,7 +2691,8 @@ void main() {
         );
         await tester.enterText(await manualModelField(tester), 'gemma3:4b');
         await tester.pumpAndSettle();
-        await tester.tap(find.text(l10nEn.dialogOKLabel));
+        await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
+      await tester.tap(find.text(l10nEn.dialogOKLabel));
         await tester.pumpAndSettle();
       }
 
@@ -3073,7 +3088,8 @@ void main() {
         );
         await tester.enterText(await manualModelField(tester), 'gemma3:4b');
         await tester.pumpAndSettle();
-        await tester.tap(find.text(l10nEn.dialogOKLabel));
+        await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
+      await tester.tap(find.text(l10nEn.dialogOKLabel));
         await tester.pumpAndSettle();
 
         expect(
@@ -3120,7 +3136,8 @@ void main() {
         );
         await tester.enterText(await manualModelField(tester), 'gemma3:4b');
         await tester.pumpAndSettle();
-        await tester.tap(find.text(l10nEn.dialogOKLabel));
+        await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
+      await tester.tap(find.text(l10nEn.dialogOKLabel));
         await tester.pumpAndSettle();
 
         expect(
@@ -3271,7 +3288,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextField), 'sk-test');
-    await tester.tap(find.text(l10nEn.dialogOKLabel));
+    await tester.ensureVisible(find.text(l10nEn.dialogOKLabel));
+      await tester.tap(find.text(l10nEn.dialogOKLabel));
     await tester.pumpAndSettle();
 
     expect(await storage.readApiKey(), 'sk-test');
@@ -3334,7 +3352,7 @@ void main() {
     // about the cancel button should not fail because a precondition exists.
     final before = Map.of(backing.store);
 
-    await tester.tap(find.text(l10nEn.dialogCancelLabel));
+    await tester.tap(find.bySemanticsIdentifier('ai-assist-cancel'));
     await tester.pumpAndSettle();
 
     expect(backing.store, before);
@@ -3391,6 +3409,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await choose(tester, AiProvider.openai);
+      await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.pumpAndSettle();
 
@@ -3425,6 +3444,7 @@ void main() {
             'be made',
       );
 
+      await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.pumpAndSettle();
 
@@ -3551,6 +3571,7 @@ void main() {
       await choose(tester, AiProvider.openai);
       await tester.enterText(find.byType(TextField).first, 'sk-x');
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.pumpAndSettle();
 
@@ -3747,6 +3768,7 @@ void main() {
     }) async {
       await tester.enterText(find.byType(TextField).first, key);
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.pumpAndSettle();
     }
@@ -3848,6 +3870,7 @@ void main() {
 
       await tester.pumpWidget(_app(storage));
       await tester.pumpAndSettle();
+      await tester.ensureVisible(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.tap(find.bySemanticsIdentifier('ai-assist-save-key'));
       await tester.pumpAndSettle();
 

@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/user_image_storage.dart';
@@ -33,41 +34,41 @@ class UserImagePickerTile extends StatelessWidget {
   });
 
   IconData get _fallbackIcon => switch (kind) {
-        UserImageKind.recipe => Icons.restaurant_menu_rounded,
-        UserImageKind.meal => Icons.restaurant_rounded,
-        UserImageKind.profile => Icons.person_rounded,
-      };
+    UserImageKind.recipe => Icons.restaurant_menu_rounded,
+    UserImageKind.meal => Icons.restaurant_rounded,
+    UserImageKind.profile => Icons.person_rounded,
+  };
 
   String get _semanticsIdentifier => switch (kind) {
-        UserImageKind.recipe => 'recipe-builder-image-picker',
-        UserImageKind.meal => 'edit-meal-image-picker',
-        UserImageKind.profile => 'profile-image-picker',
-      };
+    UserImageKind.recipe => 'recipe-builder-image-picker',
+    UserImageKind.meal => 'edit-meal-image-picker',
+    UserImageKind.profile => 'profile-image-picker',
+  };
 
   _Strings _stringsFor(BuildContext context) {
     final s = S.of(context);
     return switch (kind) {
       UserImageKind.recipe => _Strings(
-          add: s.recipeImageLabel,
-          replace: s.recipeImageReplace,
-          takePhoto: s.recipeImageTakePhoto,
-          pickFromGallery: s.recipeImagePickFromGallery,
-          remove: s.recipeImageRemove,
-        ),
+        add: s.recipeImageLabel,
+        replace: s.recipeImageReplace,
+        takePhoto: s.recipeImageTakePhoto,
+        pickFromGallery: s.recipeImagePickFromGallery,
+        remove: s.recipeImageRemove,
+      ),
       UserImageKind.meal => _Strings(
-          add: s.mealImageLabel,
-          replace: s.mealImageReplace,
-          takePhoto: s.mealImageTakePhoto,
-          pickFromGallery: s.mealImagePickFromGallery,
-          remove: s.mealImageRemove,
-        ),
+        add: s.mealImageLabel,
+        replace: s.mealImageReplace,
+        takePhoto: s.mealImageTakePhoto,
+        pickFromGallery: s.mealImagePickFromGallery,
+        remove: s.mealImageRemove,
+      ),
       UserImageKind.profile => _Strings(
-          add: s.profileImageLabel,
-          replace: s.profileImageReplace,
-          takePhoto: s.mealImageTakePhoto,
-          pickFromGallery: s.mealImagePickFromGallery,
-          remove: s.profileImageRemove,
-        ),
+        add: s.profileImageLabel,
+        replace: s.profileImageReplace,
+        takePhoto: s.mealImageTakePhoto,
+        pickFromGallery: s.mealImagePickFromGallery,
+        remove: s.profileImageRemove,
+      ),
     };
   }
 
@@ -94,8 +95,7 @@ class UserImagePickerTile extends StatelessWidget {
                       height: 96,
                       child: hasImage
                           ? FutureBuilder<String>(
-                              future:
-                                  UserImageStorage.absolutePath(imagePath!),
+                              future: UserImageStorage.absolutePath(imagePath!),
                               builder: (context, snapshot) {
                                 if (!snapshot.hasData) {
                                   return Container(
@@ -103,14 +103,16 @@ class UserImagePickerTile extends StatelessWidget {
                                   );
                                 }
                                 return Image(
-                                  image: UserImageStorage.imageProvider(snapshot.data!),
+                                  image: UserImageStorage.imageProvider(
+                                    snapshot.data!,
+                                  ),
                                   fit: BoxFit.cover,
                                   errorBuilder: (_, error, stack) => Container(
                                     color: theme.colorScheme.primaryContainer,
                                     child: Icon(
                                       _fallbackIcon,
-                                      color: theme
-                                          .colorScheme.onPrimaryContainer,
+                                      color:
+                                          theme.colorScheme.onPrimaryContainer,
                                     ),
                                   ),
                                 );
@@ -156,8 +158,12 @@ class UserImagePickerTile extends StatelessWidget {
   }) async {
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return SafeArea(
+        return AppModalSheet(
+          identifier: 'user-image-actions',
           child: Wrap(
             children: [
               ListTile(

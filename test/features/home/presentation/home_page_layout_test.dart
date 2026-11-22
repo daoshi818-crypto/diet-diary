@@ -368,10 +368,17 @@ void main() {
             await tester.pump();
             await tester.pump(const Duration(milliseconds: 500));
             final panel = find.byKey(const ValueKey('logging-hub-panel'));
+            final close = find.bySemanticsIdentifier('logging-hub-close');
+            expect(tester.getRect(panel).top, greaterThanOrEqualTo(0));
             expect(
-              tester.getRect(panel).top,
-              greaterThanOrEqualTo(size.height / 2),
+              tester.getRect(panel).bottom,
+              lessThanOrEqualTo(tester.getRect(close).top - 8),
             );
+            expect(
+              tester.getRect(close).bottom,
+              lessThanOrEqualTo(size.height),
+            );
+            expect(close.hitTestable(), findsOneWidget);
             expect(tester.takeException(), isNull);
             await tester.pumpWidget(const SizedBox.shrink());
             await tester.pump();

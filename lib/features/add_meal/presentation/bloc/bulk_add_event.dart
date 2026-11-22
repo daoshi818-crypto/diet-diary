@@ -10,6 +10,7 @@ abstract class BulkAddEvent extends Equatable {
 class ParseBulkTextEvent extends BulkAddEvent {
   final String text;
   final bool usesImperialUnits;
+  final bool databaseMatchOnly;
 
   /// The app's language, passed to the model so food names come back in the
   /// language the food search is querying. Null leaves the model to infer it
@@ -19,11 +20,17 @@ class ParseBulkTextEvent extends BulkAddEvent {
   const ParseBulkTextEvent({
     required this.text,
     required this.usesImperialUnits,
+    this.databaseMatchOnly = false,
     this.localeCode,
   });
 
   @override
-  List<Object?> get props => [text, usesImperialUnits, localeCode];
+  List<Object?> get props => [
+    text,
+    usesImperialUnits,
+    databaseMatchOnly,
+    localeCode,
+  ];
 }
 
 /// Read an already-encoded photo.

@@ -1,5 +1,17 @@
 # AI Meal Assistance
 
+## 中文定制版入口
+
+当前命名路由打开 `AiFoodAnalysisScreen`。描述页提供“食物库匹配”和“AI 营养分析”；食物照片与营养表是独立识别路径，均读取同一份 `AiCredentialStorage` 配置，不将尚未测试的照片能力判为未配置。
+
+- 食物库匹配保留 `BulkAddScreen`：多个食物与克重逐项匹配，营养来自本地数据，确认后录入。
+- AI 文本／照片通过 `AiFoodAnalysisApi` 返回每100克／毫升的营养与独立食用量；精确匹配可采用数据库值，否则标为估算。支持更换匹配、改克重、校正营养、保存自定义食物。
+- 营养表通过 `NutritionLabelApi` 转录，不估算缺失的打印值。两种 API 共用 `AiStructuredApi` 的鉴权、协议与错误处理。
+- 两种描述结果及待记录列表可传给 `RecipeBuilderScreen`，按食材汇总并保存组合餐食。
+- 自定义供应商从所填地址获取模型供选择，不为其补填模型名。未选择模型不发送请求。
+
+下文保留上游食物名称解释器的实现说明；其中“不输出营养数值”、旧照片能力门控等规则仅适用于旧 `BulkAddScreen` 解释器，不适用于上述新分析路径。当前照片在页面内保留用于预览或重试，离开后释放，不写入文档或导出目录。
+
 This page documents **how the optional AI meal-logging feature works** — what happens between
 typing a meal and seeing it in your diary, where a request goes, and what the app refuses to do.
 

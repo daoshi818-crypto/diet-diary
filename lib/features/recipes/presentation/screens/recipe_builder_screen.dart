@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:opennutritracker/core/domain/entity/recipe_entity.dart';
+import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
 import 'package:opennutritracker/core/presentation/widgets/user_image_picker_tile.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
@@ -23,7 +24,11 @@ import 'package:opennutritracker/generated/l10n.dart';
 
 class RecipeBuilderArguments {
   final RecipeEntity? existing;
-  const RecipeBuilderArguments({this.existing});
+  final List<RecipeIngredientEntity> initialIngredients;
+  const RecipeBuilderArguments({
+    this.existing,
+    this.initialIngredients = const [],
+  });
 }
 
 class RecipeBuilderScreen extends StatefulWidget {
@@ -59,9 +64,14 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
     super.didChangeDependencies();
     if (!_initialized) {
       _initialized = true;
-      final args = ModalRoute.of(context)?.settings.arguments
-          as RecipeBuilderArguments?;
-      _bloc.add(InitializeBuilderEvent(existing: args?.existing));
+      final args =
+          ModalRoute.of(context)?.settings.arguments as RecipeBuilderArguments?;
+      _bloc.add(
+        InitializeBuilderEvent(
+          existing: args?.existing,
+          initialIngredients: args?.initialIngredients ?? const [],
+        ),
+      );
       if (args?.existing != null) {
         final r = args!.existing!;
         _nameController.text = r.name;
@@ -498,6 +508,6 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
-  }
 
+  }
 }

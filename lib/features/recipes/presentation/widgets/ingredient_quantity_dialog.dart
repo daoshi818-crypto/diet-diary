@@ -1,8 +1,8 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
-import 'package:opennutritracker/core/utils/sheet_bottom_inset.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 
@@ -23,6 +23,8 @@ Future<IngredientQuantitySelection?> showIngredientQuantityDialog(
   return showModalBottomSheet<IngredientQuantitySelection>(
     context: context,
     isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
     builder: (ctx) => _IngredientQuantitySheet(
       meal: meal,
       initialAmount: initialAmount,
@@ -69,7 +71,6 @@ class _IngredientQuantitySheetState extends State<_IngredientQuantitySheet> {
   }
 
   String _defaultUnit(MealEntity meal) {
-    if (meal.hasServingValues) return 'serving';
     if (meal.isLiquid) return 'ml';
     return 'g';
   }
@@ -109,99 +110,91 @@ class _IngredientQuantitySheetState extends State<_IngredientQuantitySheet> {
       borderRadius: Dimens.borderRadiusS,
       borderSide: BorderSide(color: palette.border, width: Dimens.hairline),
     );
-    return Padding(
-      padding: EdgeInsets.only(bottom: sheetBottomInset(context)),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(Dimens.spacing24, Dimens.spacing24, Dimens.spacing24, Dimens.spacing16),
-        decoration: BoxDecoration(
-          color: palette.surface,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(Dimens.radiusXL),
-            topRight: Radius.circular(Dimens.radiusXL),
+    return AppModalSheet(
+      identifier: 'ingredient-quantity',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: palette.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
           ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: palette.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: Dimens.spacing20),
-            Text(
-              widget.meal.name ?? '?',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: Dimens.spacing16),
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: TextFormField(
-                    controller: _amountController,
-                    autofocus: true,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
+          const SizedBox(height: Dimens.spacing20),
+          Text(
+            widget.meal.name ?? '?',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: Dimens.spacing16),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextFormField(
+                  controller: _amountController,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'^\d+([.,]\d{0,2})?$'),
                     ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d+([.,]\d{0,2})?$'),
-                      ),
-                    ],
-                    decoration: InputDecoration(
-                      labelText: S.of(context).recipeIngredientAmountLabel,
-                      border: fieldBorder,
-                      enabledBorder: fieldBorder,
-                    ),
+                  ],
+                  decoration: InputDecoration(
+                    labelText: S.of(context).recipeIngredientAmountLabel,
+                    border: fieldBorder,
+                    enabledBorder: fieldBorder,
                   ),
                 ),
-                const SizedBox(width: Dimens.spacing12),
-                Expanded(
-                  flex: 2,
-                  child: DropdownButtonFormField<String>(
-                    isExpanded: true,
-                    itemHeight: null,
-                    initialValue: _unit,
-                    borderRadius: Dimens.borderRadiusM,
-                    decoration: InputDecoration(
-                      labelText: S.of(context).recipeIngredientUnitLabel,
-                      border: fieldBorder,
-                      enabledBorder: fieldBorder,
-                    ),
-                    items: _unitItems(context),
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() => _unit = value);
-                      }
-                    },
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: Dimens.spacing24),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: Dimens.spacing16),
-                  shape: Dimens.shapeM,
-                ),
-                onPressed: _onConfirm,
-                child: Text(S.of(context).addLabel),
               ),
+              const SizedBox(width: Dimens.spacing12),
+              Expanded(
+                flex: 2,
+                child: DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  itemHeight: null,
+                  initialValue: _unit,
+                  borderRadius: Dimens.borderRadiusM,
+                  decoration: InputDecoration(
+                    labelText: S.of(context).recipeIngredientUnitLabel,
+                    border: fieldBorder,
+                    enabledBorder: fieldBorder,
+                  ),
+                  items: _unitItems(context),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _unit = value);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Dimens.spacing24),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: Dimens.spacing16),
+                shape: Dimens.shapeM,
+              ),
+              onPressed: _onConfirm,
+              child: Text(S.of(context).addLabel),
             ),
-            const SizedBox(height: Dimens.spacing8),
-          ],
-        ),
+          ),
+          const SizedBox(height: Dimens.spacing8),
+        ],
       ),
     );
   }
@@ -213,8 +206,8 @@ class _IngredientQuantitySheetState extends State<_IngredientQuantitySheet> {
       Navigator.of(context).pop();
       return;
     }
-    Navigator.of(context).pop(
-      IngredientQuantitySelection(amount: amount, unit: _unit),
-    );
+    Navigator.of(
+      context,
+    ).pop(IngredientQuantitySelection(amount: amount, unit: _unit));
   }
 }

@@ -1,3 +1,4 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/usecase/create_profile_usecase.dart';
 import 'package:opennutritracker/core/domain/usecase/get_profiles_usecase.dart';
@@ -13,14 +14,18 @@ import 'package:opennutritracker/generated/l10n.dart';
 Future<void> showProfileSwitcherSheet(BuildContext pageContext) async {
   await showModalBottomSheet<void>(
     context: pageContext,
-    showDragHandle: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.transparent,
     builder: (sheetContext) {
       final getProfiles = locator<GetProfilesUsecase>();
       final profiles = getProfiles.getProfiles();
       final activeId = getProfiles.activeProfileId;
       final s = S.of(sheetContext);
 
-      return SafeArea(
+      return AppModalSheet(
+        identifier: 'profile-switcher',
+        scrollable: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,8 +53,10 @@ Future<void> showProfileSwitcherSheet(BuildContext pageContext) async {
                         onTap: () {
                           Navigator.of(sheetContext).pop();
                           if (profile.id != activeId) {
-                            locator<ProfileSwitchCoordinator>()
-                                .switchTo(pageContext, profile);
+                            locator<ProfileSwitchCoordinator>().switchTo(
+                              pageContext,
+                              profile,
+                            );
                           }
                         },
                       ),
@@ -76,8 +83,9 @@ Future<void> showProfileSwitcherSheet(BuildContext pageContext) async {
                 title: Text(s.manageProfilesLabel),
                 onTap: () {
                   Navigator.of(sheetContext).pop();
-                  Navigator.of(pageContext)
-                      .pushNamed(NavigationOptions.manageProfilesRoute);
+                  Navigator.of(
+                    pageContext,
+                  ).pushNamed(NavigationOptions.manageProfilesRoute);
                 },
               ),
             ),
@@ -130,8 +138,9 @@ Future<void> showAddProfileDialog(BuildContext pageContext) async {
 
   if (created != true) return;
 
-  final profile = await locator<CreateProfileUsecase>()
-      .createProfile(name: controller.text.trim());
+  final profile = await locator<CreateProfileUsecase>().createProfile(
+    name: controller.text.trim(),
+  );
   if (!pageContext.mounted) return;
   await locator<ProfileSwitchCoordinator>().switchTo(pageContext, profile);
 }

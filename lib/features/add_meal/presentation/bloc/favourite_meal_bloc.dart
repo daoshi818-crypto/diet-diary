@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/add_meal/util/food_query.dart';
 import 'dart:async';
 
 import 'package:equatable/equatable.dart';
@@ -63,9 +64,7 @@ class FavouriteMealBloc extends Bloc<FavouriteMealEvent, FavouriteMealState> {
   }
 
   bool Function(MealEntity) _matches(String query) =>
-      (meal) =>
-          (meal.name?.toLowerCase().contains(query) ?? false) ||
-          (meal.brands?.toLowerCase().contains(query) ?? false);
+      (meal) => foodMatchesQuery(meal, query);
 
   @override
   Future<void> close() async {

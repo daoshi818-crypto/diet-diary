@@ -1,3 +1,4 @@
+import 'package:opennutritracker/features/add_meal/util/food_query.dart';
 import 'package:logging/logging.dart';
 import 'package:opennutritracker/core/data/data_source/remote_search_cache_data_source.dart';
 import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.dart';
@@ -290,9 +291,7 @@ class SearchProductsUseCase {
   }
 
   bool _mealMatchesSearch(MealEntity meal, String normalizedSearchString) {
-    return (meal.name?.toLowerCase().contains(normalizedSearchString) ??
-            false) ||
-        (meal.brands?.toLowerCase().contains(normalizedSearchString) ?? false);
+    return foodMatchesQuery(meal, normalizedSearchString);
   }
 
   /// The fresh copy of [cached] when this search's remote page returned the

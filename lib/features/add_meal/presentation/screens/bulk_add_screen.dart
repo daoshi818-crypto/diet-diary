@@ -1,4 +1,7 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'dart:async';
+import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
+import 'package:opennutritracker/features/recipes/presentation/screens/recipe_builder_screen.dart';
 import 'dart:math' as math;
 
 import 'package:auto_size_text/auto_size_text.dart';
@@ -47,6 +50,7 @@ class BulkAddScreenArguments {
   /// Opened from the Snap meal tile: go straight to the camera, or to the AI
   /// setup when no model that can read a photo is configured yet.
   final bool startWithPhoto;
+  final bool databaseMatchOnly;
 
   /// The add-food screen's "To log" list. With one, the button puts the
   /// checked rows on it and returns there instead of logging them.
@@ -58,6 +62,7 @@ class BulkAddScreenArguments {
     this.usesImperialUnits, {
     this.initialText,
     this.startWithPhoto = false,
+    this.databaseMatchOnly = false,
     this.logTray,
   });
 }
@@ -374,60 +379,60 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
           builder: (context, state) => Text(
             state is BulkAddLoadedState && state.rows.isNotEmpty
                 ? S.of(context).bulkAddReviewTitle
+                : _args.databaseMatchOnly
+                ? S.of(context).aiFoodMatchIngredients
                 : S.of(context).bulkAddTitle,
           ),
         ),
         actions: [
-          // Only offered when the user has a key enabled. There is no
-          // offline way to read a photo, so showing the action to everyone
-          // would advertise a button that can only ever apologise.
-          FutureBuilder<bool>(
-            future: _photoAvailable,
-            builder: (context, snapshot) => snapshot.data == true
+          BlocBuilder<BulkAddBloc, BulkAddState>(
+            bloc: _bloc,
+            builder: (context, state) =>
+                state is BulkAddLoadedState && state.loggableCount > 0
                 ? Semantics(
-                    identifier: 'bulk-add-photo',
+                    identifier: 'bulk-add-save-recipe',
                     child: IconButton(
-                      onPressed: _onPhotoPressed,
-                      icon: const Icon(Icons.photo_camera_rounded),
-                      tooltip: S.of(context).bulkAddPhotoLabel,
+                      tooltip: S.of(context).saveAsMealLabel,
+                      onPressed: () => _saveMatchedRecipe(state),
+                      icon: const Icon(Icons.menu_book_outlined),
                     ),
                   )
                 : const SizedBox.shrink(),
           ),
+          // Only offered when the user has a key enabled. There is no
+          // offline way to read a photo, so showing the action to everyone
+          // would advertise a button that can only ever apologise.
+          if (!_args.databaseMatchOnly)
+            FutureBuilder<bool>(
+              future: _photoAvailable,
+              builder: (context, snapshot) => snapshot.data == true
+                  ? Semantics(
+                      identifier: 'bulk-add-photo',
+                      child: IconButton(
+                        onPressed: _onPhotoPressed,
+                        icon: const Icon(Icons.photo_camera_rounded),
+                        tooltip: S.of(context).bulkAddPhotoLabel,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
         ],
       ),
       body: SafeArea(
         child: BlocBuilder<BulkAddBloc, BulkAddState>(
           bloc: _bloc,
-          builder: (context, state) => LayoutBuilder(
-            builder: (context, constraints) => Column(
+          builder: (context, state) => SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // The **field** is bounded, not the block. At 2x on a 320dp
-                // screen the entry block measured 388px — a four-line field
-                // plus a full-height button — against about 595px of body,
-                // and with the submit bar's 192 that left the rows nothing
-                // and overflowed by 14px. #820.
-                //
-                // Capping the whole block was tried first and is worse: the
-                // Search button falls below the fold inside the scroll view,
-                // so the primary action of the screen has to be scrolled to.
-                // Bounding the field alone keeps the button where it is.
-                //
-                // A ceiling rather than fewer `maxLines`: shrinking the field
-                // at large text scales would take multi-line entry away from
-                // exactly the users who need the biggest text, on a screen
-                // that exists for typing several items at once.
                 if (state is BulkAddLoadedState &&
                     state.source == BulkAddReadSource.photo)
                   _buildPhotoSource(context)
                 else
-                  _buildInput(
-                    context,
-                    state,
-                    maxFieldHeight: constraints.maxHeight * 0.3,
-                  ),
+                  _buildInput(context, state),
                 const Divider(height: 1),
-                Expanded(child: _buildBody(context, state)),
+                _buildBody(context, state),
                 if (state is BulkAddLoadedState)
                   _buildSubmitBar(context, state),
               ],
@@ -438,96 +443,75 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     );
   }
 
-  /// Puts the hint above [body] without letting it push anything off screen.
-  ///
-  /// It lives in the body rather than in the entry block above, which is
-  /// fixed: adding a standing line there overflowed the column by 184px at 2x
-  /// on a 320dp screen, the same defect #820 fixed and the same one #824
-  /// uncovered under it. This region is the one that can give ground.
   Widget _withModelHint(BuildContext context, Widget body) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      _buildModelHint(context),
-      Expanded(child: body),
-    ],
+    children: [_buildModelHint(context), body],
   );
 
-  /// The line that says a model could read this, for a user who has never
-  /// configured one.
-  ///
-  /// It names the API key requirement before the tap. The app ships no model,
-  /// so a reader who follows this without knowing that lands in a third-party
-  /// signup nothing warned them about — the qualifier is what keeps a
-  /// standing offer from being a bait.
-  ///
-  /// It carries the same Experimental marker every other AI surface carries.
-  /// This is the most-seen of them, and marking the quiet surfaces while
-  /// leaving the loudest one bare would invert the emphasis.
-  ///
-  /// It says nothing about where nutrition values come from. A model may
-  /// never produce them, and that guarantee is reassurance rather than
-  /// something that changes whether this tap leads anywhere — it belongs on
-  /// the agreement, which is where it is.
-  Widget _buildModelHint(BuildContext context) => FutureBuilder<bool>(
-    future: _modelUnknown,
-    builder: (context, snapshot) {
-      // Nothing until the keystore read lands, and nothing for anyone who has
-      // configured a provider. A line that appeared and then vanished would
-      // resize the screen under someone already typing.
-      if (snapshot.data != true) return const SizedBox.shrink();
-      final s = S.of(context);
-      final theme = Theme.of(context);
-      return Semantics(
-        identifier: 'bulk-add-model-hint',
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: InkWell(
-            // Asks for the AI dialog by name, the same way the failure
-            // notices below have since #852. Plain Settings opens with the
-            // AI row several category groups down, and of this screen's two
-            // audiences the one reading this hint is the one that knows
-            // least about where it is going — sending it the longer way
-            // round was exactly backwards. #992.
-            onTap: () => _openSettings(
-              arguments: const SettingsScreenArguments(openAiAssist: true),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.auto_awesome_rounded,
-                    size: 18,
-                    color: theme.colorScheme.primary,
+  Widget _buildModelHint(BuildContext context) => _args.databaseMatchOnly
+      ? const SizedBox.shrink()
+      : FutureBuilder<bool>(
+          future: _modelUnknown,
+          builder: (context, snapshot) {
+            // Nothing until the keystore read lands, and nothing for anyone who has
+            // configured a provider. A line that appeared and then vanished would
+            // resize the screen under someone already typing.
+            if (snapshot.data != true) return const SizedBox.shrink();
+            final s = S.of(context);
+            final theme = Theme.of(context);
+            return Semantics(
+              identifier: 'bulk-add-model-hint',
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  // Asks for the AI dialog by name, the same way the failure
+                  // notices below have since #852. Plain Settings opens with the
+                  // AI row several category groups down, and of this screen's two
+                  // audiences the one reading this hint is the one that knows
+                  // least about where it is going — sending it the longer way
+                  // round was exactly backwards. #992.
+                  onTap: () => _openSettings(
+                    arguments: const SettingsScreenArguments(
+                      openAiAssist: true,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          '${s.bulkAddModelHintLabel} · '
-                          '${s.aiAssistExperimentalLabel}',
-                          style: theme.textTheme.bodyMedium,
+                        Icon(
+                          Icons.auto_awesome_rounded,
+                          size: 18,
+                          color: theme.colorScheme.primary,
                         ),
-                        Text(
-                          s.bulkAddModelHintKeyLabel,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${s.bulkAddModelHintLabel} · '
+                                '${s.aiAssistExperimentalLabel}',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              Text(
+                                s.bulkAddModelHintKeyLabel,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-        ),
-      );
-    },
-  );
+            );
+          },
+        );
 
   /// Stands in for the text field once a photo has been read: there is no
   /// typed line to edit, so the one thing to offer is another photo.
@@ -572,42 +556,32 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     );
   }
 
-  Widget _buildInput(
-    BuildContext context,
-    BulkAddState state, {
-    required double maxFieldHeight,
-  }) => Padding(
+  Widget _buildInput(BuildContext context, BulkAddState state) => Padding(
     padding: const EdgeInsets.all(16),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Scrolls past its ceiling rather than being clipped: what is typed
-        // must stay reachable, and at ordinary text sizes four lines are far
-        // below this so nothing changes.
-        ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxFieldHeight),
-          child: Semantics(
-            identifier: 'bulk-add-input',
-            child: TextField(
-              controller: _textController,
-              minLines: 2,
-              maxLines: 4,
-              textInputAction: TextInputAction.newline,
-              keyboardType: TextInputType.multiline,
-              decoration: InputDecoration(
-                hintText: S.of(context).bulkAddInputHint,
-                // Dictate the meal, then match it straight away.
-                suffixIcon: VoiceInputButton(
-                  key: _voice,
-                  controller: _textController,
-                  onDictated: (_) => _onParsePressed(),
-                ),
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.secondaryContainer,
-                border: const OutlineInputBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(20)),
-                  borderSide: BorderSide.none,
-                ),
+        Semantics(
+          identifier: 'bulk-add-input',
+          child: TextField(
+            controller: _textController,
+            minLines: 2,
+            maxLines: null,
+            textInputAction: TextInputAction.newline,
+            keyboardType: TextInputType.multiline,
+            decoration: InputDecoration(
+              hintText: S.of(context).bulkAddInputHint,
+              // Dictate the meal, then match it straight away.
+              suffixIcon: VoiceInputButton(
+                key: _voice,
+                controller: _textController,
+                onDictated: (_) => _onParsePressed(),
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.secondaryContainer,
+              border: const OutlineInputBorder(
+                borderRadius: BorderRadius.all(Radius.circular(20)),
+                borderSide: BorderSide.none,
               ),
             ),
           ),
@@ -707,12 +681,7 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
       );
     }
     if (state is! BulkAddLoadedState) {
-      // Scrollable because here the line *is* the body and takes a tight
-      // height from the Expanded above: at 2x in German its two rows want
-      // 112px more than this region has before anything has been parsed.
-      // Scrolling rather than clipping, for the reason #777 settled — the
-      // words are the point.
-      return SingleChildScrollView(child: _buildModelHint(context));
+      return _buildModelHint(context);
     }
     if (state.rows.isEmpty) {
       return _withModelHint(
@@ -740,6 +709,8 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     final list = Semantics(
       identifier: 'bulk-add-row-list',
       child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(vertical: 8),
         itemCount: state.rows.length + (state.parseErrors.isEmpty ? 0 : 1),
         separatorBuilder: (_, _) => const Divider(height: 1),
@@ -843,95 +814,83 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     // The ceiling is a share of what this widget was actually given, not of
     // the screen: the screen includes the app bar and the input above, so a
     // fraction of it overflows the part that is left.
-    return LayoutBuilder(
-      builder: (context, constraints) => Column(
-        children: [
-          Semantics(
-            identifier: 'bulk-add-model-notice',
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              color: emphasised
-                  ? scheme.errorContainer
-                  : scheme.surfaceContainerHighest,
-              // **Bounded, and scrollable rather than clipped.** Dropping the
-              // cap on its own overflowed by 317px at 2x on a 320dp screen —
-              // the notice sits above the rows in a `Column`, so its height
-              // comes straight out of them. A ceiling gives the rows their
-              // share back; scrolling is what stops the ceiling becoming a
-              // second truncation, which is the bug this is fixing.
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: constraints.maxHeight * 0.4,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            icon,
-                            size: 16,
-                            color: emphasised
-                                ? scheme.onErrorContainer
-                                : scheme.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              text,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: emphasised
-                                        ? scheme.onErrorContainer
-                                        : null,
-                                  ),
-                              // **No cap.** There used to be three lines, on the
-                              // reasoning that these run long in German. Measured for
-                              // #777, every one of them overran it — in English too —
-                              // and no cap survives the combination that matters:
-                              // German at 2x on a 320dp screen needed twenty lines,
-                              // which is when the words are needed most. Now that the
-                              // advice is a button, what is left is one sentence: two
-                              // or three lines on a handset, up to eight at 2x on the
-                              // narrowest screen, and never cut off.
-                            ),
-                          ),
-                        ],
-                      ),
-                      // **Below the sentence, not beside it.** Sharing the row was
-                      // measured first and is worse: a button takes about 120px,
-                      // which on a 320dp screen leaves the text 144 and pushes
-                      // German at 2x back up to twelve lines. Full width for the
-                      // words, the control underneath.
-                      if (action != null)
-                        Align(
-                          alignment: AlignmentDirectional.centerEnd,
-                          child: Semantics(
-                            identifier: 'bulk-add-notice-action',
-                            child: TextButton(
-                              onPressed: action,
-                              style: TextButton.styleFrom(
-                                foregroundColor: emphasised
-                                    ? scheme.onErrorContainer
-                                    : null,
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              child: Text(S.of(context).settingsLabel),
-                            ),
-                          ),
+    return Column(
+      children: [
+        Semantics(
+          identifier: 'bulk-add-model-notice',
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: emphasised
+                ? scheme.errorContainer
+                : scheme.surfaceContainerHighest,
+            // **Bounded, and scrollable rather than clipped.** Dropping the
+            // cap on its own overflowed by 317px at 2x on a 320dp screen —
+            // the notice sits above the rows in a `Column`, so its height
+            // comes straight out of them. A ceiling gives the rows their
+            // share back; scrolling is what stops the ceiling becoming a
+            // second truncation, which is the bug this is fixing.
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      icon,
+                      size: 16,
+                      color: emphasised
+                          ? scheme.onErrorContainer
+                          : scheme.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        text,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: emphasised ? scheme.onErrorContainer : null,
                         ),
-                    ],
-                  ),
+                        // **No cap.** There used to be three lines, on the
+                        // reasoning that these run long in German. Measured for
+                        // #777, every one of them overran it — in English too —
+                        // and no cap survives the combination that matters:
+                        // German at 2x on a 320dp screen needed twenty lines,
+                        // which is when the words are needed most. Now that the
+                        // advice is a button, what is left is one sentence: two
+                        // or three lines on a handset, up to eight at 2x on the
+                        // narrowest screen, and never cut off.
+                      ),
+                    ),
+                  ],
                 ),
-              ),
+                // **Below the sentence, not beside it.** Sharing the row was
+                // measured first and is worse: a button takes about 120px,
+                // which on a 320dp screen leaves the text 144 and pushes
+                // German at 2x back up to twelve lines. Full width for the
+                // words, the control underneath.
+                if (action != null)
+                  Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: Semantics(
+                      identifier: 'bulk-add-notice-action',
+                      child: TextButton(
+                        onPressed: action,
+                        style: TextButton.styleFrom(
+                          foregroundColor: emphasised
+                              ? scheme.onErrorContainer
+                              : null,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        child: Text(S.of(context).settingsLabel),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
-          Expanded(child: list),
-        ],
-      ),
+        ),
+        list,
+      ],
     );
   }
 
@@ -970,23 +929,19 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     // the last thing in it — so the control this change exists to add would
     // have been the first thing to go: in the tree, and untappable. Measured,
     // not assumed; the test pins it.
-    child: Center(
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(message, textAlign: TextAlign.center),
-            if (action != null)
-              Semantics(
-                identifier: 'bulk-add-message-action',
-                child: TextButton(
-                  onPressed: action,
-                  child: Text(S.of(context).settingsLabel),
-                ),
-              ),
-          ],
-        ),
-      ),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(message, textAlign: TextAlign.center),
+        if (action != null)
+          Semantics(
+            identifier: 'bulk-add-message-action',
+            child: TextButton(
+              onPressed: action,
+              child: Text(S.of(context).settingsLabel),
+            ),
+          ),
+      ],
     ),
   );
 
@@ -1579,6 +1534,38 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     _onParsePressed();
   }
 
+  Future<void> _saveMatchedRecipe(BulkAddLoadedState state) async {
+    final ingredients = <RecipeIngredientEntity>[];
+    for (final row in state.loggableRows) {
+      final amount = double.tryParse(row.amountText.replaceAll(',', '.'));
+      if (amount == null ||
+          !amount.isFinite ||
+          amount <= 0 ||
+          amount > bulkAddMaxQuantity) {
+        return;
+      }
+      final grams = convertQuantityToBaseUnit(
+        amount,
+        row.effectiveUnit,
+        row.meal!,
+      );
+      ingredients.add(
+        RecipeIngredientEntity(
+          snapshotMeal: row.meal!,
+          amount: grams,
+          unit: row.meal!.isLiquid ? 'ml' : 'g',
+          convertedAmountG: grams,
+        ),
+      );
+    }
+    if (ingredients.isEmpty) return;
+    await Navigator.pushNamed(
+      context,
+      NavigationOptions.recipeBuilderRoute,
+      arguments: RecipeBuilderArguments(initialIngredients: ingredients),
+    );
+  }
+
   void _onParsePressed() {
     FocusScope.of(context).unfocus();
     _resetAmountControllers();
@@ -1586,6 +1573,7 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
       ParseBulkTextEvent(
         text: _textController.text,
         usesImperialUnits: _args.usesImperialUnits,
+        databaseMatchOnly: _args.databaseMatchOnly,
         localeCode: Localizations.localeOf(context).languageCode,
       ),
     );
@@ -1616,7 +1604,11 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     };
     final shouldOpenCamera = await showModalBottomSheet<bool>(
       context: context,
-      builder: (sheetContext) => SafeArea(
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => AppModalSheet(
+        identifier: 'bulk-add-photo-source',
         child: Wrap(
           children: [
             // The disclosure sits here rather than in a dialog the user has
@@ -1712,7 +1704,12 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
   Future<void> _showCandidatePicker(int index, BulkAddRow row) async {
     final chosen = await showModalBottomSheet<int>(
       context: context,
-      builder: (context) => SafeArea(
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AppModalSheet(
+        identifier: 'bulk-add-candidates',
+        scrollable: false,
         // Label the surface, not each row — identifiers would churn with
         // the candidate count.
         child: Semantics(
@@ -1750,7 +1747,8 @@ class _BulkAddScreenState extends State<BulkAddScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       builder: (_) => QuickAddBottomSheet(
         intakeType: _args.intakeTypeEntity,
         day: _args.day,

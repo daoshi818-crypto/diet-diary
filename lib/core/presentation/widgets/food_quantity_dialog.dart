@@ -1,7 +1,7 @@
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/intake_entity.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
-import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/core/utils/calc/unit_calc.dart';
 import 'package:opennutritracker/core/utils/energy_display.dart';
@@ -106,72 +106,38 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
       onSelectionConfirmed: (item) async => Navigator.of(context).pop(item),
       layoutBuilder: (context, editor, actions) => Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 8, 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    widget.meal.name ?? '?',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleLarge,
+          Text(
+            widget.meal.name ?? '?',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            widget.meal.nutriments.energyPerUnit == null
+                ? '—'
+                : EnergyDisplay.formatWithUnit(
+                    context,
+                    base * widget.meal.nutriments.energyPerUnit!,
                   ),
-                ),
-                Semantics(
-                  identifier: 'food-quantity-close',
-                  child: IconButton(
-                    tooltip: s.dialogCloseLabel,
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ),
-              ],
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+              fontWeight: FontWeight.w800,
             ),
           ),
-          Flexible(
-            fit: widget.asBottomSheet ? FlexFit.tight : FlexFit.loose,
-            child: SingleChildScrollView(
-              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    widget.meal.nutriments.energyPerUnit == null
-                        ? '—'
-                        : EnergyDisplay.formatWithUnit(
-                            context,
-                            base * widget.meal.nutriments.energyPerUnit!,
-                          ),
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  editor,
-                ],
-              ),
-            ),
-          ),
+          const SizedBox(height: 16),
+          editor,
           actions,
         ],
       ),
     );
-    if (widget.asBottomSheet) return content;
+    final sheet = AppModalSheet(identifier: 'food-quantity', child: content);
+    if (widget.asBottomSheet) return sheet;
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-      shape: Dimens.shapeXL,
-      clipBehavior: Clip.antiAlias,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: 480,
-          maxHeight: MediaQuery.sizeOf(context).height * .65,
-        ),
-        child: content,
-      ),
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+      child: sheet,
     );
   }
 }
@@ -187,25 +153,13 @@ Future<LogTrayItem?> showFoodQuantitySheet({
   context: context,
   useSafeArea: true,
   isScrollControlled: true,
-  showDragHandle: true,
-  builder: (context) => AnimatedPadding(
-    duration: const Duration(milliseconds: 180),
-    padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    child: LayoutBuilder(
-      builder: (context, constraints) => SizedBox(
-        height: (MediaQuery.sizeOf(context).height * .56).clamp(
-          0,
-          constraints.maxHeight,
-        ),
-        child: FoodQuantityDialog(
-          meal: meal,
-          day: day,
-          type: type,
-          usesImperialUnits: usesImperialUnits,
-          editingIntake: editingIntake,
-          asBottomSheet: true,
-        ),
-      ),
-    ),
+  backgroundColor: Colors.transparent,
+  builder: (context) => FoodQuantityDialog(
+    meal: meal,
+    day: day,
+    type: type,
+    usesImperialUnits: usesImperialUnits,
+    editingIntake: editingIntake,
+    asBottomSheet: true,
   ),
 );

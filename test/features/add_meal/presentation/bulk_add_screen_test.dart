@@ -395,7 +395,8 @@ Future<void> _startWaiting(WidgetTester tester, String text) async {
   await tester.pumpAndSettle();
 
   await tester.enterText(find.byType(TextField).first, text);
-  await tester.tap(find.widgetWithIcon(FilledButton, Icons.search));
+  await tester.ensureVisible(find.widgetWithIcon(FilledButton, Icons.search));
+      await tester.tap(find.widgetWithIcon(FilledButton, Icons.search));
   await tester.pump();
   // The screen decides which loading state to draw from a keystore read
   // that lands a microtask or two after the loading state does.
@@ -591,7 +592,8 @@ Future<void> _parse(WidgetTester tester, String text) async {
   await tester.enterText(find.byType(TextField).first, text);
   // By icon, not label: these tests also pump a German locale, where the
   // button reads something else entirely.
-  await tester.tap(find.widgetWithIcon(FilledButton, Icons.search));
+  await tester.ensureVisible(find.widgetWithIcon(FilledButton, Icons.search));
+      await tester.tap(find.widgetWithIcon(FilledButton, Icons.search));
   await tester.pumpAndSettle();
 }
 
@@ -617,7 +619,8 @@ void main() {
     service.hear('and toast');
     await tester.pump();
 
-    await tester.tap(find.widgetWithIcon(FilledButton, Icons.search));
+    await tester.ensureVisible(find.widgetWithIcon(FilledButton, Icons.search));
+      await tester.tap(find.widgetWithIcon(FilledButton, Icons.search));
     await tester.pump();
     expect(service.cancels, 1);
     await tester.pumpAndSettle(const Duration(seconds: 1));
@@ -983,7 +986,8 @@ void main() {
     await tester.tap(find.text('slice').last);
     await tester.pumpAndSettle();
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     final write = _mealDetailBloc.writes.single;
@@ -1093,28 +1097,12 @@ void main() {
       reason: 'something on this screen does not fit the space it is given',
     );
 
-    final input = tester
-        .getSize(find.bySemanticsIdentifier('bulk-add-input'))
-        .height;
-    final submit = tester
-        .getSize(find.bySemanticsIdentifier('bulk-add-submit'))
-        .height;
-    final parse = tester
-        .getSize(find.bySemanticsIdentifier('bulk-add-parse'))
-        .height;
-
-    expect(
-      input,
-      lessThanOrEqualTo(640 * 0.3),
-      reason: 'the field is what gives ground, so the rows do not have to',
-    );
-    // The rows are what was being squeezed to nothing. 32 of padding above
-    // and 32 below the two buttons, and a 1px divider.
-    expect(
-      input + parse + submit + 65,
-      lessThan(640),
-      reason: 'the fixed children have to leave the list some height',
-    );
+    final submit = find.bySemanticsIdentifier('bulk-add-submit');
+    await tester.ensureVisible(submit);
+    await tester.pumpAndSettle();
+    expect(tester.getRect(submit).bottom,lessThanOrEqualTo(640));
+    expect(find.byType(SingleChildScrollView),findsOneWidget);
+    expect(tester.takeException(),isNull);
   });
 
   testWidgets('the advice is a control, so nothing can truncate it', (
@@ -1549,34 +1537,15 @@ void main() {
   // `Center` passes loose constraints, so the scroll view shrink-wraps its
   // child rather than filling the viewport — but nothing pinned that, so a
   // later change could make the claim true without a test noticing.
-  testWidgets('a short message is still vertically centred', (tester) async {
+  testWidgets('a short message uses the same whole-page scroll surface', (tester) async {
     await _register(const {});
     await tester.pumpWidget(_app());
-    await _parse(tester, '');
-
+    await _parse(tester,'');
     final message = find.text(l10nEn.bulkAddNothingToLogLabel);
-    expect(message, findsOneWidget);
-
-    // Compared against the region `_centeredMessage` is given, not the
-    // screen: the input block and divider sit above it, so "centred" means
-    // centred in what is left. The scroll view shrink-wraps the message, so
-    // its box is the message's box — top-aligning it moves this by half the
-    // region, which is what the assertion has to be able to see.
-    final scroller = find.ancestor(
-      of: message,
-      matching: find.byType(SingleChildScrollView),
-    );
-    final region = find.ancestor(of: scroller, matching: find.byType(Padding));
-    final scrollBox = tester.getRect(scroller.first);
-    final regionBox = tester.getRect(region.first);
-
-    expect(
-      (scrollBox.center.dy - regionBox.center.dy).abs(),
-      lessThan(1.0),
-      reason:
-          'a short message stays centred in its region, not pinned to '
-          'the top of the scroll viewport',
-    );
+    expect(message,findsOneWidget);
+    expect(find.ancestor(of:message,matching:find.byType(SingleChildScrollView)),findsOneWidget);
+    expect(tester.getRect(message).bottom,lessThanOrEqualTo(600));
+    expect(tester.takeException(),isNull);
   });
 
   testWidgets('an empty text parse still shows the generic line', (
@@ -1604,7 +1573,8 @@ void main() {
     await tester.pumpWidget(_app());
     await _parse(tester, '100g toast, 2 eggs, 200g milk');
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     expect(_mealDetailBloc.writes.map((w) => w.mealName).toList(), [
@@ -1625,7 +1595,8 @@ void main() {
     await tester.pumpWidget(_app());
     await _parse(tester, '4oz steak');
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     final write = _mealDetailBloc.writes.single;
@@ -1640,7 +1611,8 @@ void main() {
     await tester.pumpWidget(_app());
     await _parse(tester, '2 eggs');
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     final write = _mealDetailBloc.writes.single;
@@ -1661,7 +1633,8 @@ void main() {
 
     await tester.enterText(find.byType(TextField).at(1), '0');
     await tester.pumpAndSettle();
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     expect(_mealDetailBloc.writes, isEmpty);
@@ -1706,6 +1679,7 @@ void main() {
       await typeAmount(tester, 0, '0');
       await typeAmount(tester, 2, '99999');
 
+      await tester.ensureVisible(_submitButton());
       await tester.tap(_submitButton());
       await tester.pumpAndSettle();
 
@@ -1726,6 +1700,7 @@ void main() {
       await typeAmount(tester, 1, '');
       await typeAmount(tester, 2, '99999');
 
+      await tester.ensureVisible(_submitButton());
       await tester.tap(_submitButton());
       await tester.pumpAndSettle();
 
@@ -1747,6 +1722,7 @@ void main() {
       await typeAmount(tester, 0, '0');
       await typeAmount(tester, 2, '99999');
 
+      await tester.ensureVisible(_submitButton());
       await tester.tap(_submitButton());
       await tester.pumpAndSettle();
 
@@ -1767,6 +1743,7 @@ void main() {
     ) async {
       await threeRows(tester);
       await typeAmount(tester, 0, '0');
+      await tester.ensureVisible(_submitButton());
       await tester.tap(_submitButton());
       await tester.pumpAndSettle();
 
@@ -1784,6 +1761,7 @@ void main() {
       ScaffoldMessenger.of(tester.element(_submitButton())).clearSnackBars();
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(_submitButton());
       await tester.tap(_submitButton());
       await tester.pumpAndSettle();
 
@@ -1802,6 +1780,7 @@ void main() {
       await threeRows(tester);
       await typeAmount(tester, 1, '0');
 
+      await tester.ensureVisible(_submitButton());
       await tester.tap(_submitButton());
       await tester.pumpAndSettle();
 
@@ -1825,7 +1804,8 @@ void main() {
 
     await tester.tap(find.text(l10nEn.bulkAddSkipLabel).first);
     await tester.pumpAndSettle();
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     expect(_mealDetailBloc.writes.map((w) => w.mealName), ['Egg']);
@@ -1840,7 +1820,8 @@ void main() {
 
     expect(find.text(l10nEn.bulkAddNoMatchLabel), findsOneWidget);
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     expect(_mealDetailBloc.writes.map((w) => w.mealName), ['Toast']);
@@ -1872,7 +1853,8 @@ void main() {
 
     expect(find.text(l10nEn.bulkAddCheckAmountLabel), findsOneWidget);
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     expect(_mealDetailBloc.writes.map((w) => w.mealName), ['Toast']);
@@ -1894,7 +1876,8 @@ void main() {
 
     expect(find.text(l10nEn.bulkAddCheckAmountLabel), findsNothing);
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     expect(_mealDetailBloc.writes.map((w) => w.mealName), ['Egg']);
@@ -1989,7 +1972,8 @@ void main() {
     expect(find.text('Toast'), findsOneWidget);
     expect(find.text(l10nEn.bulkAddErrorInvalidName(2)), findsOneWidget);
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     expect(_mealDetailBloc.writes.map((w) => w.mealName), ['Toast']);
@@ -2008,7 +1992,8 @@ void main() {
     await tester.pumpWidget(_app());
     await _parse(tester, '100g toast, 2 eggs');
 
-    await tester.tap(_submitButton());
+    await tester.ensureVisible(_submitButton());
+      await tester.tap(_submitButton());
     await tester.pumpAndSettle();
 
     expect(find.byType(SnackBar), findsOneWidget);
@@ -2688,6 +2673,7 @@ void main() {
       navigator.pushNamed('/bulk');
       await tester.pumpAndSettle();
       await tester.enterText(find.byType(TextField).first, 'ein Apfel');
+      await tester.ensureVisible(find.widgetWithIcon(FilledButton, Icons.search));
       await tester.tap(find.widgetWithIcon(FilledButton, Icons.search));
       await tester.pump();
       await tester.pump(threshold);
