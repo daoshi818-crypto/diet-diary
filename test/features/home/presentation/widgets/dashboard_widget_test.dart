@@ -35,10 +35,11 @@ class _FakeBreakdownUsecase extends Fake
   Future<KcalGoalBreakdownEntity> getBreakdown() async => breakdown;
 }
 
-Widget _wrap(Widget child) {
+Widget _wrap(Widget child, {Locale? locale}) {
   return ChangeNotifierProvider(
     create: (_) => EnergyUnitProvider(usesKilojoules: false),
     child: MaterialApp(
+      locale: locale,
       localizationsDelegates: const [
         S.delegate,
         GlobalMaterialLocalizations.delegate,
@@ -89,6 +90,8 @@ void main() {
   DashboardWidget dashboardWidget({
     required double totalKcalLeft,
     bool showPlan = false,
+    double carbsIntake = 142.6,
+    double carbsGoal = 258.4,
   }) {
     return DashboardWidget(
       totalKcalSupplied: 2800,
@@ -96,10 +99,10 @@ void main() {
       totalKcalDaily: 2500,
       tdeeKcal: showPlan ? 2800 : null,
       totalKcalLeft: totalKcalLeft,
-      totalCarbsIntake: 142.6,
+      totalCarbsIntake: carbsIntake,
       totalFatsIntake: 30,
       totalProteinsIntake: 60,
-      totalCarbsGoal: 258.4,
+      totalCarbsGoal: carbsGoal,
       totalFatsGoal: 69.5,
       totalProteinsGoal: 93,
     );
@@ -157,7 +160,7 @@ void main() {
             expect(tester.getSize(gauge).height, lessThanOrEqualTo(130));
             expect(
               tester.getSize(find.byType(DashboardWidget)).height,
-              lessThan(size.width < 360 ? 460 : 400),
+              lessThan(size.width < 360 ? 480 : 400),
             );
           }
           expect(find.text('碳水'), findsOneWidget);
@@ -167,6 +170,9 @@ void main() {
           expect(find.bySemanticsIdentifier('home-edit-goals'), findsOneWidget);
           expect(find.text('30/69.5g'), findsOneWidget);
           expect(find.text('142.6/258.4g'), findsOneWidget);
+          expect(find.text('余 115.8g'), findsOneWidget);
+          expect(find.text('余 39.5g'), findsOneWidget);
+          expect(find.text('余 33g'), findsOneWidget);
           final cards = [
             for (final id in ['carbs', 'fat', 'protein'])
               find.descendant(
@@ -178,35 +184,44 @@ void main() {
           final progressTops = <double>[];
           final valueTops = <double>[];
           final valueFontSizes = <double>[];
+          final remainingTops = <double>[];
+          final remainingFontSizes = <double>[];
           for (final card in cards) {
             final actualSize = tester.getSize(card);
             expect(actualSize.width, closeTo(expectedSize.width, 0.01));
             expect(actualSize.height, closeTo(expectedSize.height, 0.01));
-            final value = find.descendant(
-              of: card,
-              matching: find.byWidgetPredicate(
-                (widget) =>
-                    widget is RichText &&
-                    widget.text.toPlainText().contains('/'),
-              ),
-            );
-            final paragraph = tester.renderObject<RenderParagraph>(value);
-            valueFontSizes.add(paragraph.text.style!.fontSize!);
-            final boxes = paragraph.getBoxesForSelection(
-              TextSelection(
-                baseOffset: 0,
-                extentOffset: paragraph.text.toPlainText().length,
-              ),
-            );
-            expect(boxes.map((box) => box.top).toSet(), hasLength(1));
-            expect(paragraph.didExceedMaxLines, isFalse);
-            final bounds = MatrixUtils.transformRect(
-              paragraph.getTransformTo(null),
-              Offset.zero & paragraph.size,
-            );
-            final cardBounds = tester.getRect(card);
-            expect(bounds.left, greaterThanOrEqualTo(cardBounds.left + 12));
-            expect(bounds.right, lessThanOrEqualTo(cardBounds.right - 12));
+            for (final remaining in [false, true]) {
+              final value = find.descendant(
+                of: card,
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is RichText &&
+                      (remaining
+                          ? widget.text.toPlainText().startsWith('余 ')
+                          : widget.text.toPlainText().contains('/')),
+                ),
+              );
+              final paragraph = tester.renderObject<RenderParagraph>(value);
+              (remaining ? remainingFontSizes : valueFontSizes).add(
+                paragraph.text.style!.fontSize!,
+              );
+              final boxes = paragraph.getBoxesForSelection(
+                TextSelection(
+                  baseOffset: 0,
+                  extentOffset: paragraph.text.toPlainText().length,
+                ),
+              );
+              expect(boxes.map((box) => box.top).toSet(), hasLength(1));
+              expect(paragraph.didExceedMaxLines, isFalse);
+              final bounds = MatrixUtils.transformRect(
+                paragraph.getTransformTo(null),
+                Offset.zero & paragraph.size,
+              );
+              final cardBounds = tester.getRect(card);
+              expect(bounds.left, greaterThanOrEqualTo(cardBounds.left + 12));
+              expect(bounds.right, lessThanOrEqualTo(cardBounds.right - 12));
+              (remaining ? remainingTops : valueTops).add(bounds.top);
+            }
             progressTops.add(
               tester
                   .getTopLeft(
@@ -217,9 +232,14 @@ void main() {
                   )
                   .dy,
             );
-            valueTops.add(bounds.top);
           }
-          for (final tops in [progressTops, valueTops, valueFontSizes]) {
+          for (final tops in [
+            progressTops,
+            valueTops,
+            valueFontSizes,
+            remainingTops,
+            remainingFontSizes,
+          ]) {
             expect(tops[1], closeTo(tops[0], 0.01));
             expect(tops[2], closeTo(tops[0], 0.01));
           }
@@ -242,6 +262,51 @@ void main() {
         });
       }
     }
+  }
+
+  for (final entry in [
+    (intake: 142.6, goal: 258.4, text: '余 115.8g', over: false),
+    (intake: 258.4, goal: 258.4, text: '余 0g', over: false),
+    (intake: 270.4, goal: 258.4, text: '超 12g', over: true),
+    (intake: 0.0, goal: 0.0, text: '余 0g', over: false),
+    (intake: 12.0, goal: 0.0, text: '超 12g', over: true),
+    (intake: 0.1, goal: 0.3, text: '余 0.2g', over: false),
+    (intake: 258.44, goal: 258.4, text: '余 0g', over: false),
+  ]) {
+    testWidgets('macro balance ${entry.intake}/${entry.goal}', (tester) async {
+      await tester.pumpWidget(
+        _wrap(
+          dashboardWidget(
+            totalKcalLeft: 1000,
+            carbsIntake: entry.intake,
+            carbsGoal: entry.goal,
+          ),
+          locale: const Locale('zh'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final card = find.bySemanticsIdentifier('home-macro-carbs');
+      expect(
+        find.descendant(of: card, matching: find.text(entry.text)),
+        findsOneWidget,
+      );
+      final value = tester.widget<RichText>(
+        find.descendant(
+          of: card,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is RichText && widget.text.toPlainText() == entry.text,
+          ),
+        ),
+      );
+      expect(
+        value.text.style!.color,
+        entry.over
+            ? ThemeData().colorScheme.error
+            : AppPalette.light.textStrong,
+      );
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets(

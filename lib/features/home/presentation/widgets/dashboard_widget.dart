@@ -48,6 +48,7 @@ class DashboardWidget extends StatefulWidget {
 class _DashboardWidgetState extends State<DashboardWidget> {
   final _macroLabelGroup = AutoSizeGroup();
   final _macroValueGroup = AutoSizeGroup();
+  final _macroRemainingGroup = AutoSizeGroup();
 
   void _openKcalGoalInfoScreen() {
     Navigator.of(
@@ -285,6 +286,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                   palette: palette,
                   labelGroup: _macroLabelGroup,
                   valueGroup: _macroValueGroup,
+                  remainingGroup: _macroRemainingGroup,
                 ),
               ),
               const SizedBox(width: Dimens.spacing12),
@@ -298,6 +300,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                   palette: palette,
                   labelGroup: _macroLabelGroup,
                   valueGroup: _macroValueGroup,
+                  remainingGroup: _macroRemainingGroup,
                 ),
               ),
               const SizedBox(width: Dimens.spacing12),
@@ -311,6 +314,7 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                   palette: palette,
                   labelGroup: _macroLabelGroup,
                   valueGroup: _macroValueGroup,
+                  remainingGroup: _macroRemainingGroup,
                 ),
               ),
             ],
@@ -379,6 +383,7 @@ class _MacroTile extends StatelessWidget {
   final AppPalette palette;
   final AutoSizeGroup labelGroup;
   final AutoSizeGroup valueGroup;
+  final AutoSizeGroup remainingGroup;
 
   const _MacroTile({
     required this.identifier,
@@ -389,6 +394,7 @@ class _MacroTile extends StatelessWidget {
     required this.palette,
     required this.labelGroup,
     required this.valueGroup,
+    required this.remainingGroup,
   });
 
   @override
@@ -396,9 +402,18 @@ class _MacroTile extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final textScaler = MediaQuery.textScalerOf(context);
     final labelStyle = textTheme.labelMedium!.copyWith(height: 1.4);
-    final valueStyle = textTheme.bodySmall!.copyWith(
+    final valueStyle = textTheme.labelSmall!.copyWith(height: 1.4);
+    final remainingTenths = ((goal - intake) * 10).round();
+    final overGoal = remainingTenths < 0;
+    final remainingGrams = _grams(remainingTenths.abs() / 10);
+    final remainingText = overGoal
+        ? S.of(context).macroExcessValue(remainingGrams)
+        : S.of(context).macroRemainingValue(remainingGrams);
+    final remainingStyle = textTheme.titleMedium!.copyWith(
       height: 1.4,
-      color: palette.textStrong,
+      color: overGoal
+          ? Theme.of(context).colorScheme.error
+          : palette.textStrong,
       fontWeight: FontWeight.w700,
     );
     final pct = (goal <= 0) ? 0.0 : (intake / goal).clamp(0.0, 1.0);
@@ -450,6 +465,22 @@ class _MacroTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: Dimens.spacing8),
+            SizedBox(
+              width: double.infinity,
+              height:
+                  textScaler.scale(remainingStyle.fontSize!) *
+                  remainingStyle.height!,
+              child: AutoSizeText(
+                remainingText,
+                group: remainingGroup,
+                maxLines: 1,
+                softWrap: false,
+                minFontSize: 1,
+                stepGranularity: 0.1,
+                style: remainingStyle,
+              ),
+            ),
+            const SizedBox(height: 2),
             SizedBox(
               width: double.infinity,
               height:

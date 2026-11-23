@@ -456,6 +456,16 @@
   "editMealLabel": "Edit meal",
   "editRecipeTitle": "Edit Recipe",
   "energyLabel": "energy",
+  "macroRemainingValue": "{value}g left",
+  "@macroRemainingValue": {
+    "description": "Compact remaining grams on a home macronutrient card",
+    "placeholders": {"value": {"type": "String"}}
+  },
+  "macroExcessValue": "{value}g over",
+  "@macroExcessValue": {
+    "description": "Compact grams over the target on a home macronutrient card",
+    "placeholders": {"value": {"type": "String"}}
+  },
   "energyLeftLabel": "left",
   "energyTooMuchLabel": "too much",
   "energyUnitKcalLabel": "Kilocalories (kcal)",

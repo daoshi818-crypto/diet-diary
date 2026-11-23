@@ -325,6 +325,8 @@
   "editMealLabel": "编辑餐食",
   "editRecipeTitle": "编辑食谱",
   "energyLabel": "能量",
+  "macroRemainingValue": "余 {value}g",
+  "macroExcessValue": "超 {value}g",
   "energyLeftLabel": "剩余",
   "energyTooMuchLabel": "过多",
   "energyUnitKcalLabel": "千卡（kcal）",
