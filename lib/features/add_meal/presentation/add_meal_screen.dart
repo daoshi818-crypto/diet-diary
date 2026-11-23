@@ -2,6 +2,7 @@ import 'package:opennutritracker/core/data/data_source/recipe_data_source.dart';
 import 'package:opennutritracker/core/domain/entity/recipe_entity.dart';
 import 'package:opennutritracker/core/utils/energy_display.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
 import 'package:opennutritracker/features/recipes/presentation/screens/recipe_builder_screen.dart';
 import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.dart';
@@ -230,96 +231,113 @@ class _AddMealScreenState extends State<AddMealScreen> {
   }
 
   Widget _buildScaffold(BuildContext context, AppPalette palette) {
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        title: Text(
-          _fullTray
-              ? S.of(context).foodTrayReview
-              : S.of(context).loggingFoodLibrary,
-        ),
-        actions: [
-          if (!_fullTray)
-            Semantics(
-              identifier: 'add-meal-quick-add',
-              child: TextButton(
-                onPressed: _onQuickAddPressed,
-                child: Text(
-                  S.of(context).quickAddCardLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemNavigationBarContrastEnforced: false,
+        systemNavigationBarIconBrightness: palette.brightness == Brightness.dark
+            ? Brightness.light
+            : Brightness.dark,
+      ),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          title: Text(
+            _fullTray
+                ? S.of(context).foodTrayReview
+                : S.of(context).loggingFoodLibrary,
+          ),
+          actions: [
+            if (!_fullTray)
+              Semantics(
+                identifier: 'add-meal-quick-add',
+                child: TextButton(
+                  onPressed: _onQuickAddPressed,
+                  child: Text(
+                    S.of(context).quickAddCardLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ),
-            ),
-          if (!_fullTray)
-            BlocBuilder<AddMealBloc, AddMealState>(
-              bloc: _addMealBloc,
-              builder: (BuildContext context, AddMealState state) {
-                if (state is AddMealLoadedState) {
-                  return Semantics(
-                    identifier: 'add-meal-custom-add',
-                    child: IconButton(
-                      onPressed: () =>
-                          _onCustomAddButtonPressed(state.usesImperialUnits),
-                      icon: const Icon(Icons.add_circle_outline),
-                    ),
-                  );
-                }
-                return const SizedBox();
-              },
-            ),
-        ],
-      ),
-      bottomNavigationBar: _catalog == null && _logTray.isEmpty
-          ? null
-          : Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.viewInsetsOf(context).bottom,
+            if (!_fullTray)
+              BlocBuilder<AddMealBloc, AddMealState>(
+                bloc: _addMealBloc,
+                builder: (BuildContext context, AddMealState state) {
+                  if (state is AddMealLoadedState) {
+                    return Semantics(
+                      identifier: 'add-meal-custom-add',
+                      child: IconButton(
+                        onPressed: () =>
+                            _onCustomAddButtonPressed(state.usesImperialUnits),
+                        icon: const Icon(Icons.add_circle_outline),
+                      ),
+                    );
+                  }
+                  return const SizedBox();
+                },
               ),
-              child: SafeArea(top: false, child: _buildTrayFooter()),
-            ),
-      body: _fullTray
-          ? _buildFullTray()
-          : SafeArea(
-              top: false,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 840),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+          ],
+        ),
+        bottomNavigationBar: _catalog == null && _logTray.isEmpty
+            ? null
+            : Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: _buildTrayFooter(),
+              ),
+        body: _fullTray
+            ? _buildFullTray()
+            : SafeArea(
+                top: false,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 840),
                     child: LayoutBuilder(
                       builder: (context, constraints) {
                         final compact = MediaQuery.sizeOf(context).width < 600;
                         return Column(
                           children: [
-                            const SizedBox(height: 4),
-                            AddFoodMethodTiles(
-                              onBarcodePressed: _onBarcodeIconPressed,
-                              onSnapMealPressed: () =>
-                                  _openBulkAdd(startWithPhoto: true),
-                              onDescribePressed: () => _openBulkAdd(),
-                              onLocalBatchPressed: _openLocalBatch,
-                              describeOpen: false,
-                              showAi: !_aiHidden,
-                              compact: compact,
-                              singleRow: constraints.maxHeight < 250,
-                              onNutritionLabelPressed: _openNutritionLabel,
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Column(
+                                children: [
+                                  const SizedBox(height: 4),
+                                  AddFoodMethodTiles(
+                                    onBarcodePressed: _onBarcodeIconPressed,
+                                    onSnapMealPressed: () =>
+                                        _openBulkAdd(startWithPhoto: true),
+                                    onDescribePressed: () => _openBulkAdd(),
+                                    onLocalBatchPressed: _openLocalBatch,
+                                    describeOpen: false,
+                                    showAi: !_aiHidden,
+                                    compact: compact,
+                                    singleRow: constraints.maxHeight < 250,
+                                    onNutritionLabelPressed:
+                                        _openNutritionLabel,
+                                  ),
+                                  SizedBox(height: compact ? 4 : 8),
+                                  MealSearchBar(
+                                    searchStringListener: _searchStringListener,
+                                    onSearchSubmit: _onSearchSubmit,
+                                    onSearchChanged: _onSearchChanged,
+                                    onBarcodePressed: null,
+                                    compact: compact,
+                                  ),
+                                  SizedBox(height: compact ? 4 : 8),
+                                  _buildSourceChips(
+                                    context,
+                                    palette,
+                                    compact: compact,
+                                  ),
+                                  SizedBox(height: compact ? 4 : 8),
+                                ],
+                              ),
                             ),
-                            SizedBox(height: compact ? 4 : 8),
-                            MealSearchBar(
-                              searchStringListener: _searchStringListener,
-                              onSearchSubmit: _onSearchSubmit,
-                              onSearchChanged: _onSearchChanged,
-                              onBarcodePressed: null,
-                              compact: compact,
-                            ),
-                            SizedBox(height: compact ? 4 : 8),
-                            _buildSourceChips(
-                              context,
-                              palette,
-                              compact: compact,
-                            ),
-                            SizedBox(height: compact ? 4 : 8),
                             Expanded(
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -334,14 +352,19 @@ class _AddMealScreenState extends State<AddMealScreen> {
                                       }),
                                     ),
                                   Expanded(
-                                    child: ValueListenableBuilder<String>(
-                                      valueListenable: _searchStringListener,
-                                      builder: (context, query, _) =>
-                                          _buildResults(
-                                            context,
-                                            palette,
-                                            query,
-                                          ),
+                                    child: Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: _catalog == null ? 16 : 0,
+                                      ),
+                                      child: ValueListenableBuilder<String>(
+                                        valueListenable: _searchStringListener,
+                                        builder: (context, query, _) =>
+                                            _buildResults(
+                                              context,
+                                              palette,
+                                              query,
+                                            ),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -354,7 +377,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
                   ),
                 ),
               ),
-            ),
+      ),
     );
   }
 
@@ -380,138 +403,141 @@ class _AddMealScreenState extends State<AddMealScreen> {
         MediaQuery.viewInsetsOf(context).bottom == 0;
     return Material(
       color: Theme.of(context).colorScheme.surface,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (showItems) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      s.foodTrayReview,
-                      style: Theme.of(context).textTheme.titleSmall,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showItems) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        s.foodTrayReview,
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
                     ),
-                  ),
-                  Semantics(
-                    identifier: 'food-tray-collapse',
-                    child: TextButton(
-                      onPressed: () => setState(() => _trayExpanded = false),
-                      child: Text(s.foodTrayCollapse),
+                    Semantics(
+                      identifier: 'food-tray-collapse',
+                      child: TextButton(
+                        onPressed: () => setState(() => _trayExpanded = false),
+                        child: Text(s.foodTrayCollapse),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              _trayList(maxItems: 2, showHeader: false),
+                  ],
+                ),
+                _trayList(maxItems: 2, showHeader: false),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Semantics(
+                        identifier: 'food-tray-save-recipe',
+                        child: TextButton.icon(
+                          onPressed: _saveTrayAsRecipe,
+                          icon: const Icon(Icons.menu_book_outlined, size: 18),
+                          label: Text(s.saveAsMealLabel),
+                        ),
+                      ),
+                    ),
+                    if (_logTray.length > 2)
+                      Semantics(
+                        identifier: 'food-tray-view-all',
+                        child: TextButton(
+                          onPressed: () => setState(() => _fullTray = true),
+                          child: Text(s.foodTrayViewAll(_logTray.length)),
+                        ),
+                      ),
+                  ],
+                ),
+                const Divider(height: 1),
+              ],
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
                     child: Semantics(
-                      identifier: 'food-tray-save-recipe',
-                      child: TextButton.icon(
-                        onPressed: _saveTrayAsRecipe,
-                        icon: const Icon(Icons.menu_book_outlined, size: 18),
-                        label: Text(s.saveAsMealLabel),
+                      identifier: 'add-meal-review-tray',
+                      child: InkWell(
+                        onTap: _fullTray ? null : _reviewLogTray,
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Row(
+                            children: [
+                              Badge(
+                                isLabelVisible: !_logTray.isEmpty,
+                                label: Text(_logTray.length.toString()),
+                                child: const Icon(
+                                  Icons.receipt_long_rounded,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      s.foodTrayShortTitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.labelLarge,
+                                    ),
+                                    Text(
+                                      _logTray.isEmpty
+                                          ? '—'
+                                          : EnergyDisplay.formatSumWithUnit(
+                                              context,
+                                              _logTray.items.map(
+                                                (item) => item.kcal,
+                                              ),
+                                            ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (!_fullTray)
+                                Icon(
+                                  showItems
+                                      ? Icons.expand_more
+                                      : Icons.expand_less,
+                                  size: 18,
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                  if (_logTray.length > 2)
-                    Semantics(
-                      identifier: 'food-tray-view-all',
-                      child: TextButton(
-                        onPressed: () => setState(() => _fullTray = true),
-                        child: Text(s.foodTrayViewAll(_logTray.length)),
-                      ),
-                    ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _logTray.isEmpty
+                        ? FilledButton(
+                            onPressed: null,
+                            child: Text(s.foodTrayRecord),
+                          )
+                        : LogTrayLogButton(
+                            tray: _logTray,
+                            compact: true,
+                            onPressed: _logging || _quickAdding.isNotEmpty
+                                ? null
+                                : _logAll,
+                          ),
+                  ),
                 ],
               ),
-              const Divider(height: 1),
             ],
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    identifier: 'add-meal-review-tray',
-                    child: InkWell(
-                      onTap: _fullTray ? null : _reviewLogTray,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Row(
-                          children: [
-                            Badge(
-                              isLabelVisible: !_logTray.isEmpty,
-                              label: Text(_logTray.length.toString()),
-                              child: const Icon(
-                                Icons.receipt_long_rounded,
-                                size: 24,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    s.foodTrayShortTitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.labelLarge,
-                                  ),
-                                  Text(
-                                    _logTray.isEmpty
-                                        ? '—'
-                                        : EnergyDisplay.formatSumWithUnit(
-                                            context,
-                                            _logTray.items.map(
-                                              (item) => item.kcal,
-                                            ),
-                                          ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (!_fullTray)
-                              Icon(
-                                showItems
-                                    ? Icons.expand_more
-                                    : Icons.expand_less,
-                                size: 18,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _logTray.isEmpty
-                      ? FilledButton(
-                          onPressed: null,
-                          child: Text(s.foodTrayRecord),
-                        )
-                      : LogTrayLogButton(
-                          tray: _logTray,
-                          compact: true,
-                          onPressed: _logging || _quickAdding.isNotEmpty
-                              ? null
-                              : _logAll,
-                        ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );

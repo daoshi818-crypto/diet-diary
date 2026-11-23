@@ -346,61 +346,68 @@ Future<void> _register(List<MealEntity> recent) async {
 const _captureUi = bool.fromEnvironment('GENERATE_BATCH_PREVIEW');
 final _batchPreviewBoundary = GlobalKey();
 
-Widget _app(List<RouteSettings> pushed, {bool library = false}) =>
-    ChangeNotifierProvider(
-      create: (_) => EnergyUnitProvider(usesKilojoules: false),
-      child: MaterialApp(
-        locale: _captureUi ? const Locale('zh') : const Locale('en'),
-        theme: _captureUi ? buildAppTheme(AppPalette.light) : null,
-        builder: (context, child) =>
-            RepaintBoundary(key: _batchPreviewBoundary, child: child!),
-        localizationsDelegates: const [
-          S.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        supportedLocales: S.supportedLocales,
-        initialRoute: NavigationOptions.mainRoute,
-        onGenerateRoute: (settings) {
-          if (settings.name == NavigationOptions.mainRoute) {
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (_) =>
-                  const Scaffold(key: Key('main'), body: SizedBox()),
-            );
-          }
-          if (settings.name == NavigationOptions.addMealRoute) {
-            return MaterialPageRoute<void>(
-              settings: RouteSettings(
-                name: settings.name,
-                arguments: AddMealScreenArguments(
-                  AddMealType.breakfastType,
-                  DateTime(2026, 10, 18),
-                  isFoodLibrary: library,
-                ),
-              ),
-              builder: (_) => const AddMealScreen(),
-            );
-          }
-          pushed.add(settings);
-          return MaterialPageRoute<void>(
-            settings: settings,
-            builder: (_) => const Scaffold(body: SizedBox()),
-          );
-        },
-      ),
-    );
+Widget _app(
+  List<RouteSettings> pushed, {
+  bool library = false,
+  AppPalette? palette,
+}) => ChangeNotifierProvider(
+  create: (_) => EnergyUnitProvider(usesKilojoules: false),
+  child: MaterialApp(
+    locale: _captureUi ? const Locale('zh') : const Locale('en'),
+    theme: palette != null
+        ? buildAppTheme(palette)
+        : _captureUi
+        ? buildAppTheme(AppPalette.light)
+        : null,
+    builder: (context, child) =>
+        RepaintBoundary(key: _batchPreviewBoundary, child: child!),
+    localizationsDelegates: const [
+      S.delegate,
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    supportedLocales: S.supportedLocales,
+    initialRoute: NavigationOptions.mainRoute,
+    onGenerateRoute: (settings) {
+      if (settings.name == NavigationOptions.mainRoute) {
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const Scaffold(key: Key('main'), body: SizedBox()),
+        );
+      }
+      if (settings.name == NavigationOptions.addMealRoute) {
+        return MaterialPageRoute<void>(
+          settings: RouteSettings(
+            name: settings.name,
+            arguments: AddMealScreenArguments(
+              AddMealType.breakfastType,
+              DateTime(2026, 10, 18),
+              isFoodLibrary: library,
+            ),
+          ),
+          builder: (_) => const AddMealScreen(),
+        );
+      }
+      pushed.add(settings);
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => const Scaffold(body: SizedBox()),
+      );
+    },
+  ),
+);
 
 Future<void> _openAddMeal(
   WidgetTester tester,
   List<RouteSettings> pushed, {
   bool library = false,
+  AppPalette? palette,
 }) async {
   tester.view.physicalSize = const Size(412, 915);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
-  await tester.pumpWidget(_app(pushed, library: library));
+  await tester.pumpWidget(_app(pushed, library: library, palette: palette));
   await tester.pumpAndSettle();
   tester
       .state<NavigatorState>(find.byType(Navigator))
@@ -551,6 +558,13 @@ void main() {
             findsOneWidget,
           );
           expect(
+            tester
+                .getTopLeft(find.bySemanticsIdentifier('food-category-rail'))
+                .dx,
+            0,
+            reason: 'The category rail must meet the screen edge.',
+          );
+          expect(
             find.bySemanticsIdentifier('meal-search-field').hitTestable(),
             findsOneWidget,
           );
@@ -581,6 +595,64 @@ void main() {
     },
   );
 
+  for (final palette in [AppPalette.light, AppPalette.dark]) {
+    testWidgets(
+      'food library footer fills gesture inset in ${palette.brightness.name}',
+      (tester) async {
+        await _register([]);
+        final catalog = ChineseFoodDataSource(
+          read: () => File('assets/foods/catalog.json').readAsString(),
+        );
+        await tester.runAsync(catalog.count);
+        getIt.registerSingleton(catalog);
+        await _openAddMeal(tester, [], library: true, palette: palette);
+        final review = find.bySemanticsIdentifier('add-meal-review-tray');
+        for (final inset in [24.0, 48.0]) {
+          tester.view.padding = FakeViewPadding(bottom: inset);
+          tester.view.viewPadding = FakeViewPadding(bottom: inset);
+          await tester.pumpAndSettle();
+          final footer = find
+              .ancestor(of: review, matching: find.byType(Material))
+              .first;
+          expect(tester.getBottomRight(footer).dy, 915);
+          expect(tester.widget<Material>(footer).color, palette.surface);
+          expect(
+            tester.getBottomRight(review).dy,
+            lessThanOrEqualTo(915 - inset),
+          );
+          final overlay = find
+              .ancestor(
+                of: review,
+                matching: find.byType(AnnotatedRegion<SystemUiOverlayStyle>),
+              )
+              .last;
+          final style = tester
+              .widget<AnnotatedRegion<SystemUiOverlayStyle>>(overlay)
+              .value;
+          expect(style.systemNavigationBarColor, Colors.transparent);
+          expect(style.systemNavigationBarContrastEnforced, isFalse);
+          expect(
+            style.systemNavigationBarIconBrightness,
+            palette.brightness == Brightness.dark
+                ? Brightness.light
+                : Brightness.dark,
+          );
+        }
+        if (_captureUi) {
+          await _captureBatchUi(
+            tester,
+            'edge-insets-${palette.brightness.name}',
+          );
+        }
+        tester.view.padding = FakeViewPadding.zero;
+        tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+        await tester.pumpAndSettle();
+        expect(tester.getBottomRight(review).dy, lessThanOrEqualTo(635));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   if (_captureUi) {
     testWidgets('capture actual food entry UI for review', (tester) async {
       final catalog = ChineseFoodDataSource(
@@ -604,6 +676,8 @@ void main() {
       getIt.registerSingleton(FoodEntryPreferences(_FoodEntryDB()));
       await _openAddMeal(tester, [], library: true);
       tester.view.physicalSize = const Size(375, 812);
+      tester.view.padding = const FakeViewPadding(bottom: 24);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 24);
       await tester.pumpAndSettle();
       expect(find.bySemanticsIdentifier('food-category-rail'), findsOneWidget);
       await tester.tap(find.text('主食').first);

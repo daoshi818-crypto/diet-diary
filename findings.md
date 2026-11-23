@@ -66,4 +66,8 @@
 - 随包 19,546 条食物，81 个原分类值；14,900 条为 brand/generic，不能直接作为浏览分类。分类必须归一，并保留不确定项到其他，不能按品牌当作食物类别。
 - 现有云端更新按固定提交下载完整 catalog，经 SHA256、字节数、条数与结构验证后切换，缓存当前/前一版本。分类扩展采用同文件可选 categories + 食物 category_id，旧客户端忽略附加字段。
 - 当前分类 HTML 只是原型；用户已确认实现固定侧栏，无分类按钮。录入模式与营养计算复用现有 FoodQuantityDialog/MealDetailBottomSheet。
+
+## 2026-11-23 食物库边缘
+- 分类栏继承了整个内容列的 horizontal:16；改为只给顶部控件和无本地分类的结果保留边距。
+- SafeArea 位于记录区 Material 外侧，导致底部手势安全区露出 canvas。将 SafeArea 放入 Material 内，背景延伸而操作按钮仍避开安全区；页面级 AnnotatedRegion 关闭导航栏对比度遮罩并设置透明背景及主题对应的图标亮度。
 - 原始清单使用 AppModalSheet 后再开用量 sheet，会叠加关闭按钮；改为页面内清单后只保留单一用量面板。
