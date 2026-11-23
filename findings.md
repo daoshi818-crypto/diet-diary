@@ -60,3 +60,10 @@
 - 首页、启动页、关于使用同一个SVG标记，浏览器favicon/PWA和Android/iOS启动图标由SVG派生，iOS/PWA maskable底色满幅无透明圆角。
 - SVG主文件assets/icon/diet_diary_icon.svg；再生脚本tool/generate_diary_brand_assets.dart，无新增运行依赖。
 - 品牌核对覆盖：首页SVG、应用信息、启动路由、网页title/favicon/manifest、原生桌面图标尺寸。技术包标识与Hive数据结构未改。
+
+2026-11-23: 本地批量原来直接写日记，已改为加入共享 LogTray；个人食物映射延迟到真正写日记成功之后。UI 路由 CLI 因本机 esbuild EFTYPE 不可用，沿用项目实际 AppPalette/buildAppTheme。截图通过 Flutter 真实控件与本地食物库生成。
+# 2026-11-23 分类接入
+- 随包 19,546 条食物，81 个原分类值；14,900 条为 brand/generic，不能直接作为浏览分类。分类必须归一，并保留不确定项到其他，不能按品牌当作食物类别。
+- 现有云端更新按固定提交下载完整 catalog，经 SHA256、字节数、条数与结构验证后切换，缓存当前/前一版本。分类扩展采用同文件可选 categories + 食物 category_id，旧客户端忽略附加字段。
+- 当前分类 HTML 只是原型；用户已确认实现固定侧栏，无分类按钮。录入模式与营养计算复用现有 FoodQuantityDialog/MealDetailBottomSheet。
+- 原始清单使用 AppModalSheet 后再开用量 sheet，会叠加关闭按钮；改为页面内清单后只保留单一用量面板。

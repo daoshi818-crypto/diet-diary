@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/custom_icons.dart';
@@ -10,12 +11,10 @@ class AddFoodMethodTiles extends StatelessWidget {
   final VoidCallback onSnapMealPressed;
   final VoidCallback onDescribePressed;
   final VoidCallback? onLocalBatchPressed;
-
   final bool describeOpen;
   final bool compact;
   final bool singleRow;
   final VoidCallback? onNutritionLabelPressed;
-
   final bool showAi;
 
   const AddFoodMethodTiles({
@@ -31,119 +30,111 @@ class AddFoodMethodTiles extends StatelessWidget {
     this.onLocalBatchPressed,
   });
 
+  Future<void> _chooseAiMethod(BuildContext context) async {
+    final s = S.of(context);
+    final action = await showModalBottomSheet<VoidCallback>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => AppModalSheet(
+        identifier: 'food-ai-methods',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              s.foodLibraryAiEntry,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            for (final option in [
+              (
+                'add-meal-method-describe',
+                Icons.edit_note_rounded,
+                s.localBatchAiLabel,
+                onDescribePressed,
+              ),
+              (
+                'add-meal-method-photo',
+                Icons.photo_camera_rounded,
+                s.aiFoodPhotoTitle,
+                onSnapMealPressed,
+              ),
+              if (onNutritionLabelPressed != null)
+                (
+                  'add-meal-nutrition-label',
+                  Icons.document_scanner_outlined,
+                  s.labelScanShortTitle,
+                  onNutritionLabelPressed!,
+                ),
+            ])
+              Semantics(
+                identifier: option.$1,
+                child: ListTile(
+                  leading: Icon(option.$2),
+                  title: Text(option.$3),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(context, option.$4),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (context.mounted) action?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = Theme.of(context).brightness == Brightness.dark
         ? AppPalette.dark
         : AppPalette.light;
-    final scheme = Theme.of(context).colorScheme;
     final s = S.of(context);
     final tiles = [
-      Semantics(
-        identifier: 'add-meal-method-barcode',
-        container: true,
-        child: _MethodTile(
-          compact: compact,
-          singleRow: singleRow,
-          icon: CustomIcons.barcode_scan,
-          label: s.customMealBarcodeLabel,
-          background: palette.surface,
-          foreground: palette.textStrong,
-          border: palette.border,
-          onPressed: onBarcodePressed,
-        ),
+      (
+        'add-meal-method-barcode',
+        CustomIcons.barcode_scan,
+        s.customMealBarcodeLabel,
+        onBarcodePressed,
       ),
-      if (showAi)
-        Semantics(
-          identifier: 'add-meal-method-photo',
-          container: true,
-          child: _MethodTile(
-            compact: compact,
-            singleRow: singleRow,
-            icon: Icons.photo_camera_rounded,
-            label: s.addMealSnapMealLabel,
-            background: palette.surfaceMuted,
-            foreground: palette.textStrong,
-            onPressed: onSnapMealPressed,
-          ),
-        ),
-      if (showAi || onLocalBatchPressed == null)
-        Semantics(
-          identifier: 'add-meal-method-describe',
-          container: true,
-          selected: describeOpen,
-          child: _MethodTile(
-            compact: compact,
-            singleRow: singleRow,
-            icon: Icons.edit_note_rounded,
-            label: onLocalBatchPressed == null
-                ? s.addMealDescribeLabel
-                : s.localBatchAiLabel,
-            background: describeOpen
-                ? Color.alphaBlend(
-                    scheme.primary.withValues(alpha: 0.16),
-                    palette.surfaceMuted,
-                  )
-                : palette.surfaceMuted,
-            foreground: palette.textStrong,
-            border: describeOpen
-                ? scheme.primary
-                : scheme.primary.withValues(alpha: 0.35),
-            onPressed: onDescribePressed,
-          ),
-        ),
       if (onLocalBatchPressed != null)
-        Semantics(
-          identifier: 'add-meal-method-local-batch',
-          container: true,
-          child: _MethodTile(
-            compact: compact,
-            singleRow: singleRow,
-            icon: Icons.playlist_add_rounded,
-            label: s.localBatchTitle,
-            background: palette.surface,
-            foreground: palette.textStrong,
-            border: palette.border,
-            onPressed: onLocalBatchPressed!,
-          ),
+        (
+          'add-meal-method-local-batch',
+          Icons.playlist_add_rounded,
+          s.localBatchTitle,
+          onLocalBatchPressed!,
         ),
-      if (showAi && onNutritionLabelPressed != null)
-        Semantics(
-          identifier: 'add-meal-nutrition-label',
-          container: true,
-          child: _MethodTile(
-            compact: compact,
-            singleRow: singleRow,
-            icon: Icons.document_scanner_outlined,
-            label: s.labelScanShortTitle,
-            background: palette.surfaceMuted,
-            foreground: palette.textStrong,
-            onPressed: onNutritionLabelPressed!,
-          ),
+      if (showAi)
+        (
+          'add-meal-method-ai',
+          Icons.auto_awesome_outlined,
+          s.foodLibraryAiEntry,
+          () => _chooseAiMethod(context),
         ),
     ];
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const gap = Dimens.spacing8;
-        final scale = MediaQuery.textScalerOf(context).scale(12) / 12;
-        final maxColumns = (constraints.maxWidth / (65 * scale)).floor().clamp(
-          1,
-          tiles.length,
-        );
-        final columns = singleRow
-            ? tiles.length
-            : maxColumns < tiles.length && maxColumns >= 2
-            ? (maxColumns >= 3 && tiles.length == 5 ? 3 : 2)
-            : maxColumns;
-        final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
-        return Wrap(
-          spacing: gap,
-          runSpacing: gap,
-          children: [
-            for (final tile in tiles) SizedBox(width: width, child: tile),
-          ],
-        );
-      },
+    return Row(
+      children: [
+        for (var i = 0; i < tiles.length; i++) ...[
+          if (i > 0) const SizedBox(width: Dimens.spacing8),
+          Expanded(
+            child: Semantics(
+              identifier: tiles[i].$1,
+              container: true,
+              child: _MethodTile(
+                compact: true,
+                singleRow: true,
+                icon: tiles[i].$2,
+                label: tiles[i].$3,
+                background: palette.surfaceMuted,
+                foreground: palette.textStrong,
+                border: palette.border,
+                onPressed: tiles[i].$4,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

@@ -1,4 +1,11 @@
+import 'dart:convert';
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:opennutritracker/core/styles/app_palette.dart';
+import 'package:opennutritracker/core/styles/app_theme.dart';
 import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.dart';
 
 import 'package:flutter/material.dart';
@@ -24,6 +31,7 @@ import 'package:opennutritracker/core/domain/usecase/get_intake_usecase.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
 import 'package:opennutritracker/core/utils/hive_db_provider.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/usecase/search_products_usecase.dart';
 import 'package:opennutritracker/features/add_meal/presentation/add_meal_screen.dart';
@@ -60,6 +68,7 @@ MealEntity _meal(
   bool complete = true,
   MealSourceEntity source = MealSourceEntity.custom,
   bool detailed = false,
+  List<MealPortionEntity> portions = const [],
 }) => MealEntity(
   code: name,
   name: name,
@@ -80,6 +89,7 @@ MealEntity _meal(
   ),
   source: source,
   detailed: detailed,
+  portions: portions,
 );
 
 IntakeEntity _intake(MealEntity meal) => IntakeEntity(
@@ -333,10 +343,17 @@ Future<void> _register(List<MealEntity> recent) async {
 
 /// Main at the bottom, the add-food screen pushed over it, and a recording
 /// stub for every other route.
+const _captureUi = bool.fromEnvironment('GENERATE_BATCH_PREVIEW');
+final _batchPreviewBoundary = GlobalKey();
+
 Widget _app(List<RouteSettings> pushed, {bool library = false}) =>
     ChangeNotifierProvider(
       create: (_) => EnergyUnitProvider(usesKilojoules: false),
       child: MaterialApp(
+        locale: _captureUi ? const Locale('zh') : const Locale('en'),
+        theme: _captureUi ? buildAppTheme(AppPalette.light) : null,
+        builder: (context, child) =>
+            RepaintBoundary(key: _batchPreviewBoundary, child: child!),
         localizationsDelegates: const [
           S.delegate,
           GlobalMaterialLocalizations.delegate,
@@ -388,6 +405,12 @@ Future<void> _openAddMeal(
   tester
       .state<NavigatorState>(find.byType(Navigator))
       .pushNamed(NavigationOptions.addMealRoute);
+  if (getIt.isRegistered<ChineseFoodDataSource>()) {
+    await tester.runAsync(() async {
+      await tester.pump();
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+    });
+  }
   await tester.pumpAndSettle();
 }
 
@@ -437,54 +460,413 @@ Future<void> _confirmAmount(WidgetTester tester) async {
 
 Finder _logButton() => find.bySemanticsIdentifier('add-meal-tray-log');
 
-void main() {
-  testWidgets('local batch and AI are separate, and cancel does not log', (
-    tester,
-  ) async {
-    final food = _meal('Corn');
-    await _register([food]);
-    getIt.registerSingleton<GetIntakeUsecase>(
-      _FakeGetIntakeUsecase([_intake(food)]),
-    );
-    getIt.registerSingleton(
-      ChineseFoodDataSource(
-        read: () async => throw StateError('should use confirmed history'),
-      ),
-    );
-    getIt.registerSingleton(FoodEntryPreferences(_FoodEntryDB()));
-    final pushed = <RouteSettings>[];
-    await _openAddMeal(tester, pushed);
-    expect(
-      find.bySemanticsIdentifier('add-meal-method-describe'),
-      findsOneWidget,
-    );
-    await tester.tap(find.bySemanticsIdentifier('add-meal-method-local-batch'));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'Corn 50g');
-    await tester.tap(find.text(l10nEn.localBatchMatch));
-    await tester.pumpAndSettle();
-    final cornRow = find.widgetWithText(ListTile, 'Corn 50g');
-    await tester.tap(cornRow);
-    await tester.pumpAndSettle();
-    await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
-    await tester.pumpAndSettle();
-    expect(_mealDetailBloc.writes, isEmpty);
-    expect(getIt<FoodEntryPreferences>().batchMatch('corn'), isNull);
+Future<void> _openAiMethod(WidgetTester tester, String identifier) async {
+  await tester.tap(find.bySemanticsIdentifier('add-meal-method-ai'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.bySemanticsIdentifier(identifier));
+  await tester.pumpAndSettle();
+}
 
-    await tester.tap(cornRow);
-    await tester.pumpAndSettle();
-    await _confirmAmount(tester);
-    expect(_mealDetailBloc.writes.single.amount, '50.0');
-    expect(find.textContaining(l10nEn.localBatchAdded), findsOneWidget);
-    expect(getIt<FoodEntryPreferences>().batchMatch('corn'), isNotNull);
-    await tester.tap(cornRow);
-    await tester.pumpAndSettle();
-    expect(_mealDetailBloc.writes, hasLength(1));
-    expect(
-      pushed.where((route) => route.name == NavigationOptions.bulkAddRoute),
-      isEmpty,
+Future<void> _captureBatchUi(WidgetTester tester, String name) async {
+  await tester.runAsync(() async {
+    final boundary =
+        _batchPreviewBoundary.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 2);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final directory = Directory(
+      const String.fromEnvironment('BATCH_PREVIEW_DIR'),
     );
+    await directory.create(recursive: true);
+    await File(
+      '${directory.path}/$name.png',
+    ).writeAsBytes(bytes!.buffer.asUint8List());
+    image.dispose();
   });
+}
+
+void main() {
+  setUpAll(() async {
+    if (!_captureUi) return;
+    for (final (family, path) in [
+      ('Nunito', 'C:/Windows/Fonts/msyh.ttc'),
+      ('CustomIcons', 'fonts/CustomIcons.ttf'),
+      (
+        'MaterialIcons',
+        'E:/DevCaches/flutter-ont/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
+      ),
+    ]) {
+      await (FontLoader(
+        family,
+      )..addFont(File(path).readAsBytes().then(ByteData.sublistView))).load();
+    }
+  });
+  testWidgets(
+    'fixed category rail survives search resize and cloud category updates',
+    (tester) async {
+      Map<String, dynamic> snapshot(String label) => {
+        'schema_version': 1,
+        'categories': [
+          {'id': 'cloud-group', 'label': label},
+        ],
+        'foods': [
+          {
+            'id': 'cn-test-egg',
+            'name': '鸡蛋',
+            'brand': '',
+            'unit': 'g',
+            'category': '',
+            'category_id': 'cloud-group',
+            'aliases': [],
+            'nutrients': {'energy_kcal': 144},
+            'portions': [
+              {'label': '中等个', 'grams': 50},
+            ],
+            'sources': [
+              {'source': 'cn_fct', 'id': 'test-egg'},
+            ],
+          },
+        ],
+      };
+      final catalog = ChineseFoodDataSource(
+        read: () async => jsonEncode(snapshot('肉蛋奶')),
+      );
+      final food = (await tester.runAsync(
+        () => catalog.browse(''),
+      ))!.foods.single;
+      await _register([food]);
+      getIt.registerSingleton(catalog);
+      await _openAddMeal(tester, [], library: true);
+      for (final size in [
+        const Size(375, 812),
+        const Size(360, 640),
+        const Size(812, 375),
+      ]) {
+        for (final scale in [1.0, 2.0]) {
+          tester.view.physicalSize = size;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          await tester.pumpAndSettle();
+          expect(
+            find.bySemanticsIdentifier('food-category-rail').hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            find.bySemanticsIdentifier('meal-search-field').hitTestable(),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        }
+      }
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+      tester.view.physicalSize = const Size(375, 812);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('肉蛋奶'));
+      await tester.pumpAndSettle();
+      expect(find.text('鸡蛋'), findsOneWidget);
+      await tester.enterText(find.byType(TextField), '不存在的食物');
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('food-category-rail'), findsOneWidget);
+      expect(find.text('鸡蛋'), findsNothing);
+      await tester.runAsync(
+        () => catalog.activate(jsonEncode(snapshot('云端改名'))),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('云端改名'), findsOneWidget);
+      expect(find.text('肉蛋奶'), findsNothing);
+      await tester.enterText(find.byType(TextField), '鸡蛋');
+      await tester.pumpAndSettle();
+      expect(find.text('鸡蛋'), findsWidgets);
+      expect(tester.takeException(), isNull);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    },
+  );
+
+  if (_captureUi) {
+    testWidgets('capture actual food entry UI for review', (tester) async {
+      final catalog = ChineseFoodDataSource(
+        read: () => File('assets/foods/catalog.json').readAsString(),
+      );
+      final foods = (await tester.runAsync(() async {
+        return [
+          for (final name in ['鸡蛋', '玉米', '米饭', '苹果'])
+            (await catalog.matchBatchName(name))
+                .firstWhere(
+                  (entry) => entry.food.brands?.trim().isNotEmpty != true,
+                )
+                .food,
+        ];
+      }))!;
+      await _register(foods);
+      getIt.registerSingleton<GetIntakeUsecase>(
+        _FakeGetIntakeUsecase(foods.map(_intake).toList()),
+      );
+      getIt.registerSingleton(catalog);
+      getIt.registerSingleton(FoodEntryPreferences(_FoodEntryDB()));
+      await _openAddMeal(tester, [], library: true);
+      tester.view.physicalSize = const Size(375, 812);
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('food-category-rail'), findsOneWidget);
+      await tester.tap(find.text('主食').first);
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'food-library');
+      await tester.tap(
+        find.descendant(
+          of: find.bySemanticsIdentifier('food-category-rail'),
+          matching: find.text('全部'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final search = find.byType(TextField);
+      await tester.enterText(search, '鸡蛋');
+      await tester.pumpAndSettle();
+      final plus = find.bySemanticsIdentifier('meal-item-add').first;
+      await tester.tap(plus);
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'quantity-grams');
+      await tester.tap(find.text('分量').last);
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'quantity-portions');
+      await tester.tap(find.bySemanticsIdentifier('meal-detail-add'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('add-meal-review-tray'));
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'tray-expanded');
+      await tester.tap(find.bySemanticsIdentifier('add-meal-tray-edit').first);
+      await tester.pumpAndSettle();
+      expect(find.bySemanticsIdentifier('food-quantity-close'), findsOneWidget);
+      await _captureBatchUi(tester, 'tray-edit');
+      await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('food-tray-collapse'));
+      await tester.pumpAndSettle();
+      await tester.enterText(search, '');
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('add-meal-method-ai'));
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'ai-methods');
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('add-meal-method-local-batch'),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '鸡蛋10个 玉米100g');
+      await tester.runAsync(() async {
+        await tester.tap(find.bySemanticsIdentifier('local-batch-match'));
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+      });
+      await tester.pumpAndSettle();
+      for (final (index, label) in [(0, '早餐'), (1, '午餐')]) {
+        final selector = find.bySemanticsIdentifier(
+          'local-batch-meal-type-$index',
+        );
+        await tester.ensureVisible(selector);
+        await tester.tap(selector);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+      }
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 900));
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'local-batch');
+      await tester.tap(find.bySemanticsIdentifier('local-batch-edit-amount-0'));
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'edit-amount');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'local batch reviews amounts and joins the shared tray before logging',
+    (tester) async {
+      final food = _meal('Corn');
+      await _register([food]);
+      getIt.registerSingleton<GetIntakeUsecase>(
+        _FakeGetIntakeUsecase([_intake(food)]),
+      );
+      getIt.registerSingleton(
+        ChineseFoodDataSource(
+          read: () async => throw StateError('should use confirmed history'),
+        ),
+      );
+      getIt.registerSingleton(FoodEntryPreferences(_FoodEntryDB()));
+      final pushed = <RouteSettings>[];
+      await _openAddMeal(tester, pushed);
+      expect(find.bySemanticsIdentifier('add-meal-method-ai'), findsOneWidget);
+      await tester.tap(
+        find.bySemanticsIdentifier('add-meal-method-local-batch'),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Corn 50g');
+      await tester.tap(find.text(l10nEn.localBatchMatch));
+      await tester.pumpAndSettle();
+      expect(find.text('50 g'), findsOneWidget);
+      final edit = find.bySemanticsIdentifier('local-batch-edit-amount-0');
+      await tester.ensureVisible(edit);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .widget<TextFormField>(find.byType(TextFormField))
+            .controller!
+            .text,
+        '50',
+      );
+      await tester.enterText(find.byType(TextFormField), '75');
+      await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
+      await tester.pumpAndSettle();
+      expect(find.text('50 g'), findsOneWidget);
+      expect(_mealDetailBloc.writes, isEmpty);
+      expect(getIt<FoodEntryPreferences>().batchMatch('corn'), isNull);
+
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField), '75');
+      await tester.tap(find.bySemanticsIdentifier('meal-detail-add'));
+      await tester.pumpAndSettle();
+      expect(find.text('75 g'), findsOneWidget);
+      expect(_mealDetailBloc.writes, isEmpty);
+      await tester.tap(find.bySemanticsIdentifier('local-batch-meal-type-0'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(l10nEn.dinnerLabel).last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('local-batch-add-ready'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AddMealScreen), findsOneWidget);
+      final tray = tester
+          .widget<LogTrayLogButton>(find.byType(LogTrayLogButton))
+          .tray;
+      expect(tray.items.single.amount, 75);
+      expect(tray.items.single.intakeType, IntakeTypeEntity.dinner);
+      expect(_mealDetailBloc.writes, isEmpty);
+      expect(getIt<FoodEntryPreferences>().batchMatch('corn'), isNull);
+      await tester.tap(_logButton());
+      await tester.pumpAndSettle();
+      expect(_mealDetailBloc.writes.single.amount, '75.0');
+      expect(_mealDetailBloc.writes.single.type, IntakeTypeEntity.dinner);
+      expect(getIt<FoodEntryPreferences>().batchMatch('corn'), isNotNull);
+      expect(
+        pushed.where((route) => route.name == NavigationOptions.bulkAddRoute),
+        isEmpty,
+      );
+    },
+  );
+
+  testWidgets(
+    'counted food shows its size and grams and joins mixed meal types in one tap',
+    (tester) async {
+      final egg = _meal(
+        '鸡蛋',
+        portions: const [
+          MealPortionEntity(label: '小个', gramWeight: 40, localized: true),
+          MealPortionEntity(label: '中等个', gramWeight: 50, localized: true),
+          MealPortionEntity(label: '大个', gramWeight: 60, localized: true),
+        ],
+      );
+      final corn = _meal('玉米');
+      await _register([egg, corn]);
+      getIt.registerSingleton<GetIntakeUsecase>(
+        _FakeGetIntakeUsecase([_intake(egg), _intake(corn)]),
+      );
+      getIt.registerSingleton(
+        ChineseFoodDataSource(
+          read: () async => throw StateError('no remote request'),
+        ),
+      );
+      await _openAddMeal(tester, []);
+      await tester.tap(
+        find.bySemanticsIdentifier('add-meal-method-local-batch'),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), '鸡蛋10个 玉米50g');
+      await tester.tap(find.text(l10nEn.localBatchMatch));
+      await tester.pumpAndSettle();
+      expect(find.text('10 × 中等个 · 50 g'), findsOneWidget);
+      expect(find.textContaining('= 500 g'), findsOneWidget);
+      for (final (index, label) in [
+        (0, l10nEn.lunchLabel),
+        (1, l10nEn.dinnerLabel),
+      ]) {
+        final selector = find.bySemanticsIdentifier(
+          'local-batch-meal-type-$index',
+        );
+        await tester.ensureVisible(selector);
+        await tester.tap(selector);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(label).last);
+        await tester.pumpAndSettle();
+      }
+      await tester.tap(find.bySemanticsIdentifier('local-batch-add-ready'));
+      await tester.pumpAndSettle();
+      final tray = tester
+          .widget<LogTrayLogButton>(find.byType(LogTrayLogButton))
+          .tray;
+      expect(tray.items.map((item) => item.amount), [500, 50]);
+      expect(tray.items.map((item) => item.intakeType), [
+        IntakeTypeEntity.lunch,
+        IntakeTypeEntity.dinner,
+      ]);
+      expect(_mealDetailBloc.writes, isEmpty);
+      await tester.tap(_logButton());
+      await tester.pumpAndSettle();
+      expect(_mealDetailBloc.writes.map((entry) => entry.amount), [
+        '500.0',
+        '50.0',
+      ]);
+    },
+  );
+
+  testWidgets(
+    'missing portion stays pending and confirmed rows cannot be added twice',
+    (tester) async {
+      final corn = _meal('Corn');
+      final egg = _meal('鸡蛋');
+      await _register([corn, egg]);
+      getIt.registerSingleton<GetIntakeUsecase>(
+        _FakeGetIntakeUsecase([_intake(corn), _intake(egg)]),
+      );
+      getIt.registerSingleton(
+        ChineseFoodDataSource(
+          read: () async => throw StateError('no remote request'),
+        ),
+      );
+      await _openAddMeal(tester, []);
+      await tester.tap(
+        find.bySemanticsIdentifier('add-meal-method-local-batch'),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Corn 50g 鸡蛋10个');
+      await tester.tap(find.text(l10nEn.localBatchMatch));
+      await tester.pumpAndSettle();
+      expect(find.text(l10nEn.localBatchAmountNeeded), findsOneWidget);
+      final add = find.bySemanticsIdentifier('local-batch-add-ready');
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: find.bySemanticsIdentifier('local-batch-results'),
+          matching: find.text(l10nEn.localBatchAdded),
+        ),
+        findsOneWidget,
+      );
+      final button = tester.widget<FilledButton>(
+        find.descendant(of: add, matching: find.byType(FilledButton)),
+      );
+      expect(button.onPressed, isNull);
+      expect(
+        find.bySemanticsIdentifier('local-batch-edit-amount-1'),
+        findsOneWidget,
+      );
+      await tester.tap(find.bySemanticsIdentifier('local-batch-view-tray'));
+      await tester.pumpAndSettle();
+      final tray = tester
+          .widget<LogTrayLogButton>(find.byType(LogTrayLogButton))
+          .tray;
+      expect(tray.items, hasLength(1));
+      expect(tray.items.single.amount, 50);
+      expect(_mealDetailBloc.writes, isEmpty);
+    },
+  );
 
   testWidgets('AI description opens the existing description screen', (
     tester,
@@ -492,7 +874,7 @@ void main() {
     await _register([]);
     final pushed = <RouteSettings>[];
     await _openAddMeal(tester, pushed);
-    await tester.tap(find.bySemanticsIdentifier('add-meal-method-describe'));
+    await _openAiMethod(tester, 'add-meal-method-describe');
     await tester.pumpAndSettle();
     expect(
       pushed.where((route) => route.name == NavigationOptions.bulkAddRoute),
@@ -954,20 +1336,62 @@ void main() {
       expect(find.text('580 kcal'), findsOneWidget);
       await tester.tap(find.bySemanticsIdentifier('add-meal-review-tray'));
       await tester.pumpAndSettle();
-      expect(find.text(l10nEn.logTrayTitle(2).toUpperCase()), findsOneWidget);
+      expect(find.text(l10nEn.foodTrayReview), findsOneWidget);
+      expect(find.byType(BottomSheet), findsNothing);
       expect(find.bySemanticsIdentifier('add-meal-tray-list'), findsOneWidget);
 
       await tester.tap(find.byTooltip(l10nEn.logTrayRemoveLabel).first);
       await tester.pumpAndSettle();
       expect(find.text(l10nEn.bulkAddSubmitLabel(1)), findsOneWidget);
 
-      await tester.tap(find.bySemanticsIdentifier('add-meal-tray-clear'));
-      await tester.pumpAndSettle();
-      Navigator.of(tester.element(find.byType(LogTrayList))).pop();
+      await tester.tap(find.byTooltip(l10nEn.logTrayRemoveLabel).first);
       await tester.pumpAndSettle();
       expect(_logButton(), findsNothing);
       expect(_mealDetailBloc.writes, isEmpty);
     });
+
+    testWidgets(
+      'a long tray opens a full page and cancelling its amount editor preserves the list',
+      (tester) async {
+        await _register([_meal('Oats'), _meal('Milk'), _meal('Apple')]);
+        await _openAddMeal(tester, []);
+        for (final name in ['Oats', 'Milk', 'Apple']) {
+          await _tapPlus(tester, name);
+        }
+        await tester.tap(find.bySemanticsIdentifier('add-meal-review-tray'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsIdentifier('food-tray-view-all'));
+        await tester.pumpAndSettle();
+        expect(
+          find.bySemanticsIdentifier('food-tray-back-to-library'),
+          findsOneWidget,
+        );
+        expect(find.byType(BottomSheet), findsNothing);
+        await tester.tap(
+          find.bySemanticsIdentifier('add-meal-tray-edit').first,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.bySemanticsIdentifier('food-quantity-close'),
+          findsOneWidget,
+        );
+        await tester.enterText(find.byType(TextFormField), '75');
+        await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
+        await tester.pumpAndSettle();
+        final tray = tester
+            .widget<LogTrayLogButton>(find.byType(LogTrayLogButton))
+            .tray;
+        expect(tray.length, 3);
+        expect(tray.items.first.amount, 100);
+        await tester.tap(
+          find.bySemanticsIdentifier('food-tray-back-to-library'),
+        );
+        await tester.pumpAndSettle();
+        expect(find.bySemanticsIdentifier('meal-search-field'), findsOneWidget);
+        expect(_mealDetailBloc.writes, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     testWidgets('one button logs the whole list and returns to the day', (
       tester,
@@ -1052,7 +1476,7 @@ void main() {
       tester.state<NavigatorState>(find.byType(Navigator)).pop();
       await tester.pumpAndSettle();
 
-      await tester.tap(find.bySemanticsIdentifier('add-meal-method-photo'));
+      await _openAiMethod(tester, 'add-meal-method-photo');
       await tester.pumpAndSettle();
       final review = pushed.last.arguments as BulkAddScreenArguments;
 

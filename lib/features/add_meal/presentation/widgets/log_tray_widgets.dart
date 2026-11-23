@@ -15,12 +15,18 @@ class LogTrayList extends StatelessWidget {
   final LogTray tray;
   final DateTime? day;
   final bool usesImperialUnits;
+  final int? maxItems;
+  final bool showHeader;
+  final bool compact;
 
   const LogTrayList({
     super.key,
     required this.tray,
     this.day,
     this.usesImperialUnits = false,
+    this.maxItems,
+    this.showHeader = true,
+    this.compact = false,
   });
 
   @override
@@ -35,39 +41,40 @@ class LogTrayList extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Padding(
-          padding: const EdgeInsetsDirectional.only(start: Dimens.spacing4),
-          child: Row(
-            children: [
-              // One line beside Clear at any text size (AGENTS.md, row
-              // titles): it shrinks before it ellipsizes.
-              Expanded(
-                child: AutoSizeText(
-                  S.of(context).logTrayTitle(items.length).toUpperCase(),
-                  maxLines: 1,
-                  minFontSize: 10,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: accent,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.5,
+        if (showHeader)
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: Dimens.spacing4),
+            child: Row(
+              children: [
+                // One line beside Clear at any text size (AGENTS.md, row
+                // titles): it shrinks before it ellipsizes.
+                Expanded(
+                  child: AutoSizeText(
+                    S.of(context).logTrayTitle(items.length).toUpperCase(),
+                    maxLines: 1,
+                    minFontSize: 10,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.labelLarge?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
-              ),
-              Semantics(
-                identifier: 'add-meal-tray-clear',
-                child: TextButton(
-                  onPressed: tray.clear,
-                  style: TextButton.styleFrom(
-                    foregroundColor: palette.textMuted,
-                    visualDensity: VisualDensity.compact,
+                Semantics(
+                  identifier: 'add-meal-tray-clear',
+                  child: TextButton(
+                    onPressed: tray.clear,
+                    style: TextButton.styleFrom(
+                      foregroundColor: palette.textMuted,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    child: Text(S.of(context).profileTargetWeightClearAction),
                   ),
-                  child: Text(S.of(context).profileTargetWeightClearAction),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
         // A fixed set of rows, not a builder: the list is labelled as a
         // whole, the way the result lists below it are.
         Semantics(
@@ -76,10 +83,18 @@ class LogTrayList extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              for (var i = 0; i < items.length; i++)
+              for (
+                var i = 0;
+                i <
+                    (maxItems == null || maxItems! > items.length
+                        ? items.length
+                        : maxItems!);
+                i++
+              )
                 Padding(
                   padding: const EdgeInsets.only(top: Dimens.spacing8),
                   child: _LogTrayRow(
+                    compact: compact,
                     item: items[i],
                     onEdit: () async {
                       final item = items[i];
@@ -115,12 +130,14 @@ class _LogTrayRow extends StatelessWidget {
   final VoidCallback onRemove;
   final VoidCallback onEdit;
   final ValueChanged<IntakeTypeEntity> onMealChanged;
+  final bool compact;
 
   const _LogTrayRow({
     required this.item,
     required this.onRemove,
     required this.onEdit,
     required this.onMealChanged,
+    this.compact = false,
   });
 
   @override
@@ -142,16 +159,17 @@ class _LogTrayRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: palette.surfaceMuted,
-              borderRadius: Dimens.borderRadiusS,
+          if (!compact)
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: palette.surfaceMuted,
+                borderRadius: Dimens.borderRadiusS,
+              ),
+              child: Icon(Icons.restaurant_rounded, size: 20, color: accent),
             ),
-            child: Icon(Icons.restaurant_rounded, size: 20, color: accent),
-          ),
-          const SizedBox(width: Dimens.spacing12),
+          if (!compact) const SizedBox(width: Dimens.spacing12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -214,11 +232,13 @@ class _LogTrayRow extends StatelessWidget {
 class LogTrayLogButton extends StatelessWidget {
   final LogTray tray;
   final VoidCallback? onPressed;
+  final bool compact;
 
   const LogTrayLogButton({
     super.key,
     required this.tray,
     required this.onPressed,
+    this.compact = false,
   });
 
   @override
@@ -235,28 +255,36 @@ class LogTrayLogButton extends StatelessWidget {
       child: FilledButton(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(54),
-          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 8),
+          minimumSize: Size.fromHeight(compact ? 48 : 54),
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 12 : 22,
+            vertical: 8,
+          ),
           shape: const StadiumBorder(),
         ),
         // Label and total share the line where they fit; at large text
         // sizes the total wraps under the label rather than squeezing it.
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: 12,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.check_rounded),
-                const SizedBox(width: 8),
-                Flexible(child: Text(label)),
-              ],
-            ),
-            Text(kcal, style: const TextStyle(fontWeight: FontWeight.w600)),
-          ],
-        ),
+        child: compact
+            ? Text(label, maxLines: 2, textAlign: TextAlign.center)
+            : Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 12,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_rounded),
+                      const SizedBox(width: 8),
+                      Flexible(child: Text(label)),
+                    ],
+                  ),
+                  Text(
+                    kcal,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
       ),
     );
   }

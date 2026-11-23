@@ -22,6 +22,7 @@ class LogTrayItem {
   final String? selectionUnit;
   final double amount;
   final IntakeTypeEntity? intakeType;
+  final String? batchMatchQuery;
 
   /// How the amount reads on screen — "1 slice", "200 g" — fixed when the
   /// item is added, because it is the user's own wording of the amount and
@@ -35,6 +36,7 @@ class LogTrayItem {
     required this.amount,
     required this.amountLabel,
     this.intakeType,
+    this.batchMatchQuery,
   });
 
   LogTrayItem withIntakeType(IntakeTypeEntity type) => LogTrayItem(
@@ -44,6 +46,17 @@ class LogTrayItem {
     amount: amount,
     amountLabel: amountLabel,
     intakeType: type,
+    batchMatchQuery: batchMatchQuery,
+  );
+
+  LogTrayItem withBatchMatchQuery(String? query) => LogTrayItem(
+    meal: meal,
+    unit: unit,
+    selectionUnit: selectionUnit,
+    amount: amount,
+    amountLabel: amountLabel,
+    intakeType: intakeType,
+    batchMatchQuery: query,
   );
 
   /// Energy for this amount, or 0 when the food carries none.
@@ -116,7 +129,11 @@ class LogTray extends ChangeNotifier {
   void replace(LogTrayItem previous, LogTrayItem next) {
     final index = _items.indexWhere((item) => identical(item, previous));
     if (index < 0) return;
-    _items[index] = _snapshot(next);
+    _items[index] = _snapshot(
+      next.withBatchMatchQuery(
+        next.batchMatchQuery ?? previous.batchMatchQuery,
+      ),
+    );
     notifyListeners();
   }
 

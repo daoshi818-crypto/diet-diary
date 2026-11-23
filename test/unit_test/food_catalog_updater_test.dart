@@ -57,6 +57,61 @@ void main() {
   tearDown(() async => temp.delete(recursive: true));
 
   test(
+    'cloud category changes survive offline restart and invalid membership is rejected',
+    () async {
+      String categorized(String label, {bool invalid = false}) {
+        final data = jsonDecode(food(116)) as Map<String, dynamic>;
+        data['categories'] = [
+          {'id': 'cloud-rice', 'label': label},
+        ];
+        (data['foods'] as List).single['category_id'] = invalid
+            ? 'missing'
+            : 'cloud-rice';
+        return jsonEncode(data);
+      }
+
+      var seq = 1;
+      var text = categorized('云端主食');
+      var now = DateTime.utc(2026, 11, 23);
+      final source = ChineseFoodDataSource(read: () async => food(100));
+      final updater = FoodCatalogUpdater(
+        directory: () async => temp,
+        activate: source.activate,
+        clock: () => now,
+        client: MockClient(
+          (request) async => request.url.path.endsWith('manifest.json')
+              ? http.Response(jsonEncode(manifest(seq, text)), 200)
+              : http.Response.bytes(utf8.encode(text), 200),
+        ),
+      );
+      await updater.check(manual: true);
+      expect((await source.categories()).single.label, '云端主食');
+      seq++;
+      now = now.add(const Duration(seconds: 11));
+      text = categorized('无效替换', invalid: true);
+      await updater.check(manual: true);
+      expect(updater.phase, FoodCatalogUpdatePhase.failed);
+      expect(updater.current!.sequence, 1);
+      expect((await source.categories()).single.label, '云端主食');
+      final restarted = FoodCatalogUpdater(
+        directory: () async => temp,
+        activate: source.activate,
+        client: MockClient((_) async => http.Response('', 503)),
+      );
+      final installed = await restarted.readInstalledCatalog();
+      expect(installed, isNotNull);
+      final offline = ChineseFoodDataSource(read: () async => installed!);
+      expect((await offline.categories()).single.label, '云端主食');
+      expect(
+        (await offline.browse('', categoryId: 'cloud-rice')).foods.single.code,
+        'cn-stable-food',
+      );
+      updater.dispose();
+      restarted.dispose();
+    },
+  );
+
+  test(
     'two updates and higher-sequence rollback refresh search and preserve history',
     () async {
       var seq = 1;

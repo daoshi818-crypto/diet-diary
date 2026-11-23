@@ -1413,6 +1413,24 @@
   "settingsDefaultToRawFoodUnitsSubtitle": "食物有份量设定时，改用重量或体积记录，你仍可在单位下拉中选择份。",
   "addMealSnapMealLabel": "食物拍照",
   "addMealDescribeLabel": "描述记餐",
+  "foodLibraryAiEntry": "AI 记餐",
+  "localBatchAddReady": "加入清单 · {count} 项",
+  "@localBatchAddReady": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localBatchPending": "待确认 {count} 项，暂不加入",
+  "@localBatchPending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localBatchViewList": "查看清单",
   "localBatchTitle": "批量录入",
   "localBatchAiLabel": "AI 描述",
   "localBatchHint": "鸡蛋3个 玉米100g 无糖可乐330ml",
@@ -1421,7 +1439,7 @@
   "localBatchChange": "更换食物",
   "localBatchSearch": "搜索本地食物",
   "localBatchCreate": "创建自定义食物",
-  "localBatchAdded": "已记录",
+  "localBatchAdded": "已加入清单",
   "localBatchAmountNeeded": "待填写用量",
   "localBatchNamesNeeded": "请输入食物名称",
   "bulkAddReviewTitle": "核对条目",
@@ -1459,7 +1477,7 @@
   "loggingDescribe": "AI 文字描述",
   "loggingDescribeHint": "用一句话描述吃了什么、吃了多少",
   "loggingChooseAmount": "选择用量",
-  "loggingEditAmount": "调整用量",
+  "loggingEditAmount": "修改用量",
   "loggingConfirmAmount": "确认用量并加入清单",
   "loggingSaveAmount": "保存用量",
   "loggingIntakeNutrition": "本次摄入提供",
@@ -1693,8 +1711,13 @@
   "appUpdateDownload": "下载更新",
   "appUpdateInstall": "安装更新",
   "appUpdateCheck": "检查更新",
-  "loggingEditFood": "修改食物",
+  "loggingEditFood": "修改用量",
   "loggingEditNutrition": "修改营养成分",
   "loggingNutritionPer100": "每100{unit}的营养成分",
-  "loggingNutrientInvalid": "请输入大于或等于0的有效数值"
+  "loggingNutrientInvalid": "请输入大于或等于0的有效数值",
+  "foodCategoryEmpty": "当前分类没有匹配的食物",
+  "foodTrayCollapse": "收起",
+  "foodTrayShortTitle": "待添加清单",
+  "foodTrayRecord": "记录",
+  "foodTrayViewAll": "查看全部 {count} 项"
 }

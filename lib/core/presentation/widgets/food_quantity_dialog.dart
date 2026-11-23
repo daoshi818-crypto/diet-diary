@@ -1,4 +1,3 @@
-import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/intake_entity.dart';
 import 'package:opennutritracker/core/domain/entity/intake_type_entity.dart';
@@ -25,6 +24,7 @@ class FoodQuantityDialog extends StatefulWidget {
   final LogTrayItem? initialItem;
   final (double, String)? initialQuantity;
   final bool requireQuantity;
+  final String? confirmLabel;
 
   const FoodQuantityDialog({
     super.key,
@@ -37,6 +37,7 @@ class FoodQuantityDialog extends StatefulWidget {
     this.initialItem,
     this.initialQuantity,
     this.requireQuantity = false,
+    this.confirmLabel,
   });
 
   @override
@@ -100,7 +101,9 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
       _unit = prefill.$2;
     }
     _quantity = TextEditingController(
-      text: widget.requireQuantity && prefill == null ? '' : _number(quantity),
+      text: widget.requireQuantity && prefill == null && initialAmount == null
+          ? ''
+          : _number(quantity),
     );
     final n = meal.nutriments;
     _nutrition =
@@ -266,19 +269,16 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
       selectedUnit: _unit,
       usesImperialUnits: widget.usesImperialUnits,
       onQuantityOrUnitChanged: _update,
-      confirmLabel: widget.editingIntake != null || widget.initialItem != null
-          ? s.buttonSaveLabel
-          : s.loggingConfirmAmount,
+      confirmLabel:
+          widget.confirmLabel ??
+          (widget.editingIntake != null || widget.initialItem != null
+              ? s.buttonSaveLabel
+              : s.loggingConfirmAmount),
       onSelectionConfirmed: (item) async => Navigator.of(context).pop(item),
       layoutBuilder: (context, editor, actions) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            widget.meal.name ?? '?',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          const SizedBox(height: 12),
           Text(
             meal.nutriments.energyPerUnit == null
                 ? '—'
@@ -298,7 +298,60 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
         ],
       ),
     );
-    final sheet = AppModalSheet(identifier: 'food-quantity', child: content);
+    final sheet = Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
+        top: false,
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.meal.name ?? '?',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        Semantics(
+                          identifier: 'food-quantity-close',
+                          child: IconButton(
+                            tooltip: s.dialogCloseLabel,
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                      child: content,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
     if (widget.asBottomSheet) return sheet;
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -319,6 +372,7 @@ Future<LogTrayItem?> showFoodQuantitySheet({
   LogTrayItem? initialItem,
   (double, String)? initialQuantity,
   bool requireQuantity = false,
+  String? confirmLabel,
 }) => showModalBottomSheet<LogTrayItem>(
   context: context,
   useSafeArea: true,
@@ -333,6 +387,7 @@ Future<LogTrayItem?> showFoodQuantitySheet({
     initialItem: initialItem,
     initialQuantity: initialQuantity,
     requireQuantity: requireQuantity,
+    confirmLabel: confirmLabel,
     asBottomSheet: true,
   ),
 );

@@ -216,6 +216,13 @@ Future<void> _captureScreen(
   }
 }
 
+Future<void> _openAiMethod(WidgetTester tester, String identifier) async {
+  await tester.tap(find.bySemanticsIdentifier('add-meal-method-ai'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.bySemanticsIdentifier(identifier));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   setUpAll(() async {
     if (!const bool.fromEnvironment('GENERATE_GOAL_PREVIEW')) return;
@@ -319,7 +326,7 @@ void main() {
         expect(find.text('原味燕麦片'), findsOneWidget);
         await tester.tap(find.bySemanticsIdentifier('add-meal-tray-remove'));
         await tester.pumpAndSettle();
-        Navigator.of(tester.element(find.byType(LogTrayList))).pop();
+        // Removing the final item leaves the library open.
         await tester.pumpAndSettle();
         expect(find.bySemanticsIdentifier('add-meal-tray-log'), findsNothing);
         expect(tester.takeException(), isNull);
@@ -379,25 +386,41 @@ void main() {
     },
   );
 
-  testWidgets('entry methods stay above search while typing', (tester) async {
+  testWidgets('three compact entries share one row above search', (
+    tester,
+  ) async {
     await _register();
     await tester.pumpWidget(_app([]));
     await tester.pumpAndSettle();
-
+    final entries = [
+      'add-meal-method-barcode',
+      'add-meal-method-local-batch',
+      'add-meal-method-ai',
+    ].map(find.bySemanticsIdentifier).toList();
+    final first = tester.getRect(entries.first);
+    for (final entry in entries) {
+      expect(entry.hitTestable(), findsOneWidget);
+      final rect = tester.getRect(entry);
+      expect(rect.top, first.top);
+      expect(rect.bottom, first.bottom);
+      expect(rect.height, lessThanOrEqualTo(48));
+    }
+    expect(find.bySemanticsIdentifier('add-meal-method-photo'), findsNothing);
     expect(
-      find.bySemanticsIdentifier('add-meal-method-barcode'),
-      findsOneWidget,
+      find.bySemanticsIdentifier('add-meal-method-describe'),
+      findsNothing,
     );
-    expect(find.bySemanticsIdentifier('add-meal-method-photo'), findsOneWidget);
+    await tester.tap(entries.last);
+    await tester.pumpAndSettle();
     expect(
       find.bySemanticsIdentifier('add-meal-method-describe'),
       findsOneWidget,
     );
-    expect(find.text(l10nEn.addMealSnapMealLabel), findsOneWidget);
-    // The barcode moved from the field's suffix to its own tile, and the
-    // second screen's app-bar icon is gone: both now start from here.
-    expect(find.bySemanticsIdentifier('meal-search-barcode'), findsNothing);
-    expect(find.bySemanticsIdentifier('add-meal-bulk-add'), findsNothing);
+    expect(find.bySemanticsIdentifier('add-meal-method-photo'), findsOneWidget);
+    expect(
+      find.bySemanticsIdentifier('add-meal-nutrition-label'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('hiding AI keeps the local batch entry available', (
@@ -454,9 +477,7 @@ void main() {
     await tester.pumpAndSettle();
     final search = find.bySemanticsIdentifier('meal-search-field');
     expect(
-      tester
-          .getRect(find.bySemanticsIdentifier('add-meal-method-describe'))
-          .bottom,
+      tester.getRect(find.bySemanticsIdentifier('add-meal-method-ai')).bottom,
       lessThan(tester.getRect(search).top),
     );
     await tester.enterText(
@@ -465,14 +486,14 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(
-      find.bySemanticsIdentifier('add-meal-method-photo').hitTestable(),
+      find.bySemanticsIdentifier('add-meal-method-ai').hitTestable(),
       findsOneWidget,
     );
     expect(
       find.bySemanticsIdentifier('add-meal-method-barcode').hitTestable(),
       findsOneWidget,
     );
-    await tester.tap(find.bySemanticsIdentifier('add-meal-method-describe'));
+    await _openAiMethod(tester, 'add-meal-method-describe');
 
     await tester.pumpAndSettle();
     expect(pushed.single.name, NavigationOptions.bulkAddRoute);
@@ -491,7 +512,7 @@ void main() {
     await tester.pumpWidget(_app(pushed));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.bySemanticsIdentifier('add-meal-method-photo'));
+    await _openAiMethod(tester, 'add-meal-method-photo');
     await tester.pumpAndSettle();
 
     expect(pushed.single.name, NavigationOptions.bulkAddRoute);
@@ -511,7 +532,7 @@ void main() {
       final pushed = <RouteSettings>[];
       await tester.pumpWidget(_app(pushed));
       await tester.pumpAndSettle();
-      await tester.tap(find.bySemanticsIdentifier('add-meal-method-describe'));
+      await _openAiMethod(tester, 'add-meal-method-describe');
       await tester.pumpAndSettle();
 
       expect(tester.takeException(), isNull);

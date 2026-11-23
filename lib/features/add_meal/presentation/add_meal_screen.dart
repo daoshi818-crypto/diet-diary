@@ -1,6 +1,8 @@
+import 'package:opennutritracker/core/data/data_source/recipe_data_source.dart';
+import 'package:opennutritracker/core/domain/entity/recipe_entity.dart';
+import 'package:opennutritracker/core/utils/energy_display.dart';
 import 'package:flutter/material.dart';
 import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
-import 'package:opennutritracker/core/presentation/widgets/app_modal_sheet.dart';
 import 'package:opennutritracker/features/recipes/presentation/screens/recipe_builder_screen.dart';
 import 'package:opennutritracker/core/data/data_source/custom_meal_data_source.dart';
 import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
@@ -14,6 +16,8 @@ import 'package:opennutritracker/core/utils/ai_credential_storage.dart';
 import 'package:opennutritracker/core/utils/locator.dart';
 import 'package:opennutritracker/core/utils/navigation_options.dart';
 import 'package:opennutritracker/core/utils/navigation_predicates.dart';
+import 'package:opennutritracker/features/add_meal/domain/usecase/local_batch_matcher.dart';
+import 'package:opennutritracker/features/meal_detail/util/food_entry_preferences.dart';
 import 'package:opennutritracker/features/add_meal/data/repository/products_repository.dart';
 import 'package:opennutritracker/features/add_meal/data/data_sources/chinese_food_data_source.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
@@ -29,6 +33,7 @@ import 'package:opennutritracker/features/add_meal/presentation/bloc/search_debo
 import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/features/add_meal/presentation/widgets/log_tray_widgets.dart';
 import 'package:opennutritracker/features/add_meal/presentation/widgets/add_food_methods.dart';
+import 'package:opennutritracker/features/add_meal/presentation/widgets/food_category_browser.dart';
 import 'package:opennutritracker/features/add_meal/presentation/widgets/default_results_widget.dart';
 import 'package:opennutritracker/features/add_meal/presentation/widgets/meal_search_bar.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -65,6 +70,9 @@ class _AddMealScreenState extends State<AddMealScreen> {
   bool _argumentsLoaded = false;
   late final _customMealDataSource = locator<CustomMealDataSource>();
   late final _customFoodChanges = _customMealDataSource.watch();
+  late final _recipeChanges = locator.isRegistered<RecipeDataSource>()
+      ? locator<RecipeDataSource>().watch()
+      : const Stream<void>.empty();
 
   late ProductsBloc _productsBloc;
   late FoodBloc _foodBloc;
@@ -86,9 +94,6 @@ class _AddMealScreenState extends State<AddMealScreen> {
   /// Codes whose + is still fetching the full record.
   final _quickAdding = <String>{};
 
-  // Single smart search: one field, one results list, and source-filter chips.
-  // Opens on Recent (fast re-logging); typing searches Products by default,
-  // with Food / Recent a chip away.
   _SearchSource _source = _SearchSource.recent;
 
   // #576: once the user explicitly taps the Recent chip, typing should keep
@@ -96,6 +101,11 @@ class _AddMealScreenState extends State<AddMealScreen> {
   // case still upgrades to All on first keystroke, matching existing
   // behavior for someone who never touched the chips).
   bool _stickOnRecent = false;
+  ChineseFoodDataSource? _catalog;
+  List<FoodCategory> _categories = const [];
+  String? _categoryId;
+  bool _trayExpanded = false;
+  bool _fullTray = false;
 
   @override
   void initState() {
@@ -107,8 +117,35 @@ class _AddMealScreenState extends State<AddMealScreen> {
     // a fresh instance per lookup, whose state would always be initial.
     _addMealBloc = locator<AddMealBloc>()..add(InitializeAddMealEvent());
     super.initState();
+    if (locator.isRegistered<ChineseFoodDataSource>()) {
+      _catalog = locator<ChineseFoodDataSource>();
+      _source = _SearchSource.all;
+      _catalog!.addListener(_reloadCategories);
+      _reloadCategories();
+    }
     _refreshAiHidden();
   }
+
+  Future<void> _reloadCategories() async {
+    try {
+      final categories = await _catalog!.categories();
+      if (!mounted) return;
+      setState(() {
+        _categories = categories;
+        if (!_categories.any((category) => category.id == _categoryId)) {
+          _categoryId = null;
+        }
+      });
+    } catch (error) {
+      _log.warning('Reading food categories failed', error);
+    }
+  }
+
+  List<MealEntity> _categoryMeals(List<MealEntity> meals) => _categoryId == null
+      ? meals
+      : meals
+            .where((meal) => _catalog?.categoryFor(meal) == _categoryId)
+            .toList();
 
   /// Absent in tests that register no AI store, where nothing is hidden.
   Future<void> _refreshAiHidden() async {
@@ -155,6 +192,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
 
   @override
   void dispose() {
+    _catalog?.removeListener(_reloadCategories);
     _searchStringListener.dispose();
     _favouriteMealBloc.close();
     _addMealBloc.close();
@@ -170,9 +208,15 @@ class _AddMealScreenState extends State<AddMealScreen> {
       listenable: _logTray,
       builder: (context, _) => PopScope(
         // Leaving with items on the list would drop them without a word.
-        canPop: _logTray.isEmpty,
+        canPop: !_fullTray && _logTray.isEmpty,
         onPopInvokedWithResult: (didPop, _) {
-          if (!didPop && !_logging) _confirmDiscardTray();
+          if (!didPop && !_logging) {
+            if (_fullTray) {
+              setState(() => _fullTray = false);
+            } else {
+              _confirmDiscardTray();
+            }
+          }
         },
         // Nothing on the screen takes input while the list is being
         // written: an item added or removed mid-write would be dropped by
@@ -189,219 +233,349 @@ class _AddMealScreenState extends State<AddMealScreen> {
     return Scaffold(
       resizeToAvoidBottomInset: true,
       appBar: AppBar(
-        title: Text(S.of(context).loggingFoodLibrary),
+        title: Text(
+          _fullTray
+              ? S.of(context).foodTrayReview
+              : S.of(context).loggingFoodLibrary,
+        ),
         actions: [
-          Semantics(
-            identifier: 'add-meal-quick-add',
-            child: TextButton(
-              onPressed: _onQuickAddPressed,
-              child: Text(
-                S.of(context).quickAddCardLabel,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+          if (!_fullTray)
+            Semantics(
+              identifier: 'add-meal-quick-add',
+              child: TextButton(
+                onPressed: _onQuickAddPressed,
+                child: Text(
+                  S.of(context).quickAddCardLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ),
-          ),
-          BlocBuilder<AddMealBloc, AddMealState>(
-            bloc: _addMealBloc,
-            builder: (BuildContext context, AddMealState state) {
-              if (state is AddMealLoadedState) {
-                return Semantics(
-                  identifier: 'add-meal-custom-add',
-                  child: IconButton(
-                    onPressed: () =>
-                        _onCustomAddButtonPressed(state.usesImperialUnits),
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                );
-              }
-              return const SizedBox();
-            },
-          ),
+          if (!_fullTray)
+            BlocBuilder<AddMealBloc, AddMealState>(
+              bloc: _addMealBloc,
+              builder: (BuildContext context, AddMealState state) {
+                if (state is AddMealLoadedState) {
+                  return Semantics(
+                    identifier: 'add-meal-custom-add',
+                    child: IconButton(
+                      onPressed: () =>
+                          _onCustomAddButtonPressed(state.usesImperialUnits),
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                  );
+                }
+                return const SizedBox();
+              },
+            ),
         ],
       ),
-      bottomNavigationBar: _logTray.isEmpty
+      bottomNavigationBar: _catalog == null && _logTray.isEmpty
           ? null
           : Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.viewInsetsOf(context).bottom,
               ),
-              child: SafeArea(
-                top: false,
-                child: _buildTrayFooter(compact: true),
-              ),
+              child: SafeArea(top: false, child: _buildTrayFooter()),
             ),
-      body: SafeArea(
-        top: false,
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 840),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = MediaQuery.sizeOf(context).width < 600;
-                  return Column(
-                    children: [
-                      const SizedBox(height: 4),
-                      AddFoodMethodTiles(
-                        onBarcodePressed: _onBarcodeIconPressed,
-                        onSnapMealPressed: () =>
-                            _openBulkAdd(startWithPhoto: true),
-                        onDescribePressed: () => _openBulkAdd(),
-                        onLocalBatchPressed: _openLocalBatch,
-                        describeOpen: false,
-                        showAi: !_aiHidden,
-                        compact: compact,
-                        singleRow: constraints.maxHeight < 250,
-                        onNutritionLabelPressed: _openNutritionLabel,
-                      ),
-                      SizedBox(height: compact ? 4 : 8),
-                      MealSearchBar(
-                        searchStringListener: _searchStringListener,
-                        onSearchSubmit: _onSearchSubmit,
-                        onSearchChanged: _onSearchChanged,
-                        onBarcodePressed: null,
-                        compact: compact,
-                      ),
-                      SizedBox(height: compact ? 4 : 8),
-                      _buildSourceChips(context, palette, compact: compact),
-                      SizedBox(height: compact ? 4 : 8),
-                      Expanded(
-                        child: ValueListenableBuilder<String>(
-                          valueListenable: _searchStringListener,
-                          builder: (context, query, _) =>
-                              _buildResults(context, palette, query),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTrayFooter({bool compact = false}) {
-    if (compact) {
-      return Row(
-        children: [
-          Semantics(
-            identifier: 'add-meal-review-tray',
-            child: IconButton(
-              onPressed: _reviewLogTray,
-              tooltip: S.of(context).logTrayTitle(_logTray.length),
-              icon: Badge(
-                label: Text(_logTray.length.toString()),
-                child: const Icon(Icons.receipt_long_rounded),
-              ),
-            ),
-          ),
-          Expanded(child: _buildLogButton()),
-        ],
-      );
-    }
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Semantics(
-            identifier: 'add-meal-review-tray',
-            child: TextButton.icon(
-              onPressed: _reviewLogTray,
-              icon: const Icon(Icons.receipt_long_rounded),
-              label: Text(S.of(context).logTrayTitle(_logTray.length)),
-              iconAlignment: IconAlignment.start,
-            ),
-          ),
-        ),
-        _buildLogButton(),
-      ],
-    );
-  }
-
-  /// The button that writes the list, padded the way it sits under the
-  /// results.
-  Widget _buildLogButton() => Padding(
-    padding: const EdgeInsets.fromLTRB(
-      Dimens.spacing16,
-      Dimens.spacing8,
-      Dimens.spacing16,
-      Dimens.spacing16,
-    ),
-    child: LogTrayLogButton(
-      tray: _logTray,
-      // Also waits for a + still fetching its food: that item would land
-      // on the list mid-write, miss the write, and be cleared with the
-      // rest.
-      onPressed: _logging || _quickAdding.isNotEmpty ? null : _logAll,
-    ),
-  );
-
-  Future<void> _reviewLogTray() => showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) => AppModalSheet(
-      identifier: 'food-tray',
-      child: ListenableBuilder(
-        listenable: _logTray,
-        builder: (context, _) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              S.of(context).foodTrayReview,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 12),
-            LogTrayList(
-              tray: _logTray,
-              day: _day,
-              usesImperialUnits: _addMealBloc.state is AddMealLoadedState
-                  ? (_addMealBloc.state as AddMealLoadedState).usesImperialUnits
-                  : false,
-            ),
-            const SizedBox(height: 12),
-            Semantics(
-              identifier: 'food-tray-save-recipe',
-              child: OutlinedButton.icon(
-                onPressed: _logTray.isEmpty
-                    ? null
-                    : () {
-                        final ingredients = [
-                          for (final item in _logTray.items)
-                            RecipeIngredientEntity(
-                              snapshotMeal: item.meal,
-                              amount: item.amount,
-                              unit: item.meal.isLiquid ? 'ml' : 'g',
-                              convertedAmountG: item.amount,
+      body: _fullTray
+          ? _buildFullTray()
+          : SafeArea(
+              top: false,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 840),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = MediaQuery.sizeOf(context).width < 600;
+                        return Column(
+                          children: [
+                            const SizedBox(height: 4),
+                            AddFoodMethodTiles(
+                              onBarcodePressed: _onBarcodeIconPressed,
+                              onSnapMealPressed: () =>
+                                  _openBulkAdd(startWithPhoto: true),
+                              onDescribePressed: () => _openBulkAdd(),
+                              onLocalBatchPressed: _openLocalBatch,
+                              describeOpen: false,
+                              showAi: !_aiHidden,
+                              compact: compact,
+                              singleRow: constraints.maxHeight < 250,
+                              onNutritionLabelPressed: _openNutritionLabel,
                             ),
-                        ];
-                        final nav = Navigator.of(context);
-                        nav.pop();
-                        nav.pushNamed(
-                          NavigationOptions.recipeBuilderRoute,
-                          arguments: RecipeBuilderArguments(
-                            initialIngredients: ingredients,
-                          ),
+                            SizedBox(height: compact ? 4 : 8),
+                            MealSearchBar(
+                              searchStringListener: _searchStringListener,
+                              onSearchSubmit: _onSearchSubmit,
+                              onSearchChanged: _onSearchChanged,
+                              onBarcodePressed: null,
+                              compact: compact,
+                            ),
+                            SizedBox(height: compact ? 4 : 8),
+                            _buildSourceChips(
+                              context,
+                              palette,
+                              compact: compact,
+                            ),
+                            SizedBox(height: compact ? 4 : 8),
+                            Expanded(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  if (_catalog != null)
+                                    FoodCategoryRail(
+                                      categories: _categories,
+                                      selected: _categoryId,
+                                      onSelected: (id) => setState(() {
+                                        _categoryId = id;
+                                        _source = _SearchSource.all;
+                                      }),
+                                    ),
+                                  Expanded(
+                                    child: ValueListenableBuilder<String>(
+                                      valueListenable: _searchStringListener,
+                                      builder: (context, query, _) =>
+                                          _buildResults(
+                                            context,
+                                            palette,
+                                            query,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         );
                       },
-                icon: const Icon(Icons.menu_book_outlined),
-                label: Text(S.of(context).saveAsMealLabel),
+                    ),
+                  ),
+                ),
               ),
+            ),
+    );
+  }
+
+  bool get _usesImperialUnits =>
+      _addMealBloc.state is AddMealLoadedState &&
+      (_addMealBloc.state as AddMealLoadedState).usesImperialUnits;
+
+  Widget _trayList({int? maxItems, bool showHeader = true}) => LogTrayList(
+    tray: _logTray,
+    day: _day,
+    usesImperialUnits: _usesImperialUnits,
+    maxItems: maxItems,
+    showHeader: showHeader,
+    compact: true,
+  );
+
+  Widget _buildTrayFooter() {
+    final s = S.of(context);
+    final showItems =
+        _trayExpanded &&
+        !_fullTray &&
+        !_logTray.isEmpty &&
+        MediaQuery.viewInsetsOf(context).bottom == 0;
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showItems) ...[
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      s.foodTrayReview,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                  Semantics(
+                    identifier: 'food-tray-collapse',
+                    child: TextButton(
+                      onPressed: () => setState(() => _trayExpanded = false),
+                      child: Text(s.foodTrayCollapse),
+                    ),
+                  ),
+                ],
+              ),
+              _trayList(maxItems: 2, showHeader: false),
+              Row(
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      identifier: 'food-tray-save-recipe',
+                      child: TextButton.icon(
+                        onPressed: _saveTrayAsRecipe,
+                        icon: const Icon(Icons.menu_book_outlined, size: 18),
+                        label: Text(s.saveAsMealLabel),
+                      ),
+                    ),
+                  ),
+                  if (_logTray.length > 2)
+                    Semantics(
+                      identifier: 'food-tray-view-all',
+                      child: TextButton(
+                        onPressed: () => setState(() => _fullTray = true),
+                        child: Text(s.foodTrayViewAll(_logTray.length)),
+                      ),
+                    ),
+                ],
+              ),
+              const Divider(height: 1),
+            ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    identifier: 'add-meal-review-tray',
+                    child: InkWell(
+                      onTap: _fullTray ? null : _reviewLogTray,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            Badge(
+                              isLabelVisible: !_logTray.isEmpty,
+                              label: Text(_logTray.length.toString()),
+                              child: const Icon(
+                                Icons.receipt_long_rounded,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    s.foodTrayShortTitle,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.labelLarge,
+                                  ),
+                                  Text(
+                                    _logTray.isEmpty
+                                        ? '—'
+                                        : EnergyDisplay.formatSumWithUnit(
+                                            context,
+                                            _logTray.items.map(
+                                              (item) => item.kcal,
+                                            ),
+                                          ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (!_fullTray)
+                              Icon(
+                                showItems
+                                    ? Icons.expand_more
+                                    : Icons.expand_less,
+                                size: 18,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _logTray.isEmpty
+                      ? FilledButton(
+                          onPressed: null,
+                          child: Text(s.foodTrayRecord),
+                        )
+                      : LogTrayLogButton(
+                          tray: _logTray,
+                          compact: true,
+                          onPressed: _logging || _quickAdding.isNotEmpty
+                              ? null
+                              : _logAll,
+                        ),
+                ),
+              ],
             ),
           ],
         ),
       ),
+    );
+  }
+
+  void _reviewLogTray() {
+    if (_logTray.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      if (MediaQuery.sizeOf(context).height /
+              MediaQuery.textScalerOf(context).scale(1) <
+          700) {
+        _fullTray = true;
+      } else {
+        _trayExpanded = !_trayExpanded;
+      }
+    });
+  }
+
+  Widget _buildFullTray() => SafeArea(
+    top: false,
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Semantics(
+            identifier: 'food-tray-back-to-library',
+            child: TextButton.icon(
+              onPressed: () => setState(() => _fullTray = false),
+              icon: const Icon(Icons.arrow_back),
+              label: Text(S.of(context).loggingFoodLibrary),
+            ),
+          ),
+          _trayList(),
+          const SizedBox(height: 12),
+          Semantics(
+            identifier: 'food-tray-save-recipe',
+            child: OutlinedButton.icon(
+              onPressed: _logTray.isEmpty ? null : _saveTrayAsRecipe,
+              icon: const Icon(Icons.menu_book_outlined),
+              label: Text(S.of(context).saveAsMealLabel),
+            ),
+          ),
+        ],
+      ),
     ),
   );
+
+  void _saveTrayAsRecipe() {
+    final ingredients = [
+      for (final item in _logTray.items)
+        RecipeIngredientEntity(
+          snapshotMeal: item.meal,
+          amount: item.amount,
+          unit: item.meal.isLiquid ? 'ml' : 'g',
+          convertedAmountG: item.amount,
+        ),
+    ];
+    Navigator.of(context).pushNamed(
+      NavigationOptions.recipeBuilderRoute,
+      arguments: RecipeBuilderArguments(initialIngredients: ingredients),
+    );
+  }
 
   void _onProductsRefreshButtonPressed() {
     _productsBloc.add(const RefreshProductsEvent());
@@ -434,7 +608,9 @@ class _AddMealScreenState extends State<AddMealScreen> {
   _SearchSource _resolveSource(String trimmed) {
     if (_source == _SearchSource.favourites) return _SearchSource.favourites;
     if (_source == _SearchSource.custom) return _SearchSource.custom;
-    if (trimmed.isEmpty) return _SearchSource.recent;
+    if (trimmed.isEmpty) {
+      return _catalog != null ? _source : _SearchSource.recent;
+    }
     if (_source == _SearchSource.recent) {
       // Typing searches every source at once (All) by default — unless the
       // user explicitly chose the Recent chip, in which case it stays put
@@ -509,6 +685,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
   void _selectSource(_SearchSource source) {
     setState(() {
       _source = source;
+      if (source == _SearchSource.custom) _categoryId = null;
       _stickOnRecent = source == _SearchSource.recent;
     });
     final query = _searchStringListener.value;
@@ -625,7 +802,47 @@ class _AddMealScreenState extends State<AddMealScreen> {
     ),
   );
 
+  List<MealEntity> _personalMeals(String query) {
+    if (_categoryId != null) return const [];
+    final terms = query.trim().toLowerCase().split(RegExp(r'\s+'));
+    final meals =
+        [
+          ..._customMealDataSource.getAllCustomMeals().map(
+            MealEntity.fromMealDBO,
+          ),
+          if (locator.isRegistered<RecipeDataSource>())
+            ...locator<RecipeDataSource>().getAllRecipes().map(
+              (recipe) => RecipeEntity.fromDBO(recipe).toMealEntity(),
+            ),
+        ].where((meal) {
+          final text = '${meal.name ?? ''} ${meal.brands ?? ''}'.toLowerCase();
+          return terms.every(text.contains);
+        }).toList();
+    return rankMealsByRelevance(meals, query);
+  }
+
   Widget _buildResults(BuildContext context, AppPalette palette, String query) {
+    if (_catalog != null && _source == _SearchSource.all) {
+      return BlocBuilder<AddMealBloc, AddMealState>(
+        bloc: _addMealBloc,
+        builder: (context, state) => StreamBuilder<void>(
+          stream: _customFoodChanges,
+          builder: (context, _) => StreamBuilder<void>(
+            stream: _recipeChanges,
+            builder: (context, _) => CatalogFoodResults(
+              catalog: _catalog!,
+              query: query,
+              categoryId: _categoryId,
+              personalMeals: _personalMeals(query),
+              itemBuilder: (meal) => _mealCard(
+                meal,
+                state is AddMealLoadedState && state.usesImperialUnits,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     switch (_source) {
       case _SearchSource.custom:
         return _buildCustomResults(context, query);
@@ -892,17 +1109,15 @@ class _AddMealScreenState extends State<AddMealScreen> {
                 child: CircularProgressIndicator(),
               );
             } else if (state is RecentMealLoadedState) {
-              if (state.recentMeals.isNotEmpty) {
+              final meals = _categoryMeals(state.recentMeals);
+              if (meals.isNotEmpty) {
                 return Semantics(
                   identifier: 'add-meal-recent-list',
                   container: true,
                   child: ListView.builder(
-                    itemCount: state.recentMeals.length,
+                    itemCount: meals.length,
                     itemBuilder: (context, index) {
-                      return _mealCard(
-                        state.recentMeals[index],
-                        state.usesImperialUnits,
-                      );
+                      return _mealCard(meals[index], state.usesImperialUnits);
                     },
                   ),
                 );
@@ -952,14 +1167,15 @@ class _AddMealScreenState extends State<AddMealScreen> {
             child: CircularProgressIndicator(),
           );
         } else if (state is FavouriteMealLoadedState) {
-          if (state.favourites.isNotEmpty) {
+          final meals = _categoryMeals(state.favourites);
+          if (meals.isNotEmpty) {
             return Semantics(
               identifier: 'add-meal-favourites-list',
               container: true,
               child: ListView.builder(
-                itemCount: state.favourites.length,
+                itemCount: meals.length,
                 itemBuilder: (context, index) =>
-                    _mealCard(state.favourites[index], state.usesImperialUnits),
+                    _mealCard(meals[index], state.usesImperialUnits),
               ),
             );
           }
@@ -1076,7 +1292,10 @@ class _AddMealScreenState extends State<AddMealScreen> {
     );
     if (!mounted || meal == null) return;
     if (_isFoodLibrary) {
-      setState(() => _source = _SearchSource.custom);
+      setState(() {
+        _source = _SearchSource.custom;
+        _categoryId = null;
+      });
       return;
     }
     final state = _addMealBloc.state;
@@ -1090,6 +1309,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
   Widget _mealCard(MealEntity meal, bool usesImperialUnits) => MealItemCard(
     day: _day,
     mealEntity: meal,
+    compact: _catalog != null,
     addMealType: _mealType,
     usesImperialUnits: usesImperialUnits,
     logTray: _logTray,
@@ -1162,6 +1382,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
       // Sequential, not concurrent: the tracked-day totals are a
       // read-modify-write, and overlapping writes would lose updates.
       for (final item in _logTray.items) {
+        if (!mounted) return;
         await mealDetailBloc.addIntake(
           context,
           item.unit,
@@ -1171,6 +1392,19 @@ class _AddMealScreenState extends State<AddMealScreen> {
           _day,
         );
         written.add(item);
+        if (item.batchMatchQuery case final query?) {
+          final identity = LocalBatchMatcher.foodIdentity(item.meal);
+          if (identity != null) {
+            try {
+              await FoodEntryPreferences.current?.rememberBatchMatch(
+                batchFoodKey(query),
+                identity,
+              );
+            } catch (error) {
+              _log.warning('Saving confirmed batch preference failed', error);
+            }
+          }
+        }
       }
     } catch (e, stackTrace) {
       _log.severe('Logging the to-log list failed', e, stackTrace);
@@ -1231,6 +1465,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
     await Navigator.of(context).push<void>(
       MaterialPageRoute(
         builder: (_) => LocalBatchScreen(
+          logTray: _logTray,
           day: _day,
           type: _mealType.getIntakeType(),
           usesImperialUnits:

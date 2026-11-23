@@ -32,6 +32,7 @@ class MealItemCard extends StatelessWidget {
   /// What the + does when there is a list: add the food at its default
   /// amount without opening it. Null keeps the + opening the detail screen.
   final VoidCallback? onQuickAdd;
+  final bool compact;
 
   const MealItemCard({
     super.key,
@@ -42,6 +43,7 @@ class MealItemCard extends StatelessWidget {
     this.favouriteSemanticsIdentifier,
     this.logTray,
     this.onQuickAdd,
+    this.compact = false,
   });
 
   @override
@@ -52,6 +54,88 @@ class MealItemCard extends StatelessWidget {
     final energy = mealEntity.nutriments.energyKcal100;
     final s = S.of(context);
     final packageQuantity = mealEntity.mealQuantity?.toLenientDoubleOrNull();
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: AppCard(
+          onTap: () => _onItemPressed(context),
+          padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      mealEntity.name ?? '?',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (mealEntity.brands?.trim().isNotEmpty == true) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        mealEntity.brands!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: energy == null
+                                ? '—'
+                                : EnergyDisplay.formatWithUnit(context, energy),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          TextSpan(
+                            text:
+                                ' / 100 ${mealEntity.isLiquid ? s.milliliterUnit : s.gramUnit}',
+                          ),
+                        ],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                    ),
+                    if (foodWeightBasisLabel(s, mealEntity.name)
+                        case final basis?)
+                      Text(
+                        basis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Semantics(
+                identifier: 'meal-item-add',
+                child: IconButton(
+                  constraints: const BoxConstraints(
+                    minWidth: 48,
+                    minHeight: 48,
+                  ),
+                  tooltip: s.loggingChooseAmount,
+                  color: Theme.of(context).colorScheme.primary,
+                  icon: const Icon(Icons.add_circle_outline_rounded),
+                  onPressed: onQuickAdd ?? () => _onItemPressed(context),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: AppCard(

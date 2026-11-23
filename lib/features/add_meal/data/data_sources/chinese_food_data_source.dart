@@ -8,19 +8,45 @@ import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 
 /// Searches a complete offline snapshot; updates replace it after validation.
-class ChineseFoodDataSource {
+class FoodCategory {
+  final String id;
+  final String label;
+  const FoodCategory(this.id, this.label);
+}
+
+class FoodCatalogPage {
+  final List<MealEntity> foods;
+  final int total;
+  const FoodCatalogPage(this.foods, this.total);
+}
+
+class _LocalCatalog {
+  final List<_LocalFood> foods;
+  final List<FoodCategory> categories;
+  late final Map<String, String?> categoryById = {
+    for (final food in foods) food.meal.code!: food.categoryId,
+  };
+  _LocalCatalog(this.foods, this.categories);
+}
+
+class ChineseFoodDataSource extends ChangeNotifier {
   final Future<String> Function() _read;
-  Future<List<_LocalFood>>? _loading;
+  Future<_LocalCatalog>? _loading;
+  _LocalCatalog? _active;
 
   ChineseFoodDataSource({Future<String> Function()? read})
     : _read =
           read ?? (() => rootBundle.loadString('assets/foods/catalog.json'));
 
-  Future<List<_LocalFood>> _foods() => _loading ??= _load();
+  Future<_LocalCatalog> _catalog() =>
+      _active != null ? Future.value(_active!) : _loading ??= _load();
+  Future<List<_LocalFood>> _foods() async => (await _catalog()).foods;
 
-  Future<List<_LocalFood>> _load() async {
+  Future<_LocalCatalog> _load() async {
     try {
-      return await compute(_decodeFoods, await _read());
+      final loaded = await compute(_decodeCatalog, await _read());
+      // A downloaded snapshot may have activated while the asset was loading.
+      return _active ??= loaded;
     } catch (_) {
       _loading = null;
       rethrow;
@@ -31,8 +57,51 @@ class ChineseFoodDataSource {
       compute(_countValidFoods, text);
 
   Future<void> activate(String text) async {
-    final foods = await compute(_decodeFoods, text);
-    _loading = Future.value(foods);
+    final catalog = await compute(_decodeCatalog, text);
+    _active = catalog;
+    _loading = Future.value(catalog);
+    notifyListeners();
+  }
+
+  Future<List<FoodCategory>> categories() async =>
+      List.unmodifiable((await _catalog()).categories);
+
+  String? categoryFor(MealEntity meal) => _active?.categoryById[meal.code];
+
+  Future<FoodCatalogPage> browse(
+    String query, {
+    String? categoryId,
+    int offset = 0,
+    int limit = 60,
+  }) async {
+    final terms = foodQueryTerms(query);
+    final matches = (await _foods())
+        .where(
+          (food) =>
+              (categoryId == null || food.categoryId == categoryId) &&
+              terms.every(food.searchText.contains),
+        )
+        .toList();
+    final key = terms.join();
+    int score(_LocalFood food) {
+      final name = batchFoodKey(food.meal.name!);
+      return name == key
+          ? 0
+          : name.startsWith(key)
+          ? 1
+          : 2;
+    }
+
+    matches.sort((a, b) {
+      final rank = score(a).compareTo(score(b));
+      if (rank != 0) return rank;
+      final length = a.meal.name!.length.compareTo(b.meal.name!.length);
+      return length != 0 ? length : a.meal.code!.compareTo(b.meal.code!);
+    });
+    return FoodCatalogPage(
+      matches.skip(offset).take(limit).map((food) => food.meal).toList(),
+      matches.length,
+    );
   }
 
   Future<int> count() async => (await _foods()).length;
@@ -119,19 +188,21 @@ class _LocalFood {
   final String? barcode;
   final Set<String> sourceKeys;
   final Set<String> aliases;
+  final String? categoryId;
   const _LocalFood(
     this.meal,
     this.searchText,
     this.barcode,
     this.sourceKeys,
     this.aliases,
+    this.categoryId,
   );
 }
 
 String batchFoodKey(String value) =>
     value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), '');
 
-List<_LocalFood> _decodeFoods(String text) {
+_LocalCatalog _decodeCatalog(String text) {
   final decoded = jsonDecode(text) as Map<String, dynamic>;
   if (decoded['schema_version'] != 1 || decoded['foods'] is! List) {
     throw const FormatException('Unsupported Chinese food catalogue');
@@ -140,8 +211,32 @@ List<_LocalFood> _decodeFoods(String text) {
   if ((decoded['foods'] as List).isEmpty) {
     throw const FormatException('Empty catalogue');
   }
-  return (decoded['foods'] as List).map((entry) {
+  final categoryIds = <String>{};
+  final categories = <FoodCategory>[];
+  final metadata = decoded['categories'];
+  if (metadata != null) {
+    if (metadata is! List || metadata.isEmpty || metadata.length > 64) {
+      throw const FormatException('Invalid food categories');
+    }
+    for (final category in metadata) {
+      if (category is! Map ||
+          category['id'] is! String ||
+          !RegExp(r'^[a-z][a-z0-9_-]{0,63}$').hasMatch(category['id']) ||
+          !categoryIds.add(category['id']) ||
+          category['label'] is! String ||
+          (category['label'] as String).trim().isEmpty ||
+          (category['label'] as String).length > 24) {
+        throw const FormatException('Invalid food category');
+      }
+      categories.add(FoodCategory(category['id'], category['label']));
+    }
+  }
+  final foods = (decoded['foods'] as List).map((entry) {
     final row = entry as Map<String, dynamic>;
+    if ((metadata != null && !categoryIds.contains(row['category_id'])) ||
+        (metadata == null && row['category_id'] != null)) {
+      throw const FormatException('Unknown food category');
+    }
     if (row['id'] is! String ||
         (row['id'] as String).isEmpty ||
         !ids.add(row['id'] as String) ||
@@ -232,8 +327,10 @@ List<_LocalFood> _decodeFoods(String text) {
         for (final alias in row['aliases'] as List)
           batchFoodKey(alias.toString()),
       },
+      row['category_id'] as String?,
     );
   }).toList();
+  return _LocalCatalog(foods, categories);
 }
 
-int _countValidFoods(String text) => _decodeFoods(text).length;
+int _countValidFoods(String text) => _decodeCatalog(text).foods.length;

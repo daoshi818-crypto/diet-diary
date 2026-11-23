@@ -1493,6 +1493,24 @@
   "bulkAddPhotoNoFoodLabel": "No food found in that photo. Try another photo, or type the items instead.",
   "addMealSnapMealLabel": "Snap meal",
   "addMealDescribeLabel": "Describe",
+  "foodLibraryAiEntry": "AI logging",
+  "localBatchAddReady": "Add {count} to list",
+  "@localBatchAddReady": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localBatchPending": "{count} items still need review",
+  "@localBatchPending": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "localBatchViewList": "View list",
   "localBatchTitle": "Batch entry",
   "localBatchAiLabel": "AI description",
   "localBatchHint": "Eggs 50g Corn 100g",
@@ -1501,7 +1519,7 @@
   "localBatchChange": "Change food",
   "localBatchSearch": "Search local foods",
   "localBatchCreate": "Create custom food",
-  "localBatchAdded": "Added",
+  "localBatchAdded": "Added to list",
   "localBatchAmountNeeded": "Enter amount",
   "localBatchNamesNeeded": "Enter a food name",
   "bulkAddReviewTitle": "Review items",
@@ -1602,7 +1620,7 @@
   "loggingDescribe": "AI meal description",
   "loggingDescribeHint": "Describe what you ate in a sentence",
   "loggingChooseAmount": "Choose amount",
-  "loggingEditAmount": "Adjust amount",
+  "loggingEditAmount": "Edit amount",
   "loggingConfirmAmount": "Confirm amount",
   "loggingSaveAmount": "Save amount",
   "loggingIntakeNutrition": "Nutrition for this amount",
@@ -1891,7 +1909,7 @@
   "appUpdateDownload": "Download update",
   "appUpdateInstall": "Install update",
   "appUpdateCheck": "Check for updates",
-  "loggingEditFood": "Edit food",
+  "loggingEditFood": "Edit amount",
   "loggingEditNutrition": "Edit nutrition",
   "loggingNutritionPer100": "Nutrition per 100 {unit}",
   "@loggingNutritionPer100": {
@@ -1901,5 +1919,11 @@
       }
     }
   },
-  "loggingNutrientInvalid": "Enter a valid number greater than or equal to 0"
+  "loggingNutrientInvalid": "Enter a valid number greater than or equal to 0",
+  "foodCategoryEmpty": "No foods in this category match your search",
+  "foodTrayCollapse": "Collapse",
+  "foodTrayShortTitle": "Selected foods",
+  "foodTrayRecord": "Record",
+  "foodTrayViewAll": "View all {count}",
+  "@foodTrayViewAll": {"placeholders": {"count": {"type": "int"}}}
 }
