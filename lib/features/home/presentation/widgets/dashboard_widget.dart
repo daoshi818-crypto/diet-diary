@@ -46,6 +46,9 @@ class DashboardWidget extends StatefulWidget {
 }
 
 class _DashboardWidgetState extends State<DashboardWidget> {
+  final _macroLabelGroup = AutoSizeGroup();
+  final _macroValueGroup = AutoSizeGroup();
+
   void _openKcalGoalInfoScreen() {
     Navigator.of(
       context,
@@ -280,6 +283,8 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                   goal: widget.totalCarbsGoal,
                   color: palette.carbs,
                   palette: palette,
+                  labelGroup: _macroLabelGroup,
+                  valueGroup: _macroValueGroup,
                 ),
               ),
               const SizedBox(width: Dimens.spacing12),
@@ -291,6 +296,8 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                   goal: widget.totalFatsGoal,
                   color: palette.fat,
                   palette: palette,
+                  labelGroup: _macroLabelGroup,
+                  valueGroup: _macroValueGroup,
                 ),
               ),
               const SizedBox(width: Dimens.spacing12),
@@ -302,6 +309,8 @@ class _DashboardWidgetState extends State<DashboardWidget> {
                   goal: widget.totalProteinsGoal,
                   color: palette.protein,
                   palette: palette,
+                  labelGroup: _macroLabelGroup,
+                  valueGroup: _macroValueGroup,
                 ),
               ),
             ],
@@ -368,6 +377,8 @@ class _MacroTile extends StatelessWidget {
   final double goal;
   final Color color;
   final AppPalette palette;
+  final AutoSizeGroup labelGroup;
+  final AutoSizeGroup valueGroup;
 
   const _MacroTile({
     required this.identifier,
@@ -376,11 +387,20 @@ class _MacroTile extends StatelessWidget {
     required this.goal,
     required this.color,
     required this.palette,
+    required this.labelGroup,
+    required this.valueGroup,
   });
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final textScaler = MediaQuery.textScalerOf(context);
+    final labelStyle = textTheme.labelMedium!.copyWith(height: 1.4);
+    final valueStyle = textTheme.bodySmall!.copyWith(
+      height: 1.4,
+      color: palette.textStrong,
+      fontWeight: FontWeight.w700,
+    );
     final pct = (goal <= 0) ? 0.0 : (intake / goal).clamp(0.0, 1.0);
     return Semantics(
       identifier: identifier,
@@ -391,27 +411,33 @@ class _MacroTile extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 9,
-                  height: 9,
-                  decoration: BoxDecoration(
-                    color: color,
-                    shape: BoxShape.circle,
+            SizedBox(
+              height:
+                  textScaler.scale(labelStyle.fontSize!) * labelStyle.height!,
+              child: Row(
+                children: [
+                  Container(
+                    width: 9,
+                    height: 9,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: AutoSizeText(
-                    label,
-                    maxLines: 1,
-                    minFontSize: 10,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.labelMedium,
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: AutoSizeText(
+                      label,
+                      group: labelGroup,
+                      maxLines: 1,
+                      softWrap: false,
+                      minFontSize: 1,
+                      stepGranularity: 0.1,
+                      style: labelStyle,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: Dimens.spacing8),
             ClipRRect(
@@ -424,11 +450,18 @@ class _MacroTile extends StatelessWidget {
               ),
             ),
             const SizedBox(height: Dimens.spacing8),
-            Text(
-              '${_grams(intake)} / ${_grams(goal)} g',
-              style: textTheme.bodySmall?.copyWith(
-                color: palette.textStrong,
-                fontWeight: FontWeight.w700,
+            SizedBox(
+              width: double.infinity,
+              height:
+                  textScaler.scale(valueStyle.fontSize!) * valueStyle.height!,
+              child: AutoSizeText(
+                '${_grams(intake)}/${_grams(goal)}g',
+                group: valueGroup,
+                maxLines: 1,
+                softWrap: false,
+                minFontSize: 1,
+                stepGranularity: 0.1,
+                style: valueStyle,
               ),
             ),
           ],

@@ -13,6 +13,7 @@ import 'package:opennutritracker/core/utils/energy_unit_provider.dart';
 import 'package:opennutritracker/core/utils/locator.dart';
 import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/app_theme.dart';
+import 'package:opennutritracker/core/presentation/widgets/app_card.dart';
 import 'package:opennutritracker/features/home/presentation/widgets/dashboard_widget.dart';
 import 'package:opennutritracker/features/settings/presentation/widgets/kcal_goal_info_screen.dart';
 import 'package:opennutritracker/generated/l10n.dart';
@@ -95,22 +96,23 @@ void main() {
       totalKcalDaily: 2500,
       tdeeKcal: showPlan ? 2800 : null,
       totalKcalLeft: totalKcalLeft,
-      totalCarbsIntake: 100,
+      totalCarbsIntake: 142.6,
       totalFatsIntake: 30,
       totalProteinsIntake: 60,
-      totalCarbsGoal: 375,
+      totalCarbsGoal: 258.4,
       totalFatsGoal: 69.5,
       totalProteinsGoal: 93,
     );
   }
 
   for (final size in [
+    const Size(320, 640),
     const Size(360, 640),
     const Size(375, 667),
     const Size(812, 375),
   ]) {
     for (final dark in [false, true]) {
-      for (final scale in [1.0, 2.0]) {
+      for (final scale in [1.0, 1.3, 2.0]) {
         testWidgets('compact dashboard $size dark=$dark text=$scale', (
           tester,
         ) async {
@@ -155,7 +157,7 @@ void main() {
             expect(tester.getSize(gauge).height, lessThanOrEqualTo(130));
             expect(
               tester.getSize(find.byType(DashboardWidget)).height,
-              lessThan(400),
+              lessThan(size.width < 360 ? 460 : 400),
             );
           }
           expect(find.text('碳水'), findsOneWidget);
@@ -163,7 +165,64 @@ void main() {
           expect(find.text('蛋白质'), findsOneWidget);
           expect(find.bySemanticsIdentifier('home-kcal-gauge'), findsOneWidget);
           expect(find.bySemanticsIdentifier('home-edit-goals'), findsOneWidget);
-          expect(find.text('30 / 69.5 g'), findsOneWidget);
+          expect(find.text('30/69.5g'), findsOneWidget);
+          expect(find.text('142.6/258.4g'), findsOneWidget);
+          final cards = [
+            for (final id in ['carbs', 'fat', 'protein'])
+              find.descendant(
+                of: find.bySemanticsIdentifier('home-macro-$id'),
+                matching: find.byType(AppCard),
+              ),
+          ];
+          final expectedSize = tester.getSize(cards.first);
+          final progressTops = <double>[];
+          final valueTops = <double>[];
+          final valueFontSizes = <double>[];
+          for (final card in cards) {
+            final actualSize = tester.getSize(card);
+            expect(actualSize.width, closeTo(expectedSize.width, 0.01));
+            expect(actualSize.height, closeTo(expectedSize.height, 0.01));
+            final value = find.descendant(
+              of: card,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is RichText &&
+                    widget.text.toPlainText().contains('/'),
+              ),
+            );
+            final paragraph = tester.renderObject<RenderParagraph>(value);
+            valueFontSizes.add(paragraph.text.style!.fontSize!);
+            final boxes = paragraph.getBoxesForSelection(
+              TextSelection(
+                baseOffset: 0,
+                extentOffset: paragraph.text.toPlainText().length,
+              ),
+            );
+            expect(boxes.map((box) => box.top).toSet(), hasLength(1));
+            expect(paragraph.didExceedMaxLines, isFalse);
+            final bounds = MatrixUtils.transformRect(
+              paragraph.getTransformTo(null),
+              Offset.zero & paragraph.size,
+            );
+            final cardBounds = tester.getRect(card);
+            expect(bounds.left, greaterThanOrEqualTo(cardBounds.left + 12));
+            expect(bounds.right, lessThanOrEqualTo(cardBounds.right - 12));
+            progressTops.add(
+              tester
+                  .getTopLeft(
+                    find.descendant(
+                      of: card,
+                      matching: find.byType(LinearProgressIndicator),
+                    ),
+                  )
+                  .dy,
+            );
+            valueTops.add(bounds.top);
+          }
+          for (final tops in [progressTops, valueTops, valueFontSizes]) {
+            expect(tops[1], closeTo(tops[0], 0.01));
+            expect(tops[2], closeTo(tops[0], 0.01));
+          }
           if (_visual && size == const Size(360, 640)) {
             await tester.runAsync(() async {
               final boundary =
