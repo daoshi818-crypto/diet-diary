@@ -243,12 +243,30 @@ class _AddMealScreenState extends State<AddMealScreen> {
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         appBar: AppBar(
+          leading: _fullTray
+              ? Semantics(
+                  identifier: 'food-tray-back-to-library',
+                  child: IconButton(
+                    onPressed: () => setState(() => _fullTray = false),
+                    tooltip: S.of(context).loggingFoodLibrary,
+                    icon: const Icon(Icons.arrow_back),
+                  ),
+                )
+              : null,
           title: Text(
             _fullTray
                 ? S.of(context).foodTrayReview
                 : S.of(context).loggingFoodLibrary,
           ),
           actions: [
+            if (_fullTray)
+              Semantics(
+                identifier: 'add-meal-tray-clear',
+                child: TextButton(
+                  onPressed: _logTray.clear,
+                  child: Text(S.of(context).profileTargetWeightClearAction),
+                ),
+              ),
             if (!_fullTray)
               Semantics(
                 identifier: 'add-meal-quick-add',
@@ -572,15 +590,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Semantics(
-            identifier: 'food-tray-back-to-library',
-            child: TextButton.icon(
-              onPressed: () => setState(() => _fullTray = false),
-              icon: const Icon(Icons.arrow_back),
-              label: Text(S.of(context).loggingFoodLibrary),
-            ),
-          ),
-          _trayList(),
+          _trayList(showHeader: false),
           const SizedBox(height: 12),
           Semantics(
             identifier: 'food-tray-save-recipe',

@@ -324,6 +324,14 @@ void main() {
         await tester.tap(review);
         await tester.pumpAndSettle();
         expect(find.text('原味燕麦片'), findsOneWidget);
+        expect(
+          find.bySemanticsIdentifier('add-meal-tray-remove').hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          find.bySemanticsIdentifier('add-meal-tray-edit').hitTestable(),
+          findsOneWidget,
+        );
         await tester.tap(find.bySemanticsIdentifier('add-meal-tray-remove'));
         await tester.pumpAndSettle();
         // Removing the final item leaves the library open.
