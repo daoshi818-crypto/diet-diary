@@ -17,6 +17,8 @@ class MealDetailNutrimentsTable extends StatelessWidget {
   final double? servingQuantity;
   final String? servingUnit;
   final bool showMicronutrients;
+  final double? referenceAmount;
+  final String? referenceLabel;
 
   const MealDetailNutrimentsTable({
     super.key,
@@ -25,6 +27,8 @@ class MealDetailNutrimentsTable extends StatelessWidget {
     this.servingQuantity,
     this.servingUnit,
     this.showMicronutrients = false,
+    this.referenceAmount,
+    this.referenceLabel,
   });
 
   @override
@@ -40,9 +44,9 @@ class MealDetailNutrimentsTable extends StatelessWidget {
             ?.copyWith(fontWeight: FontWeight.w700, color: palette.textMuted) ??
         const TextStyle();
 
-    final headerText = usesImperialUnits && servingQuantity != null
+    final headerText = referenceLabel ?? (usesImperialUnits && servingQuantity != null
         ? "${S.of(context).perServingLabel} (${servingQuantity!.roundToPrecision(1)}${servingUnit ?? 'g/ml'})"
-        : S.of(context).per100gmlLabel;
+        : S.of(context).per100gmlLabel);
 
     final n = product.nutriments;
     final hasMicroData = n.hasMicronutrientData;
@@ -256,6 +260,7 @@ class MealDetailNutrimentsTable extends StatelessWidget {
   }
 
   double _adjustValueForServing(double value) {
+    if (referenceAmount != null) return value * referenceAmount! / 100;
     if (!usesImperialUnits || servingQuantity == null) {
       return value;
     }

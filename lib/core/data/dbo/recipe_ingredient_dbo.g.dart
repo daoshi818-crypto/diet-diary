@@ -21,13 +21,16 @@ class RecipeIngredientDBOAdapter extends TypeAdapter<RecipeIngredientDBO> {
       amount: (fields[1] as num).toDouble(),
       unit: fields[2] as String,
       convertedAmountG: (fields[3] as num).toDouble(),
+      portions: (fields[4] as List?)
+          ?.map((e) => (e as Map).cast<String, dynamic>())
+          .toList(),
     );
   }
 
   @override
   void write(BinaryWriter writer, RecipeIngredientDBO obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.snapshotMeal)
       ..writeByte(1)
@@ -35,7 +38,9 @@ class RecipeIngredientDBOAdapter extends TypeAdapter<RecipeIngredientDBO> {
       ..writeByte(2)
       ..write(obj.unit)
       ..writeByte(3)
-      ..write(obj.convertedAmountG);
+      ..write(obj.convertedAmountG)
+      ..writeByte(4)
+      ..write(obj.portions);
   }
 
   @override
@@ -61,6 +66,9 @@ RecipeIngredientDBO _$RecipeIngredientDBOFromJson(Map<String, dynamic> json) =>
       amount: (json['amount'] as num).toDouble(),
       unit: json['unit'] as String,
       convertedAmountG: (json['convertedAmountG'] as num).toDouble(),
+      portions: (json['portions'] as List<dynamic>?)
+          ?.map((e) => e as Map<String, dynamic>)
+          .toList(),
     );
 
 Map<String, dynamic> _$RecipeIngredientDBOToJson(
@@ -70,4 +78,5 @@ Map<String, dynamic> _$RecipeIngredientDBOToJson(
   'amount': instance.amount,
   'unit': instance.unit,
   'convertedAmountG': instance.convertedAmountG,
+  'portions': instance.portions,
 };

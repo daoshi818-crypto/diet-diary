@@ -4,6 +4,9 @@ import 'package:opennutritracker/core/styles/app_palette.dart';
 import 'package:opennutritracker/core/styles/dimens.dart';
 import 'package:opennutritracker/core/utils/energy_display.dart';
 import 'package:opennutritracker/generated/l10n.dart';
+import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
+import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
+import 'package:opennutritracker/features/meal_detail/presentation/food_nutrition_screen.dart';
 
 class IngredientListItem extends StatelessWidget {
   final RecipeIngredientEntity ingredient;
@@ -30,57 +33,99 @@ class IngredientListItem extends StatelessWidget {
     final amountStr = ingredient.amount % 1 == 0
         ? ingredient.amount.toStringAsFixed(0)
         : ingredient.amount.toStringAsFixed(1);
+    final amountLabel =
+        ['g', 'ml', 'oz', 'fl.oz'].contains(ingredient.unit) ||
+            isPortionUnit(ingredient.unit)
+        ? logTrayAmountLabel(context, ingredient.amount, ingredient.unit, meal)
+        : '$amountStr ${ingredient.unit}';
+    final baseLabel =
+        '${ingredient.convertedAmountG.toStringAsFixed(1).replaceFirst(RegExp(r'\.0$'), '')} '
+        '${meal.isLiquid ? S.of(context).milliliterUnit : S.of(context).gramUnit}';
+    final displayAmount = isPortionUnit(ingredient.unit)
+        ? '$amountLabel · $baseLabel'
+        : amountLabel;
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: Dimens.borderRadiusM,
-      child: InkWell(
+    return Semantics(
+      identifier: 'recipe-ingredient-detail',
+      child: Material(
+        color: Colors.transparent,
         borderRadius: Dimens.borderRadiusM,
-        onTap: onEdit,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: Dimens.spacing8, vertical: Dimens.spacing12),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.14),
-                  borderRadius: Dimens.borderRadiusS,
+        child: InkWell(
+          borderRadius: Dimens.borderRadiusM,
+          onTap: () => showFoodNutritionDetails(
+            context,
+            meal: meal,
+            amount: ingredient.convertedAmountG,
+            amountLabel: displayAmount,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: Dimens.spacing8,
+              vertical: Dimens.spacing12,
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.14),
+                    borderRadius: Dimens.borderRadiusS,
+                  ),
+                  child: Icon(Icons.eco_rounded, color: accent, size: 22),
                 ),
-                child: Icon(Icons.eco_rounded, color: accent, size: 22),
-              ),
-              const SizedBox(width: Dimens.spacing12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      meal.name ?? '?',
-                      // What tells foods apart ("raw", "dried") often ends
-                      // the name, so it wraps rather than being cut off.
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                const SizedBox(width: Dimens.spacing12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        meal.name ?? '?',
+                        // What tells foods apart ("raw", "dried") often ends
+                        // the name, so it wraps rather than being cut off.
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$displayAmount · '
+                        '${EnergyDisplay.formatWithUnit(context, contributionKcal)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (onEdit != null)
+                  Semantics(
+                    identifier: 'recipe-ingredient-edit-amount',
+                    child: IconButton(
+                      icon: const Icon(Icons.edit_outlined, size: 22),
+                      tooltip: S.of(context).loggingEditAmount,
+                      onPressed: onEdit,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$amountStr ${ingredient.unit} · '
-                      '${EnergyDisplay.formatWithUnit(context, contributionKcal)}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: textTheme.bodySmall?.copyWith(color: palette.textMuted),
+                  ),
+                if (onRemove != null)
+                  Semantics(
+                    identifier: 'recipe-ingredient-remove',
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.delete_outline_rounded,
+                        color: palette.textMuted,
+                        size: 22,
+                      ),
+                      tooltip: S.of(context).removeIngredientLabel,
+                      onPressed: onRemove,
                     ),
-                  ],
-                ),
-              ),
-              if (onRemove != null)
-                IconButton(
-                  icon: Icon(Icons.delete_outline_rounded, color: palette.textMuted, size: 22),
-                  tooltip: S.of(context).removeIngredientLabel,
-                  onPressed: onRemove,
-                ),
-            ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),

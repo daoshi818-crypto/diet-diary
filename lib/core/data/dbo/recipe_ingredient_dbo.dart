@@ -21,11 +21,15 @@ class RecipeIngredientDBO extends HiveObject {
   @HiveField(3)
   final double convertedAmountG;
 
+  @HiveField(4)
+  final List<Map<String, dynamic>>? portions;
+
   RecipeIngredientDBO({
     required this.snapshotMeal,
     required this.amount,
     required this.unit,
     required this.convertedAmountG,
+    this.portions,
   });
 
   factory RecipeIngredientDBO.fromJson(Map<String, dynamic> json) =>

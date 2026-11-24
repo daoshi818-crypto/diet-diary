@@ -108,9 +108,10 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
       _mealDetailBloc.add(HydrateMealEvent(meal));
     }
 
-    _mealDetailBloc.add(LoadDailyTotalsEvent(_day));
-
-    _applyInitialSelection();
+    if (_initialUnit.isEmpty) {
+      _mealDetailBloc.add(LoadDailyTotalsEvent(_day));
+      _applyInitialSelection();
+    }
 
     super.didChangeDependencies();
   }
@@ -244,11 +245,8 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
             quantityTextController: quantityTextController,
             onCustomPortionsChanged: FoodEntryPreferences.current == null
                 ? null
-                : () {
-                    setState(
-                      () => meal = FoodEntryPreferences.current!
-                          .withCustomPortions(_sourceMeal),
-                    );
+                : (updated) {
+                    setState(() => meal = updated);
                     return meal;
                   },
             onQuantityOrUnitChanged: onQuantityOrUnitChanged,
@@ -265,14 +263,13 @@ class _MealDetailScreenState extends State<MealDetailScreen> {
                 return Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 720),
-                    child: compact
-                        ? content
-                        : Column(
-                            children: [
-                              Expanded(child: content),
-                              Material(color: palette.surface, child: actions),
-                            ],
-                          ),
+                    child: Column(
+                      children: [
+                        Expanded(child: content),
+                        if (!compact)
+                          Material(color: palette.surface, child: actions),
+                      ],
+                    ),
                   ),
                 );
               },

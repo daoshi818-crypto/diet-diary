@@ -256,6 +256,47 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets(
+    'quantity keeps focus and its input connection when the keyboard resizes detail',
+    (tester) async {
+      await pumpMealDetail(
+        tester,
+        _solidWithServing(),
+        size: const Size(375, 667),
+      );
+      final field = find.byType(TextFormField).first;
+      await tester.ensureVisible(field);
+      await tester.tap(field);
+      await tester.pumpAndSettle();
+      final editable = find.descendant(
+        of: field,
+        matching: find.byType(EditableText),
+      );
+      final input = tester.state<EditableTextState>(editable);
+      expect(input.widget.focusNode.hasFocus, isTrue);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
+      expect(
+        identical(tester.state<EditableTextState>(editable), input),
+        isTrue,
+      );
+      expect(input.widget.focusNode.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+      tester.testTextInput.enterText('175');
+      await tester.pumpAndSettle();
+      expect(bloc!.state.totalQuantityConverted, '175.0');
+      expect(tester.getBottomLeft(field).dy, lessThanOrEqualTo(667 - 300));
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
+      expect(
+        identical(tester.state<EditableTextState>(editable), input),
+        isTrue,
+      );
+      expect(input.widget.controller.text, '175');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   for (final size in [
     const Size(320, 640),
     const Size(375, 667),

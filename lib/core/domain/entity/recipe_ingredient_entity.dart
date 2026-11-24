@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 import 'package:opennutritracker/core/data/dbo/meal_dbo.dart';
 import 'package:opennutritracker/core/data/dbo/recipe_ingredient_dbo.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 
 class RecipeIngredientEntity extends Equatable {
   final MealEntity snapshotMeal;
@@ -18,7 +19,15 @@ class RecipeIngredientEntity extends Equatable {
 
   factory RecipeIngredientEntity.fromDBO(RecipeIngredientDBO dbo) {
     return RecipeIngredientEntity(
-      snapshotMeal: MealEntity.fromMealDBO(dbo.snapshotMeal),
+      snapshotMeal: MealEntity.fromMealDBO(dbo.snapshotMeal).withPortions([
+        for (final portion in dbo.portions ?? <Map<String, dynamic>>[])
+          MealPortionEntity(
+            label: portion['label'] as String,
+            gramWeight: (portion['gramWeight'] as num).toDouble(),
+            localized: portion['localized'] == true,
+            englishLabel: portion['englishLabel'] as String?,
+          ),
+      ]),
       amount: dbo.amount,
       unit: dbo.unit,
       convertedAmountG: dbo.convertedAmountG,
@@ -31,6 +40,17 @@ class RecipeIngredientEntity extends Equatable {
       amount: amount,
       unit: unit,
       convertedAmountG: convertedAmountG,
+      portions: snapshotMeal.portions.isEmpty
+          ? null
+          : [
+              for (final portion in snapshotMeal.portions)
+                {
+                  'label': portion.label,
+                  'gramWeight': portion.gramWeight,
+                  'localized': portion.localized,
+                  'englishLabel': portion.englishLabel,
+                },
+            ],
     );
   }
 

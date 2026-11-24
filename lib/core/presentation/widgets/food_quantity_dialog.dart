@@ -25,6 +25,8 @@ class FoodQuantityDialog extends StatefulWidget {
   final (double, String)? initialQuantity;
   final bool requireQuantity;
   final String? confirmLabel;
+  final bool allowMealTypeChange;
+  final bool requireCompleteNutrition;
 
   const FoodQuantityDialog({
     super.key,
@@ -38,6 +40,8 @@ class FoodQuantityDialog extends StatefulWidget {
     this.initialQuantity,
     this.requireQuantity = false,
     this.confirmLabel,
+    this.allowMealTypeChange = true,
+    this.requireCompleteNutrition = true,
   });
 
   @override
@@ -250,20 +254,18 @@ class _FoodQuantityDialogState extends State<FoodQuantityDialog> {
     final meal = _meal;
     final content = MealDetailBottomSheet(
       product: meal,
+      requireCompleteNutrition: widget.requireCompleteNutrition,
       submissionEnabled: widget.editingIntake == null || _nutritionValid,
       day: widget.day,
       intakeTypeEntity: widget.type,
-      allowMealTypeChange: widget.editingIntake == null,
+      allowMealTypeChange:
+          widget.editingIntake == null && widget.allowMealTypeChange,
       quantityTextController: _quantity,
       rememberSelection: widget.editingIntake == null,
       onCustomPortionsChanged: FoodEntryPreferences.current == null
           ? null
-          : () {
-              setState(
-                () => _food = FoodEntryPreferences.current!.withCustomPortions(
-                  widget.meal,
-                ),
-              );
+          : (updated) {
+              setState(() => _food = updated);
               return _food;
             },
       selectedUnit: _unit,
@@ -373,6 +375,8 @@ Future<LogTrayItem?> showFoodQuantitySheet({
   (double, String)? initialQuantity,
   bool requireQuantity = false,
   String? confirmLabel,
+  bool allowMealTypeChange = true,
+  bool requireCompleteNutrition = true,
 }) => showModalBottomSheet<LogTrayItem>(
   context: context,
   useSafeArea: true,
@@ -388,6 +392,8 @@ Future<LogTrayItem?> showFoodQuantitySheet({
     initialQuantity: initialQuantity,
     requireQuantity: requireQuantity,
     confirmLabel: confirmLabel,
+    allowMealTypeChange: allowMealTypeChange,
+    requireCompleteNutrition: requireCompleteNutrition,
     asBottomSheet: true,
   ),
 );

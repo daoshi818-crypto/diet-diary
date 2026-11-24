@@ -432,7 +432,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
     if (selection == null) return;
     _bloc.add(
       AddIngredientEvent(
-        meal: selectedMeal,
+        meal: selection.meal,
         amount: selection.amount,
         unit: selection.unit,
       ),
@@ -451,6 +451,7 @@ class _RecipeBuilderScreenState extends State<RecipeBuilderScreen> {
     _bloc.add(
       UpdateIngredientEvent(
         index: index,
+        meal: selection.meal,
         amount: selection.amount,
         unit: selection.unit,
       ),

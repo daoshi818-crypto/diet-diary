@@ -1,6 +1,9 @@
 import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dart';
 import 'package:opennutritracker/core/utils/calc/unit_calc.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments_entity.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
+import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
+import 'package:opennutritracker/features/meal_detail/util/meal_quantity_converter.dart';
 
 class ComputeRecipeNutritionResult {
   final MealNutrimentsEntity perHundredG;
@@ -21,7 +24,14 @@ class ComputeRecipeNutritionUseCase {
     required double amount,
     required String unit,
     double? servingQuantityG,
+    MealEntity? meal,
   }) {
+    if (meal != null && isPortionUnit(unit)) {
+      if (meal.portions.isEmpty && meal.scalableServingQuantity == null) {
+        return null;
+      }
+      return convertQuantityToBaseUnit(amount, unit, meal);
+    }
     switch (unit) {
       case 'g':
       case 'gml':

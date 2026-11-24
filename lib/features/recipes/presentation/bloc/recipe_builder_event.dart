@@ -69,14 +69,16 @@ class UpdateIngredientEvent extends RecipeBuilderEvent {
   final int index;
   final double amount;
   final String unit;
+  final MealEntity? meal;
   const UpdateIngredientEvent({
     required this.index,
     required this.amount,
     required this.unit,
+    this.meal,
   });
 
   @override
-  List<Object?> get props => [index, amount, unit];
+  List<Object?> get props => [index, amount, unit, meal];
 }
 
 class RemoveIngredientEvent extends RecipeBuilderEvent {

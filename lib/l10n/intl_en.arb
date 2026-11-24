@@ -456,6 +456,11 @@
   "editMealLabel": "Edit meal",
   "editRecipeTitle": "Edit Recipe",
   "energyLabel": "energy",
+  "foodDeleteCustomPortion": "Delete \"{name}\"?",
+  "@foodDeleteCustomPortion": {
+    "placeholders": {"name": {"type": "String"}}
+  },
+  "foodDeleteCustomPortionHint": "Your current amount will be kept by weight or volume. Saved food records and recipes will not change.",
   "macroRemainingValue": "{value}g left",
   "@macroRemainingValue": {
     "description": "Compact remaining grams on a home macronutrient card",

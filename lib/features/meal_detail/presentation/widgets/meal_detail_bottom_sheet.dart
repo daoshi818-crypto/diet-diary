@@ -47,8 +47,9 @@ class MealDetailBottomSheet extends StatefulWidget {
   final String? confirmLabel;
   final bool allowMealTypeChange;
   final bool submissionEnabled;
-  final MealEntity Function()? onCustomPortionsChanged;
+  final MealEntity Function(MealEntity)? onCustomPortionsChanged;
   final bool rememberSelection;
+  final bool requireCompleteNutrition;
   final Widget Function(BuildContext, Widget editor, Widget actions)?
   layoutBuilder;
 
@@ -69,6 +70,7 @@ class MealDetailBottomSheet extends StatefulWidget {
     this.submissionEnabled = true,
     this.onCustomPortionsChanged,
     this.rememberSelection = true,
+    this.requireCompleteNutrition = true,
     this.layoutBuilder,
   });
 
@@ -270,11 +272,73 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
     if (!mounted || custom == null) return;
     await prefs.savePortion(food, custom.$1, custom.$2);
     if (!mounted) return;
-    final updated = widget.onCustomPortionsChanged!();
+    final updated = widget.onCustomPortionsChanged!(
+      prefs.withCustomPortions(
+        food.withPortions([
+          for (final portion in food.portions)
+            if (portion.label != custom.$1) portion,
+        ]),
+      ),
+    );
     final index = updated.portions.lastIndexWhere(
       (p) => p.label == custom.$1 && p.gramWeight == custom.$2,
     );
     if (index >= 0) _applyQuantity(1, portionUnit(index));
+  }
+
+  Future<void> _deleteCustomPortion() async {
+    final prefs = FoodEntryPreferences.current;
+    final food = widget.product;
+    final index = effectivePortionIndex(widget.selectedUnit);
+    if (prefs == null ||
+        widget.onCustomPortionsChanged == null ||
+        index >= food.portions.length) {
+      return;
+    }
+    final portion = food.portions[index];
+    if (prefs.customPortions(food)[portion.label] != portion.gramWeight) {
+      return;
+    }
+    _quantityFocusNode.unfocus();
+    final s = S.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(s.foodDeleteCustomPortion(portion.label)),
+        content: Text(s.foodDeleteCustomPortionHint),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(s.dialogCancelLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(s.dialogDeleteLabel),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final quantity = double.tryParse(
+      widget.quantityTextController.text.replaceAll(',', '.'),
+    );
+    final amount = quantity == null
+        ? null
+        : convertQuantityToBaseUnit(quantity, widget.selectedUnit, food);
+    await prefs.deletePortion(food, portion.label);
+    if (!mounted) return;
+    widget.onCustomPortionsChanged!(
+      food.withPortions([
+        for (var i = 0; i < food.portions.length; i++)
+          if (i != index) food.portions[i],
+      ]),
+    );
+    final unit = food.isLiquid ? 'ml' : 'g';
+    if (amount != null && amount.isFinite) {
+      _applyQuantity(amount, unit);
+    } else {
+      widget.onQuantityOrUnitChanged(widget.quantityTextController.text, unit);
+    }
   }
 
   String _baseUnitLabel(S s) =>
@@ -299,11 +363,20 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final s = S.of(context);
-    final missing = _hasRequiredProductInfoMissing();
+    final missing =
+        widget.requireCompleteNutrition && _hasRequiredProductInfoMissing();
     final portionItems = _portionItems(s);
     final quantity = double.tryParse(
       widget.quantityTextController.text.replaceAll(',', '.'),
     );
+    final selectedPortionIndex = effectivePortionIndex(widget.selectedUnit);
+    final selectedCustomPortion =
+        _mode == 'serving' &&
+        selectedPortionIndex < widget.product.portions.length &&
+        FoodEntryPreferences.current?.customPortions(
+              widget.product,
+            )[widget.product.portions[selectedPortionIndex].label] ==
+            widget.product.portions[selectedPortionIndex].gramWeight;
     final canSubmit =
         !missing &&
         widget.submissionEnabled &&
@@ -393,6 +466,16 @@ class _MealDetailBottomSheetState extends State<MealDetailBottomSheet> {
                       onPressed: _addCustomPortion,
                       icon: const Icon(Icons.add_rounded),
                       tooltip: s.foodCustomPortion,
+                    ),
+                  ),
+                if (widget.onCustomPortionsChanged != null &&
+                    selectedCustomPortion)
+                  Semantics(
+                    identifier: 'food-delete-custom-portion',
+                    child: IconButton(
+                      onPressed: _deleteCustomPortion,
+                      tooltip: s.dialogDeleteLabel,
+                      icon: const Icon(Icons.delete_outline_rounded),
                     ),
                   ),
               ],

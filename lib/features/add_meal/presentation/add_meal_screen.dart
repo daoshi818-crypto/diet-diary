@@ -428,7 +428,15 @@ class _AddMealScreenState extends State<AddMealScreen> {
                     ),
                   ],
                 ),
-                _trayList(maxItems: 2, showHeader: false),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(context).height * 0.34,
+                  ),
+                  child: SingleChildScrollView(
+                    key: const ValueKey('food-tray-inline-scroll'),
+                    child: _trayList(showHeader: false),
+                  ),
+                ),
                 Row(
                   children: [
                     Expanded(
@@ -549,7 +557,7 @@ class _AddMealScreenState extends State<AddMealScreen> {
     setState(() {
       if (MediaQuery.sizeOf(context).height /
               MediaQuery.textScalerOf(context).scale(1) <
-          700) {
+          450) {
         _fullTray = true;
       } else {
         _trayExpanded = !_trayExpanded;

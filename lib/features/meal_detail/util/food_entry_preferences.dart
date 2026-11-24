@@ -81,6 +81,16 @@ class FoodEntryPreferences {
         jsonEncode({...customPortions(food), name: amount}),
       );
 
+  Future<void> deletePortion(MealEntity food, String name) async {
+    final custom = customPortions(food);
+    if (!custom.containsKey(name)) return;
+    custom.remove(name);
+    await _db.foodEntryBox.put(_customKey(food), jsonEncode(custom));
+    if (_db.foodEntryBox.get(_lastKey(food)) == 'portion:$name') {
+      await _db.foodEntryBox.delete(_lastKey(food));
+    }
+  }
+
   String? lastUnit(MealEntity food) {
     final value = _db.foodEntryBox.get(_lastKey(food));
     if (value == null) return null;

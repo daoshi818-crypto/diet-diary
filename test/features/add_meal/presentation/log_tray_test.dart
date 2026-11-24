@@ -293,6 +293,9 @@ class _FoodEntryBox extends Fake implements Box<String> {
 
   @override
   Future<void> put(dynamic key, String value) async => _values[key] = value;
+
+  @override
+  Future<void> delete(dynamic key) async => _values.remove(key);
 }
 
 class _FakeCustomFoods extends Fake implements CustomMealDataSource {
@@ -660,7 +663,7 @@ void main() {
       );
       final foods = (await tester.runAsync(() async {
         return [
-          for (final name in ['鸡蛋', '玉米', '米饭', '苹果'])
+          for (final name in ['鸡蛋', '玉米', '米饭', '苹果', '香蕉'])
             (await catalog.matchBatchName(name))
                 .firstWhere(
                   (entry) => entry.food.brands?.trim().isNotEmpty != true,
@@ -702,13 +705,86 @@ void main() {
       await _captureBatchUi(tester, 'quantity-portions');
       await tester.tap(find.bySemanticsIdentifier('meal-detail-add'));
       await tester.pumpAndSettle();
+      for (final (name, amount) in [
+        ('玉米', '100'),
+        ('米饭', '220'),
+        ('苹果', '180'),
+        ('香蕉', '120'),
+      ]) {
+        await tester.enterText(search, name);
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsIdentifier('meal-item-add').first);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byType(SegmentedButton<String>),
+            matching: find.text('克重'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextFormField), amount);
+        await tester.pumpAndSettle();
+        await tester.tap(find.bySemanticsIdentifier('meal-detail-add'));
+        await tester.pumpAndSettle();
+      }
+      await tester.enterText(search, '');
+      await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('add-meal-review-tray'));
       await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('add-meal-tray-detail'),
+        findsNWidgets(5),
+      );
+      final third = find.bySemanticsIdentifier('add-meal-tray-detail').at(2);
+      expect(third.hitTestable(), findsOneWidget);
       await _captureBatchUi(tester, 'tray-expanded');
+      await tester.tap(
+        find.bySemanticsIdentifier('add-meal-tray-detail').first,
+      );
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'tray-food-nutrition');
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('add-meal-tray-detail'),
+        findsNWidgets(5),
+      );
+      await tester.drag(
+        find.byKey(const ValueKey('food-tray-inline-scroll')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.bySemanticsIdentifier('add-meal-tray-detail').last.hitTestable(),
+        findsOneWidget,
+      );
+      await tester.drag(
+        find.byKey(const ValueKey('food-tray-inline-scroll')),
+        const Offset(0, 400),
+      );
+      await tester.pumpAndSettle();
+      tester.view.physicalSize = const Size(320, 640);
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'tray-small');
+      expect(tester.takeException(), isNull);
+      tester.view.physicalSize = const Size(375, 812);
+      await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('add-meal-tray-edit').first);
       await tester.pumpAndSettle();
       expect(find.bySemanticsIdentifier('food-quantity-close'), findsOneWidget);
       await _captureBatchUi(tester, 'tray-edit');
+      await tester.tap(find.bySemanticsIdentifier('food-add-custom-portion'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.bySemanticsIdentifier('food-custom-portion-name'), '我的一份');
+      await tester.enterText(find.bySemanticsIdentifier('food-custom-portion-size'), '120');
+      await tester.pumpAndSettle();
+      await tester.tap(find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.widgetWithText(FilledButton, '保存'),
+      ));
+      await tester.pumpAndSettle();
+      await _captureBatchUi(tester, 'custom-portion-delete');
+      expect(find.bySemanticsIdentifier('food-delete-custom-portion'), findsOneWidget);
       await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
       await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsIdentifier('food-tray-collapse'));
@@ -1425,7 +1501,7 @@ void main() {
     });
 
     testWidgets(
-      'a long tray opens a full page and cancelling its amount editor preserves the list',
+      'three foods are visible inline and optional full review preserves cancelled edits',
       (tester) async {
         await _register([_meal('Oats'), _meal('Milk'), _meal('Apple')]);
         await _openAddMeal(tester, []);
@@ -1434,6 +1510,11 @@ void main() {
         }
         await tester.tap(find.bySemanticsIdentifier('add-meal-review-tray'));
         await tester.pumpAndSettle();
+        expect(
+          find.bySemanticsIdentifier('add-meal-tray-detail').hitTestable(),
+          findsNWidgets(3),
+        );
+        expect(find.bySemanticsIdentifier('meal-search-field'), findsOneWidget);
         await tester.tap(find.bySemanticsIdentifier('food-tray-view-all'));
         await tester.pumpAndSettle();
         expect(

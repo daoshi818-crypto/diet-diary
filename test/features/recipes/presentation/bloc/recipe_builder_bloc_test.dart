@@ -7,6 +7,8 @@ import 'package:opennutritracker/core/domain/usecase/save_recipe_usecase.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments_entity.dart';
 import 'package:opennutritracker/features/recipes/presentation/bloc/recipe_builder_bloc.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
+import 'package:opennutritracker/features/recipes/domain/entity/shared_recipe_payload.dart';
 
 class _FakeRecipeRepository implements RecipeRepository {
   final List<RecipeEntity> saved = [];
@@ -60,6 +62,61 @@ void main() {
   tearDown(() => bloc.close());
 
   group('RecipeBuilderBloc', () {
+    test(
+      'named and custom portions preserve exact weight through save and reopen',
+      () async {
+        final meal = _meal('egg').withPortions(const [
+          MealPortionEntity(label: '小个', gramWeight: 40, localized: true),
+          MealPortionEntity(label: '中个', gramWeight: 50, localized: true),
+        ]);
+        bloc.add(const UpdateNameEvent('鸡蛋餐'));
+        bloc.add(AddIngredientEvent(meal: meal, amount: 3, unit: 'serving#1'));
+        await Future<void>.delayed(Duration.zero);
+        expect(bloc.state.totalWeightG, 150);
+        final custom = meal.withPortions([
+          ...meal.portions,
+          const MealPortionEntity(
+            label: '我的一份',
+            gramWeight: 120,
+            localized: true,
+          ),
+        ]);
+        bloc.add(
+          UpdateIngredientEvent(
+            index: 0,
+            meal: custom,
+            amount: 2,
+            unit: 'serving#2',
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(bloc.state.totalWeightG, 240);
+        expect(bloc.state.aggregatedNutrimentsPer100.energyKcal100, 100);
+        bloc.add(const SaveRecipeEvent());
+        await Future<void>.delayed(Duration.zero);
+        final saved = RecipeEntity.fromDBO(repo.saved.single.toDBO());
+        final reopened = RecipeBuilderBloc(compute, save);
+        addTearDown(reopened.close);
+        reopened.add(InitializeBuilderEvent(existing: saved));
+        await Future<void>.delayed(Duration.zero);
+        final ingredient = reopened.state.ingredients.single;
+        expect(ingredient.amount, 2);
+        expect(ingredient.unit, 'serving#2');
+        expect(ingredient.snapshotMeal.portions.last.gramWeight, 120);
+        reopened.add(
+          const UpdateIngredientEvent(index: 0, amount: 3, unit: 'serving#2'),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(reopened.state.totalWeightG, 360);
+        final shared = SharedRecipeIngredient.fromIngredient(
+          ingredient,
+        ).toIngredient();
+        expect(shared.unit, 'g');
+        expect(shared.amount, 240);
+        expect(shared.convertedAmountG, 240);
+      },
+    );
+
     test('initial state has no id, empty name, empty ingredients', () {
       expect(bloc.state.id, isNull);
       expect(bloc.state.name, '');

@@ -325,6 +325,8 @@
   "editMealLabel": "编辑餐食",
   "editRecipeTitle": "编辑食谱",
   "energyLabel": "能量",
+  "foodDeleteCustomPortion": "删除「{name}」？",
+  "foodDeleteCustomPortionHint": "当前用量将保留为克重或容量，已保存的记录和食谱不受影响。",
   "macroRemainingValue": "余 {value}g",
   "macroExcessValue": "超 {value}g",
   "energyLeftLabel": "剩余",

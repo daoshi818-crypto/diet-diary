@@ -133,6 +133,7 @@ class RecipeBuilderBloc
           amount: event.amount,
           unit: event.unit,
           servingQuantityG: event.meal.servingQuantity,
+          meal: event.meal,
         ) ??
         0;
     final newIngredient = RecipeIngredientEntity(
@@ -153,13 +154,17 @@ class RecipeBuilderBloc
   ) {
     if (event.index < 0 || event.index >= state.ingredients.length) return;
     final old = state.ingredients[event.index];
-    final convertedG = _computeUseCase.convertAmountToGrams(
+    final meal = event.meal ?? old.snapshotMeal;
+    final convertedG =
+        _computeUseCase.convertAmountToGrams(
           amount: event.amount,
           unit: event.unit,
-          servingQuantityG: old.snapshotMeal.servingQuantity,
+          servingQuantityG: meal.servingQuantity,
+          meal: meal,
         ) ??
         0;
     final updated = old.copyWith(
+      snapshotMeal: meal,
       amount: event.amount,
       unit: event.unit,
       convertedAmountG: convertedG,

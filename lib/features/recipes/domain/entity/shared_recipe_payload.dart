@@ -6,6 +6,7 @@ import 'package:opennutritracker/core/domain/entity/recipe_ingredient_entity.dar
 import 'package:opennutritracker/core/utils/id_generator.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_entity.dart';
 import 'package:opennutritracker/features/add_meal/domain/entity/meal_nutriments_entity.dart';
+import 'package:opennutritracker/features/add_meal/util/portion_unit.dart';
 
 class SharedRecipeParseException implements Exception {
   final String message;
@@ -69,8 +70,10 @@ class SharedRecipeIngredient {
     return SharedRecipeIngredient(
       name: i.snapshotMeal.name,
       brands: i.snapshotMeal.brands,
-      amount: i.amount,
-      unit: i.unit,
+      amount: isPortionUnit(i.unit) ? i.convertedAmountG : i.amount,
+      unit: isPortionUnit(i.unit)
+          ? (i.snapshotMeal.isLiquid ? 'ml' : 'g')
+          : i.unit,
       convertedAmountG: i.convertedAmountG,
       energyKcal100: n.energyKcal100,
       carbohydrates100: n.carbohydrates100,
@@ -129,7 +132,15 @@ class SharedRecipeIngredient {
         mainImageUrl: null,
         url: null,
         mealQuantity: null,
-        mealUnit: null,
+        mealUnit:
+            unit == 'ml' ||
+                unit == 'l' ||
+                unit == 'cl' ||
+                unit == 'dl' ||
+                unit == 'fl.oz' ||
+                unit == 'fl oz'
+            ? 'ml'
+            : 'g',
         servingQuantity: null,
         servingUnit: null,
         servingSize: null,

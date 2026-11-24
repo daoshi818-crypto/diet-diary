@@ -1,4 +1,12 @@
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:opennutritracker/core/styles/app_palette.dart';
+import 'package:opennutritracker/core/styles/app_theme.dart';
+import 'package:opennutritracker/features/add_meal/domain/entity/meal_portion_entity.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:opennutritracker/core/data/repository/recipe_repository.dart';
@@ -13,6 +21,9 @@ import 'package:opennutritracker/features/recipes/presentation/bloc/recipe_build
 import 'package:opennutritracker/features/recipes/presentation/screens/recipe_builder_screen.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 import 'package:provider/provider.dart';
+import 'package:opennutritracker/features/meal_detail/presentation/food_nutrition_screen.dart';
+import 'package:opennutritracker/features/meal_detail/presentation/widgets/meal_detail_nutriments_table.dart';
+import 'package:opennutritracker/core/presentation/widgets/food_quantity_dialog.dart';
 
 import '../../../../helpers/test_l10n.dart';
 
@@ -65,11 +76,41 @@ RecipeEntity _soup({required double totalWeightG}) {
   );
 }
 
+const _captureUi = bool.fromEnvironment('RECIPE_UI_CAPTURE');
+final _captureKey = GlobalKey();
+
+Future<void> _capture(WidgetTester tester, String name) async {
+  await tester.runAsync(() async {
+    final boundary =
+        _captureKey.currentContext!.findRenderObject()!
+            as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 2);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final directory = Directory(
+      const String.fromEnvironment('RECIPE_UI_CAPTURE_DIR'),
+    );
+    await directory.create(recursive: true);
+    await File(
+      '${directory.path}/$name.png',
+    ).writeAsBytes(bytes!.buffer.asUint8List());
+    image.dispose();
+  });
+}
+
 Widget _app(RecipeEntity? existing) {
   return ChangeNotifierProvider<EnergyUnitProvider>(
     create: (_) => EnergyUnitProvider(),
     child: MaterialApp(
-      localizationsDelegates: const [S.delegate],
+      locale: _captureUi ? const Locale('zh') : null,
+      theme: _captureUi ? buildAppTheme(AppPalette.light) : null,
+      builder: (context, child) =>
+          RepaintBoundary(key: _captureKey, child: child!),
+      localizationsDelegates: const [
+        S.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       supportedLocales: S.supportedLocales,
       onGenerateRoute: (_) => MaterialPageRoute(
         settings: RouteSettings(
@@ -84,7 +125,21 @@ Widget _app(RecipeEntity? existing) {
 /// The total-weight field's two states (#1277, PR #1280 review): a weight
 /// typed in by hand has to say so, and has to have a way back to the sum.
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
+    if (_captureUi) {
+      for (final (family, path) in [
+        ('Nunito', 'C:/Windows/Fonts/msyh.ttc'),
+        ('CustomIcons', 'fonts/CustomIcons.ttf'),
+        (
+          'MaterialIcons',
+          'E:/DevCaches/flutter-ont/bin/cache/artifacts/material_fonts/materialicons-regular.otf',
+        ),
+      ]) {
+        await (FontLoader(
+          family,
+        )..addFont(File(path).readAsBytes().then(ByteData.sublistView))).load();
+      }
+    }
     final compute = ComputeRecipeNutritionUseCase();
     GetIt.instance.registerFactory<RecipeBuilderBloc>(
       () => RecipeBuilderBloc(
@@ -109,9 +164,105 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Finder weightField() => find.widgetWithText(
-        TextField,
-        l10nEn.recipeTotalWeightLabel,
+  Finder weightField() =>
+      find.widgetWithText(TextField, l10nEn.recipeTotalWeightLabel);
+
+  if (_captureUi) {
+    testWidgets('capture recipe portions and ingredient nutrition', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(375, 812);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final base = _soup(totalWeightG: 150);
+      final food = MealEntity(
+        code: 'egg',
+        name: '鸡蛋',
+        url: null,
+        mealQuantity: null,
+        mealUnit: 'g',
+        servingQuantity: null,
+        servingUnit: null,
+        servingSize: null,
+        nutriments: const MealNutrimentsEntity(
+          energyKcal100: 144,
+          carbohydrates100: 2,
+          fat100: 10,
+          proteins100: 13,
+          sugars100: null,
+          saturatedFat100: null,
+          fiber100: null,
+        ),
+        source: MealSourceEntity.custom,
+        portions: const [
+          MealPortionEntity(label: '中个', gramWeight: 50, localized: true),
+        ],
+      );
+      await tester.pumpWidget(
+        _app(
+          base.copyWith(
+            name: '鸡蛋餐',
+            ingredients: [
+              RecipeIngredientEntity(
+                snapshotMeal: food,
+                amount: 3,
+                unit: 'serving',
+                convertedAmountG: 150,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final detail = find.bySemanticsIdentifier('recipe-ingredient-detail');
+      await tester.ensureVisible(detail);
+      await _capture(tester, 'recipe-ingredients');
+      await tester.tap(find.text('鸡蛋'));
+      await tester.pumpAndSettle();
+      await _capture(tester, 'recipe-ingredient-nutrition');
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.bySemanticsIdentifier('recipe-ingredient-edit-amount'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('= 150 g'), findsOneWidget);
+      await _capture(tester, 'recipe-portion-picker');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'ingredient title opens its nutrition and edit uses the shared amount picker',
+    (tester) async {
+      await pumpBuilder(tester, _soup(totalWeightG: 800));
+      final ingredient = find.bySemanticsIdentifier('recipe-ingredient-detail');
+      await tester.ensureVisible(ingredient);
+      await tester.tap(find.text('stock'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FoodNutritionScreen), findsOneWidget);
+      final table = tester.widget<MealDetailNutrimentsTable>(
+        find.byType(MealDetailNutrimentsTable).first,
+      );
+      expect(table.referenceAmount, 800);
+      expect(find.text('720 kcal'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      final edit = find.bySemanticsIdentifier('recipe-ingredient-edit-amount');
+      await tester.ensureVisible(edit);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      expect(find.byType(FoodQuantityDialog), findsOneWidget);
+      expect(find.text('Weight'), findsWidgets);
+      expect(find.text('Volume'), findsOneWidget);
+      expect(find.text('Portion'), findsOneWidget);
+      expect(find.bySemanticsIdentifier('food-detail-meal-type'), findsNothing);
+      await tester.enterText(find.byType(TextFormField), '700');
+      await tester.pumpAndSettle();
+      await tester.tap(find.bySemanticsIdentifier('food-quantity-close'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(weightField()).controller!.text, '800');
+    },
       );
 
   testWidgets('a typed weight says so, and Use ingredient total undoes it', (

@@ -8,6 +8,8 @@ import 'package:opennutritracker/features/add_meal/presentation/log_tray.dart';
 import 'package:opennutritracker/features/add_meal/presentation/widgets/log_tray_widgets.dart';
 import 'package:opennutritracker/generated/l10n.dart';
 import 'package:provider/provider.dart';
+import 'package:opennutritracker/features/meal_detail/presentation/food_nutrition_screen.dart';
+import 'package:opennutritracker/features/meal_detail/presentation/widgets/meal_detail_nutriments_table.dart';
 
 MealEntity _meal(String name, double kcal100) => MealEntity(
   code: name,
@@ -66,6 +68,30 @@ Future<void> _pumpTray(
 );
 
 void main() {
+  testWidgets(
+    'tapping a tray food opens nutrition for its actual amount without changing the list',
+    (tester) async {
+      final tray = LogTray()..add(_item('Apple', 150));
+      await _pumpTray(tester, tray);
+      await tester.tap(find.bySemanticsIdentifier('add-meal-tray-detail'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FoodNutritionScreen), findsOneWidget);
+      final table = tester.widget<MealDetailNutrimentsTable>(
+        find.byType(MealDetailNutrimentsTable).first,
+      );
+      expect(table.referenceAmount, 150);
+      expect(find.text('150 kcal'), findsOneWidget);
+      expect(find.text('15.0g'), findsOneWidget);
+      expect(find.text('7.5g'), findsOneWidget);
+      expect(find.text('4.5g'), findsOneWidget);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(tray.items.single.amount, 150);
+      expect(tray.length, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   group('the To-log rows add up to the total under them (#1469)', () {
     testWidgets('the 2.6.0 case: 80.85 + 14.7 reads 81 + 15 = 96', (
       tester,
